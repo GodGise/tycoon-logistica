@@ -43,7 +43,8 @@ function avviaMappa(contenitore, quandoFallisce) {
     mappa = new maplibregl.Map({ container: contenitore, style: STILE_MAPPA, center: [13.236, 46.062], zoom: 12.6, attributionControl: { compact: true } });
   } catch (e) { quandoFallisce('Questo browser non riesce a disegnare la mappa (WebGL non disponibile).'); return; }
   mappa.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-  mappa.on('error', e => { if (!mappaPronta && e && e.error && /style|Failed to fetch/i.test(String(e.error.message))) quandoFallisce('Non riesco a scaricare la mappa: serve internet.'); });
+  // avvisa solo se, dopo un po', lo stile della mappa non si è proprio caricato (un singolo tile mancante non conta)
+  mappa.once('error', () => setTimeout(() => { if (!mappaPronta && !mappa.isStyleLoaded()) quandoFallisce('Non riesco a scaricare la mappa: serve internet.'); }, 4000));
   mappa.on('load', () => {
     mappa.addSource('zone', { type: 'geojson', data: geoZone() });
     mappa.addLayer({ id: 'zone-fill', type: 'fill', source: 'zone',
@@ -65,13 +66,30 @@ function avviaMappa(contenitore, quandoFallisce) {
 
     const el = document.createElement('div'); el.className = 'marker-deposito'; el.title = DEPOSITO.nome; el.textContent = 'D';
     new maplibregl.Marker({ element: el }).setLngLat([DEPOSITO.lng, DEPOSITO.lat]).addTo(mappa);
-    // inquadra tutte le zone lasciando spazio al pannello
-    const tutti = ZONE.flatMap(z => z.poligono), xs = tutti.map(p => p[0]), ys = tutti.map(p => p[1]);
-    const stretto = window.innerWidth <= 760;
-    mappa.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]],
-      { padding: stretto ? { top: 80, bottom: window.innerHeight * 0.6, left: 20, right: 20 } : { top: 90, bottom: 40, left: 450, right: 60 }, duration: 0 });
+    inquadraZone();
+    const avviso = document.getElementById('avviso-mappa'); if (avviso) avviso.hidden = true;
+    window.addEventListener('resize', () => { clearTimeout(inquadraZone._t); inquadraZone._t = setTimeout(inquadraZone, 250); });
     mappaPronta = true;
   });
+}
+
+// Inquadra le zone lasciando spazio al pannello. Il margine si adatta alla finestra,
+// così su schermi stretti la mappa non si allontana fino a mostrare tutto il Friuli.
+function inquadraZone() {
+  if (!mappa) return;
+  const tutti = ZONE.flatMap(z => z.poligono), xs = tutti.map(p => p[0]), ys = tutti.map(p => p[1]);
+  const W = mappa.getContainer().clientWidth, H = mappa.getContainer().clientHeight;
+  const stretto = W <= 760;
+  const pannello = stretto ? 0 : Math.min(450, W * 0.45);
+  const basso = stretto ? Math.min(H * 0.6, H - 160) : 40;
+  const padding = { top: Math.min(90, H * 0.12), bottom: basso, left: pannello + 20, right: 30 };
+  // se lo spazio libero è troppo piccolo, rinuncia al margine invece di allontanare la mappa
+  if (W - padding.left - padding.right < 160 || H - padding.top - padding.bottom < 120) { padding.left = padding.right = 20; padding.top = padding.bottom = 20; }
+  const cam = mappa.cameraForBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding, maxZoom: 13.5 });
+  if (!cam) return;
+  // centra le zone nello spazio libero (padding) e non allontanarti oltre lo zoom 11.5
+  const centro = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+  mappa.jumpTo({ center: centro, zoom: Math.max(11.5, cam.zoom), padding });
 }
 
 function aggiornaZoneMappa() {
