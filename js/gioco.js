@@ -62,10 +62,11 @@ function utileMese(voci) {
 }
 
 /* ---------- prezzi ---------- */
+function prezzoRicaricaDeposito() { return S.prezzi.pun_eur_kwh + COSTANTI.oneriDeposito; }
 function costoKm(m, usato) {
   const energia = m.tipo === 'diesel'
     ? m.consumo / 100 * S.prezzi.diesel_eur_litro
-    : m.consumo / 100 * S.prezzi.pun_eur_kwh * COSTANTI.fattoreDeposito;
+    : m.consumo / 100 * prezzoRicaricaDeposito();
   return { energia, manutenzione: m.manutKm * (usato ? 1.5 : 1) };
 }
 // Settimane di gioco perché l'elettrico (nuovo) recuperi la differenza rispetto al diesel di riferimento.

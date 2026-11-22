@@ -13,8 +13,9 @@ const COSTANTI = {
   aumentoPremioIncidente: 0.15,   // +15% al premio flotta per incidente
   rientroPremioSettimanale: 0.01, // il premio torna verso la base piano piano
   costoAnnuncio: 50,              // pubblicare un annuncio di lavoro
-  fattoreDeposito: 2.0,           // PUN all'ingrosso × fattore = ricarica in deposito
-  fattoreColonnina: 5.0,          // ricarica veloce (non ancora usata in v0.1)
+  // prezzo della ricarica = PUN all'ingrosso (dato reale) + una quota fissa per reti, oneri e tasse
+  oneriDeposito: 0.10,            // €/kWh in più sul PUN: ricarica lenta in deposito
+  oneriColonnina: 0.45,           // €/kWh in più sul PUN: colonnina veloce (non ancora usata)
   valoreRivendita: 0.5,
 };
 
