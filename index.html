@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tycoon Logistica</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="mappa" aria-label="Mappa di Udine"></div>
+<div id="avviso-mappa" hidden></div>
+
+<aside class="pannello" aria-label="Pannello di gestione">
+  <header class="testa">
+    <div class="marchio"><span class="logo" aria-hidden="true">TL</span><div><strong>Tycoon Logistica</strong><small>nome provvisorio</small></div></div>
+    <div class="cassa-box">
+      <span class="etichetta">Cassa</span>
+      <span id="cassa" class="cifra-grande">–</span>
+      <span id="utile-mese" class="sotto">–</span>
+    </div>
+  </header>
+  <nav class="schede" role="tablist">
+    <button role="tab" data-scheda="azienda" aria-selected="true">Azienda</button>
+    <button role="tab" data-scheda="attivita">Attività</button>
+    <button role="tab" data-scheda="conti">Conti</button>
+    <button role="tab" data-scheda="flotta">Flotta</button>
+    <button role="tab" data-scheda="personale">Personale</button>
+  </nav>
+  <section id="contenuto" class="contenuto" role="tabpanel"></section>
+</aside>
+
+<div class="hud">
+  <div class="data-box"><span id="data">–</span><span id="ora">–</span></div>
+  <div class="velocita" role="group" aria-label="Velocità">
+    <button data-vel="0">Pausa</button><button data-vel="1">1×</button><button data-vel="2">2×</button><button data-vel="4">4×</button>
+  </div>
+  <div class="barra-giorno"><i id="barra-giorno"></i></div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="js/dati.js"></script>
+<script src="js/gioco.js"></script>
+<script src="js/mappa.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

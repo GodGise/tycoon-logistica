@@ -1,0 +1,70 @@
+# Tycoon Logistica – prototipo v0.1
+
+Tycoon di logistica free to play: gestisci un'azienda di corrieri su una mappa vera di Udine.
+Nome del gioco provvisorio.
+
+## Giocare online
+
+https://godgise.github.io/tycoon-logistica/ (si aggiorna da solo a ogni modifica su `main`).
+
+## Come si avvia sul Mac
+
+Serve internet (la mappa e la libreria MapLibre si scaricano online).
+
+```bash
+cd tycoon
+python3 -m http.server 8000
+```
+
+Poi apri **http://localhost:8000** in Safari o Chrome.
+
+Si può anche aprire `index.html` con doppio clic: funziona, ma il browser non lascia leggere
+`prezzi.json` da file, quindi il gioco usa i prezzi di riserva scritti in `js/dati.js`.
+
+La partita si salva da sola nel browser. Per ricominciare: scheda **Azienda → Ricomincia da capo**.
+Barra spaziatrice = pausa.
+
+## Cosa c'è nella v0.1
+
+- Mappa scura di Udine (MapLibre + stile Dark Matter di CARTO su dati OpenStreetMap), pannello in vetro con le schede Azienda, Attività, Conti, Flotta, Personale
+- Un deposito (Udine Sud) e 3 zone: Centro (140 pacchi/giorno), Nord (95), Sud (80)
+- Furgoni diesel ed elettrici, nuovi o usati, con riquadro Ammortamento calcolato sui prezzi della settimana
+- Autisti (con esperienza che sale col tempo) e magazzinieri, con stipendio scelto tramite annuncio
+- 2 € a consegna, massimo 125 consegne per corriere, 300 pacchi al giorno per magazziniere
+- Incidenti (riparazione a carico dell'autista, premio assicurativo che sale), guasti più frequenti sull'usato
+- Busta paga e assicurazione a fine mese, giacenze che fanno scendere la reputazione
+- Furgoni animati sulla mappa, feed attività raggruppato, importi formattati in italiano
+
+Non ancora inclusi (previsti dal documento): jolly a chiamata, furgone di riserva, eventi rari dei dipendenti, ricarica alla colonnina.
+
+## File
+
+| File | Cosa fa |
+|---|---|
+| `index.html` | La pagina del gioco |
+| `css/style.css` | Grafica: mappa a tutto schermo, pannello in vetro |
+| `js/dati.js` | **Numeri da tarare**: prezzi furgoni, zone, costanti di bilanciamento |
+| `js/gioco.js` | Simulazione (un giorno alla volta), senza grafica |
+| `js/mappa.js` | Mappa, zone colorate, furgoni animati |
+| `js/ui.js` | Pannello, schede, ciclo di gioco |
+| `prezzi.json` | Prezzi della settimana letti all'avvio |
+| `scripts/aggiorna_prezzi.py` | Scarica i dati MIMIT (gasolio, media self FVG) e GME (PUN Index) e scrive `prezzi.json` |
+| `.github/workflows/prezzi.yml` | Fa girare lo script ogni martedì con GitHub Actions e committa `prezzi.json` |
+
+## Prezzi settimanali con GitHub Actions
+
+1. Carica la cartella in una repo GitHub.
+2. Vai su **Actions → Aggiorna prezzi settimanali → Run workflow** per la prima prova.
+3. Da lì in poi gira da solo ogni martedì.
+
+Per provarlo in locale: `pip install pypdf` e poi `python3 scripts/aggiorna_prezzi.py`.
+
+Note sulle fonti:
+- MIMIT: dal 10 febbraio 2026 i CSV usano `|` come separatore; lo script gestisce anche il vecchio `;`.
+- GME: il PUN si legge dal report settimanale in PDF. Se GME cambia il nome dei file, lo script tiene il valore della settimana prima e lo scrive in `note`.
+- La mappa CARTO è gratuita per progetti non commerciali con traffico limitato: se il gioco cresce, valutare un server di tile proprio o un altro fornitore.
+
+## Da tarare
+
+Prezzi dei furgoni (provvisori, da verificare con i listini), stipendi, pacchi per zona,
+capacità dei magazzinieri, aumento del premio per incidente: tutto in `js/dati.js`.
