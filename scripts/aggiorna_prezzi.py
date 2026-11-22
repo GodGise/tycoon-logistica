@@ -16,6 +16,7 @@ import json
 import re
 import statistics
 import sys
+import time
 import urllib.request
 
 URL_PREZZI = "https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv"
@@ -26,10 +27,19 @@ PROVINCE_FVG = {"UD", "PN", "GO", "TS"}
 UA = {"User-Agent": "Mozilla/5.0 (tycoon-logistica; aggiornamento prezzi settimanale)"}
 
 
-def scarica(url, timeout=120):
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
+def scarica(url, timeout=300, tentativi=3):
+    """Scarica con piu' tentativi: il sito MIMIT a volte risponde lentamente."""
+    ultimo = None
+    for i in range(tentativi):
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read()
+        except Exception as e:  # noqa: BLE001
+            ultimo = e
+            print(f"  tentativo {i + 1}/{tentativi} fallito per {url}: {e}", file=sys.stderr)
+            time.sleep(10 * (i + 1))
+    raise ultimo
 
 
 def leggi_csv_mimit(testo):
@@ -90,7 +100,7 @@ def pun_settimanale(oggi):
         for sep in ("%5C", ""):
             url = URL_GME.format(sep=sep, data=pubblicato.strftime("%Y%m%d"), sett=settimana)
             try:
-                pdf = PdfReader(io.BytesIO(scarica(url, timeout=60)))
+                pdf = PdfReader(io.BytesIO(scarica(url, timeout=60, tentativi=1)))
                 testo = "\n".join(p.extract_text() or "" for p in pdf.pages[:2])
                 return pun_da_testo_pdf(testo), settimana, pubblicato.year
             except Exception as e:  # noqa: BLE001 - proviamo la variante successiva

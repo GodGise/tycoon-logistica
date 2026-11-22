@@ -51,7 +51,8 @@ function vistaAzienda() {
   <div class="scheda">
     <h2 style="margin:0">Prezzi della settimana <small>${esc(p.settimana || '')}</small></h2>
     <div class="riga"><span>Gasolio (media FVG)</span><span class="num">${eur2.format(p.diesel_eur_litro)}/l</span></div>
-    <div class="riga"><span>Ricarica in deposito</span><span class="num">${eur2.format(p.pun_eur_kwh * COSTANTI.fattoreDeposito)}/kWh</span></div>
+    <div class="riga"><span>Ricarica in deposito</span><span class="num">${eur2.format(prezzoRicaricaDeposito())}/kWh</span></div>
+    <div class="riga"><span>Energia all'ingrosso (PUN)</span><span class="num">${eur2.format(p.pun_eur_kwh)}/kWh</span></div>
     <p class="nota">Fonte: ${esc(p.fonte || '')}</p>
   </div>
   <button class="btn link" data-azione="nuova">Ricomincia da capo</button>`;
