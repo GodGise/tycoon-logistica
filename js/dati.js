@@ -8,7 +8,8 @@ const COSTANTI = {
   euroPerConsegna: 2,
   maxConsegneCorriere: 125,       // oltre restano pacchi in giacenza
   pacchiMagazziniere: 300,        // pacchi smistati al giorno da un magazziniere
-  secondiPerGiorno: 12,           // durata di un giorno di gioco a velocità 1×
+  secondiPerGiorno: 180,          // ogni giornata dura 3 minuti reali, senza possibilità di accelerare
+  // il fine settimana (sabato + domenica) passa in un unico blocco da 3 minuti
   assicurazioneMensile: 150,      // per furgone, premio base
   aumentoPremioIncidente: 0.15,   // +15% al premio flotta per incidente
   rientroPremioSettimanale: 0.01, // il premio torna verso la base piano piano

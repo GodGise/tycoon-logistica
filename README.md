@@ -22,7 +22,8 @@ Si può anche aprire `index.html` con doppio clic: funziona, ma il browser non l
 `prezzi.json` da file, quindi il gioco usa i prezzi di riserva scritti in `js/dati.js`.
 
 La partita si salva da sola nel browser. Per ricominciare: scheda **Azienda → Ricomincia da capo**.
-Barra spaziatrice = pausa.
+
+Il tempo scorre da solo: **ogni giornata dura 3 minuti** (il fine settimana passa in un unico blocco da 3 minuti). Non si può accelerare: come nei tycoon classici, all'inizio c'è tempo per organizzarsi. Il tempo scorre solo mentre il gioco è aperto.
 
 ## Cosa c'è nella v0.1
 

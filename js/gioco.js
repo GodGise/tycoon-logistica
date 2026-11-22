@@ -35,7 +35,7 @@ function nuovaPartita(prezzi) {
     candidati: { autista: [], magazziniere: [] }, annunciInArrivo: {},
     giacenze: {}, ieri: null,
     conti: { mese: chiaveMese(DATA_INIZIO), voci: vociVuote() }, storico: [],
-    feed: [], prezzi: prezzi || PREZZI_RISERVA,
+    feed: [], prezzi: prezzi || PREZZI_RISERVA, tempoGiorno: 0,
   };
   ZONE.forEach(z => S.giacenze[z.id] = 0);
   generaCandidati('autista'); generaCandidati('magazziniere');

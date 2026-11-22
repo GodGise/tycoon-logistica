@@ -9,7 +9,7 @@ const segnato = n => `<span class="num ${n >= 0 ? 'piu' : 'meno'}">${n >= 0 ? '+
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtData = g => dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-let scheda = 'azienda', velocita = 1, accumulo = 0, ultimoT = null, daRidisegnare = true;
+let scheda = 'azienda', ultimoT = null, daRidisegnare = true;
 let negozioUsato = false, negozioAperto = false;
 
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('vis'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('vis'), 2600); }
@@ -162,7 +162,7 @@ function testata() {
   $('#cassa').className = 'cifra-grande' + (S.cassa < 0 ? ' meno' : '');
   const u = utileMese(S.conti.voci);
   $('#utile-mese').innerHTML = `${segnato(u)} <span style="color:var(--testo-2)">questo mese</span>`;
-  $('#data').textContent = fmtData(S.giorno);
+  $('#data').textContent = dataDelGiorno(S.giorno).getDay() === 6 ? 'Fine settimana ' + dataDelGiorno(S.giorno).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) : fmtData(S.giorno);
 }
 function ridisegna() {
   testata();
@@ -208,23 +208,29 @@ $('#contenuto').addEventListener('change', e => {
 $('#contenuto').addEventListener('input', e => {
   const t = e.target; if (t.dataset.azione === 'stipendio') $('#val-' + t.dataset.ruolo).textContent = eur.format(+t.value);
 });
-document.querySelector('.velocita').addEventListener('click', e => {
-  const b = e.target.closest('button[data-vel]'); if (!b) return; impostaVelocita(+b.dataset.vel);
-});
-document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); impostaVelocita(velocita ? 0 : 1); } });
-function impostaVelocita(v) { velocita = v; document.querySelectorAll('.velocita button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.vel === v)); }
 
 /* ---------- ciclo di gioco ---------- */
+// Il tempo scorre da solo: ogni giornata dura 3 minuti, il fine settimana passa in un unico blocco.
+// Il tempo trascorso nella giornata è salvato, quindi ricaricare la pagina non fa ripartire il giorno.
+let ultimoSalvataggio = 0;
 function ciclo(t) {
   if (ultimoT === null) ultimoT = t;
   const dt = Math.min(0.25, (t - ultimoT) / 1000); ultimoT = t;
-  const durata = COSTANTI.secondiPerGiorno * (feriale(S.giorno) ? 1 : 0.25);
-  accumulo += dt * velocita;
-  if (accumulo >= durata) { accumulo = 0; simulaGiorno(); salva(); ridisegnaSePossibile(); }
-  const p = accumulo / durata;
+  const durata = COSTANTI.secondiPerGiorno;
+  S.tempoGiorno = (S.tempoGiorno || 0) + dt;
+  if (S.tempoGiorno >= durata) {
+    S.tempoGiorno = 0;
+    const sabato = dataDelGiorno(S.giorno).getDay() === 6;
+    simulaGiorno();
+    if (sabato) simulaGiorno(); // anche la domenica
+    salva(); ridisegnaSePossibile();
+  }
+  if (t - ultimoSalvataggio > 5000) { ultimoSalvataggio = t; salva(); }
+  const p = S.tempoGiorno / durata, resto = Math.ceil(durata - S.tempoGiorno);
   $('#barra-giorno').style.width = (p * 100) + '%';
-  const minuti = Math.floor(6 * 60 + p * 14 * 60); // dalle 6 alle 20
-  $('#ora').textContent = feriale(S.giorno) ? `${String(Math.floor(minuti / 60)).padStart(2, '0')}:${String(minuti % 60).padStart(2, '0')}` : 'weekend';
+  $('#countdown').textContent = `${Math.floor(resto / 60)}:${String(resto % 60).padStart(2, '0')}`;
+  const minuti = Math.floor(7 * 60 + p * 12 * 60); // giornata lavorativa dalle 7 alle 19
+  $('#ora').textContent = feriale(S.giorno) ? `${String(Math.floor(minuti / 60)).padStart(2, '0')}:${String(minuti % 60).padStart(2, '0')}` : 'fine settimana';
   aggiornaFurgoniMappa(p);
   if (daRidisegnare && !(document.activeElement && /SELECT|INPUT/.test(document.activeElement.tagName))) ridisegna();
   requestAnimationFrame(ciclo);
@@ -239,7 +245,6 @@ async function avvio() {
   const prezzi = await leggiPrezzi();
   if (!carica()) nuovaPartita(prezzi || PREZZI_RISERVA);
   else if (prezzi) S.prezzi = prezzi;
-  impostaVelocita(1);
   ridisegna();
   avviaMappa('mappa', msg => { const a = $('#avviso-mappa'); a.hidden = false; a.textContent = msg + ' Il gioco funziona lo stesso dal pannello.'; });
   requestAnimationFrame(ciclo);

@@ -102,9 +102,8 @@ tr.totale td { font-weight: 700; font-size: 16px; }
   background: var(--vetro); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border: 1px solid var(--bordo); border-radius: 16px; position: fixed; }
 .data-box { display: grid; line-height: 1.2; }
 #data { font-weight: 700; } #ora { color: var(--testo-2); font-size: 13px; font-variant-numeric: tabular-nums; }
-.velocita { display: flex; gap: 2px; background: rgba(0,0,0,.3); padding: 3px; border-radius: 10px; }
-.velocita button { border: 0; background: transparent; border-radius: 8px; padding: 8px 10px; min-width: 44px; cursor: pointer; color: var(--testo-2); font-weight: 700; }
-.velocita button[aria-pressed="true"] { background: var(--accento); color: #1a1208; }
+.prossimo { display: grid; text-align: right; line-height: 1.2; padding: 4px 6px 4px 14px; border-left: 1px solid var(--bordo); }
+#countdown { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .barra-giorno { position: absolute; left: 16px; right: 16px; bottom: 3px; height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
 .barra-giorno i { display: block; height: 100%; width: 0; background: var(--accento); }
 .marker-deposito { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 800;
