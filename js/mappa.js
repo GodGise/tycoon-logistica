@@ -49,6 +49,7 @@ function avviaMappa(contenitore, quandoFallisce) {
   // avvisa solo se, dopo un po', lo stile della mappa non si è proprio caricato (un singolo tile mancante non conta)
   mappa.once('error', () => setTimeout(() => { if (!mappaPronta && !mappa.isStyleLoaded()) quandoFallisce('Non riesco a scaricare la mappa: serve internet.'); }, 4000));
   mappa.on('load', () => {
+    coloriStileApple();
     mappa.addSource('zone', { type: 'geojson', data: geoZone() });
     mappa.addLayer({ id: 'zone-fill', type: 'fill', source: 'zone',
       paint: { 'fill-color': ['get', 'colore'], 'fill-opacity': ['case', ['==', ['get', 'servita'], 1], 0.22, 0.07] } });
@@ -116,6 +117,23 @@ function mostraCitta(citta) {
   if (!mappaPronta) return anteprimaZone;
   aggiornaZoneMappa(); inquadraZone();
   return anteprimaZone;
+}
+
+// Ricolora lo stile Dark Matter con una palette scura in stile Apple Maps:
+// terra grigio antracite, acqua blu notte, parchi verde scuro, strade grigie più chiare.
+function coloriStileApple() {
+  const imposta = (id, prop, val) => { try { mappa.setPaintProperty(id, prop, val); } catch (e) { /* livello senza questa proprietà */ } };
+  mappa.getStyle().layers.forEach(l => {
+    const id = l.id.toLowerCase();
+    if (l.type === 'background') imposta(l.id, 'background-color', '#242426');
+    else if (/water/.test(id) && l.type === 'fill') imposta(l.id, 'fill-color', '#16263a');
+    else if (/water/.test(id) && l.type === 'line') imposta(l.id, 'line-color', '#1d3049');
+    else if (/park|wood|grass|forest|landcover|landuse/.test(id) && l.type === 'fill') imposta(l.id, 'fill-color', '#22302a');
+    else if (/building/.test(id) && l.type === 'fill') { imposta(l.id, 'fill-color', '#303033'); imposta(l.id, 'fill-outline-color', '#38383b'); }
+    else if (/highway|motorway|major|trunk|primary/.test(id) && l.type === 'line') imposta(l.id, 'line-color', '#5a5a60');
+    else if (/road|street|minor|secondary|tertiary|path|service/.test(id) && l.type === 'line') imposta(l.id, 'line-color', '#3f3f44');
+    else if (l.type === 'symbol') { imposta(l.id, 'text-color', '#c7c7cc'); imposta(l.id, 'text-halo-color', 'rgba(20,20,22,0.9)'); }
+  });
 }
 
 function aggiornaZoneMappa() {
