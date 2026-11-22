@@ -1,6 +1,6 @@
 # Tycoon Logistica – prototipo v0.1
 
-Tycoon di logistica free to play: gestisci un'azienda di corrieri su una mappa vera di Udine.
+Tycoon di logistica free to play: gestisci un'azienda di corrieri su una mappa vera, nella città che scegli tu.
 Nome del gioco provvisorio.
 
 ## Giocare online
@@ -28,7 +28,8 @@ Il tempo scorre da solo: **ogni giornata dura 3 minuti** (il fine settimana pass
 ## Cosa c'è nella v0.1
 
 - Mappa scura di Udine (MapLibre + stile Dark Matter di CARTO su dati OpenStreetMap), pannello in vetro con le schede Azienda, Attività, Conti, Flotta, Personale
-- Un deposito (Udine Sud) e 3 zone: Centro (140 pacchi/giorno), Nord (95), Sud (80)
+- Qualsiasi città: la cerchi (OpenStreetMap Nominatim) e le zone si creano da sole a cerchi e spicchi intorno al centro (5 zone per le città piccole, 13 per quelle grandi)
+- Magazzini dove vuoi: clicchi sulla mappa. Ogni zona parte dal magazzino più vicino e i km del giro dipendono dalla distanza. Affitto 1.200 €/mese a magazzino, 5.000 € per aprirne uno in più
 - Furgoni diesel ed elettrici, nuovi o usati, con riquadro Ammortamento calcolato sui prezzi della settimana
 - Autisti (con esperienza che sale col tempo) e magazzinieri, con stipendio scelto tramite annuncio
 - 2 € a consegna, massimo 125 consegne per corriere, 300 pacchi al giorno per magazziniere
@@ -44,7 +45,8 @@ Non ancora inclusi (previsti dal documento): jolly a chiamata, furgone di riserv
 |---|---|
 | `index.html` | La pagina del gioco |
 | `css/style.css` | Grafica: mappa a tutto schermo, pannello in vetro |
-| `js/dati.js` | **Numeri da tarare**: prezzi furgoni, zone, costanti di bilanciamento |
+| `js/dati.js` | **Numeri da tarare**: prezzi furgoni, costanti di bilanciamento |
+| `js/citta.js` | Ricerca città e generazione automatica delle zone |
 | `js/gioco.js` | Simulazione (un giorno alla volta), senza grafica |
 | `js/mappa.js` | Mappa, zone colorate, furgoni animati |
 | `js/ui.js` | Pannello, schede, ciclo di gioco |

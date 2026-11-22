@@ -2,6 +2,9 @@
 
 const STILE_MAPPA = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 let mappa = null, mappaPronta = false;
+let anteprimaZone = null;          // zone mostrate mentre si sceglie la città, prima di iniziare
+let markerDepositi = [], attesaClick = null;
+function zoneAttuali() { return S ? S.zone : (anteprimaZone || []); }
 const percorsi = {}; // id furgone -> { giorno, punti }
 
 function puntoNelPoligono([x, y], poli) {
@@ -25,22 +28,22 @@ function centroide(poli) {
 }
 
 function geoZone() {
-  return { type: 'FeatureCollection', features: ZONE.map(z => {
+  return { type: 'FeatureCollection', features: zoneAttuali().map(z => {
     const servita = S && S.furgoni.some(f => f.zona === z.id);
     return { type: 'Feature', properties: { id: z.id, nome: z.nome, colore: z.colore, servita: servita ? 1 : 0 },
       geometry: { type: 'Polygon', coordinates: [[...z.poligono, z.poligono[0]]] } };
   }) };
 }
 function geoEtichette() {
-  return { type: 'FeatureCollection', features: ZONE.map(z => ({ type: 'Feature',
+  return { type: 'FeatureCollection', features: zoneAttuali().map(z => ({ type: 'Feature',
     properties: { nome: z.nome, info: S && S.ieri && S.ieri.perZona && S.ieri.perZona[z.id] ? `${S.ieri.perZona[z.id].consegne} consegne ieri` : `${z.pacchi} pacchi/giorno` },
-    geometry: { type: 'Point', coordinates: centroide(z.poligono) } })) };
+    geometry: { type: 'Point', coordinates: z.centro || centroide(z.poligono) } })) };
 }
 
 function avviaMappa(contenitore, quandoFallisce) {
   if (typeof maplibregl === 'undefined') { quandoFallisce('La libreria della mappa non si è caricata: controlla la connessione.'); return; }
   try {
-    mappa = new maplibregl.Map({ container: contenitore, style: STILE_MAPPA, center: [13.236, 46.062], zoom: 12.6, attributionControl: { compact: true } });
+    mappa = new maplibregl.Map({ container: contenitore, style: STILE_MAPPA, center: S ? [S.citta.lng, S.citta.lat] : [12.5, 42.5], zoom: S ? 12 : 5, attributionControl: { compact: true } });
   } catch (e) { quandoFallisce('Questo browser non riesce a disegnare la mappa (WebGL non disponibile).'); return; }
   mappa.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
   // avvisa solo se, dopo un po', lo stile della mappa non si è proprio caricato (un singolo tile mancante non conta)
@@ -64,8 +67,11 @@ function avviaMappa(contenitore, quandoFallisce) {
     mappa.addLayer({ id: 'furgoni', type: 'circle', source: 'furgoni',
       paint: { 'circle-radius': 6, 'circle-color': ['get', 'colore'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } });
 
-    const el = document.createElement('div'); el.className = 'marker-deposito'; el.title = DEPOSITO.nome; el.textContent = 'D';
-    new maplibregl.Marker({ element: el }).setLngLat([DEPOSITO.lng, DEPOSITO.lat]).addTo(mappa);
+    aggiornaDepositiMappa();
+    mappa.on('click', e => {
+      if (!attesaClick) return;
+      const cb = attesaClick; annullaPuntoSullaMappa(); cb([e.lngLat.lng, e.lngLat.lat]);
+    });
     inquadraZone();
     const avviso = document.getElementById('avviso-mappa'); if (avviso) avviso.hidden = true;
     window.addEventListener('resize', () => { clearTimeout(inquadraZone._t); inquadraZone._t = setTimeout(inquadraZone, 250); });
@@ -77,7 +83,8 @@ function avviaMappa(contenitore, quandoFallisce) {
 // così su schermi stretti la mappa non si allontana fino a mostrare tutto il Friuli.
 function inquadraZone() {
   if (!mappa) return;
-  const tutti = ZONE.flatMap(z => z.poligono), xs = tutti.map(p => p[0]), ys = tutti.map(p => p[1]);
+  if (!zoneAttuali().length) return;
+  const tutti = zoneAttuali().flatMap(z => z.poligono), xs = tutti.map(p => p[0]), ys = tutti.map(p => p[1]);
   const W = mappa.getContainer().clientWidth, H = mappa.getContainer().clientHeight;
   const stretto = W <= 760;
   const pannello = stretto ? 0 : Math.min(450, W * 0.45);
@@ -87,13 +94,33 @@ function inquadraZone() {
   if (W - padding.left - padding.right < 160 || H - padding.top - padding.bottom < 120) { padding.left = padding.right = 20; padding.top = padding.bottom = 20; }
   const cam = mappa.cameraForBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding, maxZoom: 13.5 });
   if (!cam) return;
-  // centra le zone nello spazio libero (padding) e non allontanarti oltre lo zoom 11.5
+  // centra le zone nello spazio libero (padding) e non allontanarti oltre lo zoom 10.5
   const centro = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
-  mappa.jumpTo({ center: centro, zoom: Math.max(11.5, cam.zoom), padding });
+  mappa.jumpTo({ center: centro, zoom: Math.max(10.5, cam.zoom), padding });
+}
+
+// magazzini: un segnaposto numerato per ciascuno
+function aggiornaDepositiMappa() {
+  if (!mappaPronta) return;
+  markerDepositi.forEach(m => m.remove()); markerDepositi = [];
+  (S ? S.depositi : []).forEach((d, i) => {
+    const el = document.createElement('div'); el.className = 'marker-deposito'; el.title = d.nome; el.textContent = i + 1;
+    markerDepositi.push(new maplibregl.Marker({ element: el }).setLngLat([d.lng, d.lat]).addTo(mappa));
+  });
+}
+// modalità "clicca sulla mappa" per mettere un magazzino
+function chiediPuntoSullaMappa(cb) { attesaClick = cb; if (mappa) mappa.getCanvas().style.cursor = 'crosshair'; }
+function annullaPuntoSullaMappa() { attesaClick = null; if (mappa) mappa.getCanvas().style.cursor = ''; }
+function mostraCitta(citta) {
+  anteprimaZone = generaZone(citta);
+  if (!mappaPronta) return anteprimaZone;
+  aggiornaZoneMappa(); inquadraZone();
+  return anteprimaZone;
 }
 
 function aggiornaZoneMappa() {
   if (!mappaPronta) return;
+  aggiornaDepositiMappa();
   mappa.getSource('zone').setData(geoZone());
   mappa.getSource('etichette').setData(geoEtichette());
 }
@@ -101,16 +128,17 @@ function aggiornaZoneMappa() {
 // progresso: 0..1 della giornata in corso
 function aggiornaFurgoniMappa(progresso) {
   if (!mappaPronta || !S) return;
-  const dep = [DEPOSITO.lng, DEPOSITO.lat];
+  const primo = S.depositi[0], dep0 = [primo.lng, primo.lat];
   const lavora = feriale(S.giorno);
   const features = S.furgoni.map((f, i) => {
-    let pos = [dep[0] + 0.0012 + (i % 4) * 0.0006, dep[1] - 0.0004 - Math.floor(i / 4) * 0.0005];
+    let pos = [dep0[0] + 0.0012 + (i % 4) * 0.0006, dep0[1] - 0.0004 - Math.floor(i / 4) * 0.0005];
     let colore = '#8a96a3';
     const z = f.zona && zona(f.zona);
     if (z && furgoneOperativo(f) && lavora) {
       colore = z.colore;
-      if (!percorsi[f.id] || percorsi[f.id].giorno !== S.giorno) {
-        percorsi[f.id] = { giorno: S.giorno, punti: [dep, ...Array.from({ length: 6 }, () => puntoCasuale(z.poligono)), dep] };
+      const m = magazzinoVicino(z.centro).magazzino, dep = [m.lng, m.lat];
+      if (!percorsi[f.id] || percorsi[f.id].giorno !== S.giorno || percorsi[f.id].dep !== m.id) {
+        percorsi[f.id] = { giorno: S.giorno, dep: m.id, punti: [dep, ...Array.from({ length: 6 }, () => puntoCasuale(z.poligono)), dep] };
       }
       // fuori dal deposito dalle 8 alle 17 circa (dal 15% all'85% della giornata)
       const t = limita((progresso - 0.15) / 0.7, 0, 1);

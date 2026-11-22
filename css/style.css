@@ -84,6 +84,15 @@ select { background: rgba(0,0,0,.35); border: 1px solid var(--bordo); border-rad
 .ammortamento { border: 1px solid rgba(61,220,132,.35); background: rgba(61,220,132,.08); border-radius: 12px; padding: 12px; }
 .ammortamento b { color: #8ff0b8; }
 
+/* avvio: scelta della città */
+.pannello.in-avvio .schede { display: none; }
+.cerca { display: flex; gap: 8px; }
+.cerca input { flex: 1; background: rgba(0,0,0,.35); border: 1px solid var(--bordo); border-radius: 10px; padding: 10px 12px; min-height: 44px; font-size: 16px; }
+.lista-citta { display: grid; gap: 6px; }
+.voce-citta { display: grid; text-align: left; gap: 2px; background: var(--campo); border: 1px solid var(--bordo); border-radius: 12px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
+.voce-citta:hover { background: rgba(255,255,255,.12); }
+.voce-citta span { color: var(--testo-2); font-size: 13px; }
+
 /* feed */
 .giorno-feed h3 { margin: 0 0 6px; font-size: 13px; color: var(--testo-2); font-weight: 600; }
 .voce-feed { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--bordo); }
