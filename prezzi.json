@@ -4,7 +4,7 @@
   "settimana": "settimana del 22/11/2026",
   "fonte": "MIMIT – prezzi carburanti (IODL 2.0), media self service FVG · GME – PUN Index GME",
   "note": [
-    "gasolio non aggiornato (<urlopen error timed out>)"
+    "gasolio non aggiornato (<urlopen error [Errno 110] Connection timed out>)"
   ],
   "pun_eur_mwh": 260.35,
   "pun_settimana": "settimana 46/2026",
