@@ -1,7 +1,12 @@
 {
   "diesel_eur_litro": 1.68,
-  "pun_eur_kwh": 0.12,
-  "settimana": "valori di partenza",
-  "fonte": "Valori indicativi: verranno sostituiti dallo script settimanale (MIMIT e GME)",
-  "note": ["file di esempio, non ancora aggiornato dallo script"]
+  "pun_eur_kwh": 0.2604,
+  "settimana": "settimana del 22/11/2026",
+  "fonte": "MIMIT – prezzi carburanti (IODL 2.0), media self service FVG · GME – PUN Index GME",
+  "note": [
+    "gasolio non aggiornato (<urlopen error timed out>)"
+  ],
+  "pun_eur_mwh": 260.35,
+  "pun_settimana": "settimana 46/2026",
+  "aggiornato": "2026-11-22"
 }
