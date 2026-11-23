@@ -3,12 +3,12 @@
 const DATA_INIZIO = new Date(2027, 0, 4); // lunedì 4 gennaio 2027
 const CHIAVE_SALVATAGGIO = 'tycoon-logistica-v02';
 const VOCI = {
-  incassi: 'Consegne', vendite: 'Vendite (mezzi e magazzini)',
+  incassi: 'Consegne', contratti: 'Contratti', premi: 'Premi obiettivi', vendite: 'Vendite (mezzi e magazzini)',
   personale: 'Personale', carburante: 'Carburante', ricarica: 'Ricarica',
   manutenzione: 'Manutenzione', assicurazione: 'Assicurazione', mezzi: 'Acquisto mezzi',
-  magazzini: 'Acquisto magazzini', annunci: 'Annunci di lavoro',
+  magazzini: 'Acquisto magazzini', penali: 'Penali contratti', annunci: 'Annunci di lavoro',
 };
-const VOCI_ENTRATA = ['incassi', 'vendite'];
+const VOCI_ENTRATA = ['incassi', 'contratti', 'premi', 'vendite'];
 
 let S = null; // stato della partita
 
@@ -53,6 +53,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
     giacenze: {}, ieri: null,
     conti: { mese: chiaveMese(DATA_INIZIO), voci: vociVuote() }, storico: [],
     feed: [], prezzi: prezzi || PREZZI_RISERVA, tempoGiorno: 0,
+    offertaContratto: null, contrattiAttivi: [], obiettivo: null,
   };
   S.zone.forEach(z => S.giacenze[z.id] = 0);
   movimento('magazzini', -S.depositi[0].valore);
@@ -81,6 +82,7 @@ function utileMese(voci) {
 
 /* ---------- prezzi ---------- */
 function prezzoRicaricaDeposito() { return S.prezzi.pun_eur_kwh + COSTANTI.oneriDeposito; }
+function tariffa() { return COSTANTI.euroPerConsegna * (0.85 + S.reputazione / 100 * 0.3); }
 function costoKm(m, usato) {
   const energia = m.tipo === 'diesel'
     ? m.consumo / 100 * S.prezzi.diesel_eur_litro
@@ -133,14 +135,14 @@ function licenzia(id) {
 }
 
 /* ---------- flotta ---------- */
-function prezzoAcquisto(m, usato) { return Math.round(m.prezzo * (usato ? SCONTO_USATO : 1)); }
-function compraFurgone(idModello, usato) {
-  const m = modello(idModello), prezzo = prezzoAcquisto(m, usato);
+function prezzoAcquisto(m, usato, all = 'standard') { return Math.round(m.prezzo * (usato ? SCONTO_USATO : 1)) + ALLESTIMENTI[all].costo; }
+function compraFurgone(idModello, usato, allestimento = 'standard') {
+  const m = modello(idModello), prezzo = prezzoAcquisto(m, usato, allestimento);
   if (S.cassa < prezzo) return 'Non hai abbastanza soldi.';
   movimento('mezzi', -prezzo);
   S.furgoni.push({ id: nuovoId('f'), modello: m.id, usato, km: usato ? casoInt(90000, 180000) : 0,
-    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0 });
-  notizia(`Comprato ${m.nome}${usato ? ' usato' : ''} per ${prezzo} €.`, 'info');
+    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0, allestimento });
+  notizia(`Comprato ${m.nome}${usato ? ' usato' : ''}${allestimento !== 'standard' ? ' ' + ALLESTIMENTI[allestimento].nome.toLowerCase() : ''} per ${prezzo.toLocaleString('it-IT')} €.`, 'info');
   return null;
 }
 function vendiFurgone(id) {
@@ -214,6 +216,8 @@ function concludiGiornata() {
   avanzaIncasso(1);
   const c = S.inCorso.costi;
   for (const k in c) if (c[k]) movimento(k, -c[k]);
+  (S.inCorso.contratti || []).forEach(x => { if (x.ricavo) movimento('contratti', x.ricavo); if (x.penale) movimento('penali', -x.penale); notiziaContratto(x); });
+  if (S.inCorso.premio) movimento('premi', S.inCorso.premio);
   S.inCorso = null;
 
   // fine mese: buste paga e assicurazione
@@ -237,25 +241,33 @@ function giornoLavorativo() {
   if (servite.length && magazzinieri === 0) notizia('Nessun magazziniere: i pacchi restano nel magazzino e i furgoni non partono.', 'male', 'no-mag');
   else if (quota < 1) notizia('Magazzino intasato: i magazzinieri non riescono a smistare tutti i pacchi.', 'male', 'intasato');
 
-  let consegneTot = 0, carburante = 0, ricarica = 0, manut = 0;
-  const perZona = {};
+  let consegneTot = 0, consegneNormali = 0, carburante = 0, ricarica = 0, manut = 0, giacenzeTot = 0;
+  const perZona = {}, perFurgone = {}, chiusi = [];
   servite.forEach(z => {
     const smistati = Math.floor(arrivo[z.id] * quota);
     const giri = S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f));
-    const consegne = Math.min(smistati, giri.length * COSTANTI.maxConsegneCorriere);
+    // prima i contratti, poi i pacchi normali
+    const ec = eseguiContratti(z, giri, giri.length * COSTANTI.maxConsegneCorriere);
+    chiusi.push(...ec.chiusi);
+    const consegneCtr = ec.chiusi.reduce((t, c) => t + c.fatti, 0);
+    const consegne = Math.min(smistati, ec.capacita);
     const restano = arrivo[z.id] - consegne;
     const persi = Math.max(0, restano - z.pacchi);       // oltre un giorno di giacenza gli ordini si perdono
     S.giacenze[z.id] = restano - persi;
-    perZona[z.id] = { arrivo: arrivo[z.id], consegne, giacenza: S.giacenze[z.id], giri: giri.length };
-    consegneTot += consegne;
+    perZona[z.id] = { arrivo: arrivo[z.id], consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id], giri: giri.length };
+    consegneTot += consegne + consegneCtr; consegneNormali += consegne; giacenzeTot += S.giacenze[z.id];
 
     if (restano > 0 && giri.length) notizia(`Zona ${z.nome}: pacchi in giacenza, la reputazione scende.`, 'male', 'giac-' + z.id);
     if (!giri.length) notizia(`Zona ${z.nome}: nessun furgone operativo oggi.`, 'male', 'ferma-' + z.id);
-    S.reputazione = limita(S.reputazione + (restano > 0 ? -Math.min(3, 0.5 + restano / 40) : 0.25), 0, 100);
+    // reputazione: scende solo se resta indietro più del 10% dei pacchi della zona, sale se si consegna tutto
+    const soglia = z.pacchi * 0.1;
+    S.reputazione = limita(S.reputazione + (restano > soglia ? -Math.min(2, restano / 50) : restano > 0 ? 0 : 0.4), 0, 100);
     if (persi > 0) notizia(`Zona ${z.nome}: ${persi} ordini persi per le giacenze.`, 'male', 'persi-' + z.id);
 
+    const totZona = consegne + consegneCtr;
     giri.forEach((f, i) => {
-      const mie = Math.floor(consegne / giri.length) + (i < consegne % giri.length ? 1 : 0);
+      const mie = Math.floor(totZona / giri.length) + (i < totZona % giri.length ? 1 : 0);
+      perFurgone[f.id] = mie;
       const km = Math.round(kmGiro(z) * (0.7 + 0.3 * Math.min(1, mie / 100)));
       const m = modello(f.modello), c = costoKm(m, f.usato);
       if (m.tipo === 'diesel') carburante += km * c.energia; else ricarica += km * c.energia;
@@ -281,12 +293,16 @@ function giornoLavorativo() {
   // i giorni di fermo si scalano a fine giornata, ma non il giorno stesso dell'incidente/guasto
   S.furgoni.forEach(f => { if (f.fermo > 0 && f.fermoDal !== S.giorno) { f.fermo -= 1; if (f.fermo === 0) f.motivo = null; } });
 
-  const incasso = consegneTot * COSTANTI.euroPerConsegna;
-  // l'incasso entra in cassa piano piano durante la giornata, i costi a fine giornata
-  S.inCorso = { giorno: S.giorno, incasso, accreditato: 0,
+  chiusi.push(...contrattiNonServiti());
+  const incasso = Math.round(consegneNormali * tariffa());
+  const premio = valutaObiettivo(consegneTot, giacenzeTot);
+  nuovoObiettivo(consegneTot, giacenzeTot);
+  // l'incasso delle consegne entra in cassa piano piano durante la giornata;
+  // contratti, premi, penali e costi a fine giornata
+  S.inCorso = { giorno: S.giorno, incasso, accreditato: 0, perFurgone, contratti: chiusi, premio,
     costi: { carburante: Math.round(carburante), ricarica: Math.round(ricarica), manutenzione: Math.round(manut) } };
   S.ieri = { festivo: false, consegne: consegneTot, incasso, perZona };
-  if (consegneTot) notizia(`${consegneTot} consegne, incasso ${incasso} €.`, 'buono', 'giornata');
+  if (consegneTot) notizia(`${consegneTot} consegne, incasso ${incasso.toLocaleString('it-IT')} €.`, 'buono', 'giornata');
 }
 
 function assicurazioneFurgone(f) { return Math.round(COSTANTI.assicurazioneMensile * (f.premio || 1)); }
@@ -327,6 +343,8 @@ function carica() {
       S = JSON.parse(t);
       // partite salvate prima di questa versione
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
+      if (!S.contrattiAttivi) S.contrattiAttivi = [];
+      S.furgoni.forEach(f => { if (!f.allestimento) f.allestimento = 'standard'; });
       S.furgoni.forEach(f => { if (!f.premio) f.premio = S.premio || 1; });
       delete S.premio;
       return S;

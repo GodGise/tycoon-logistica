@@ -6,6 +6,7 @@ let anteprimaZone = null;          // zone mostrate mentre si sceglie la città,
 let markerDepositi = [], attesaClick = null;
 function zoneAttuali() { return S ? S.zone : (anteprimaZone || []); }
 const percorsi = {}; // id furgone -> { giorno, punti }
+const posizioniFurgoni = {}; // id furgone -> [lng, lat] attuale
 
 function puntoNelPoligono([x, y], poli) {
   let dentro = false;
@@ -163,7 +164,31 @@ function aggiornaFurgoniMappa(progresso) {
       const p = percorsi[f.id].punti, tratto = t * (p.length - 1), k = Math.min(p.length - 2, Math.floor(tratto)), r = tratto - k;
       pos = [p[k][0] + (p[k + 1][0] - p[k][0]) * r, p[k][1] + (p[k + 1][1] - p[k][1]) * r];
     } else if (f.fermo > 0) colore = '#ff5c5c';
+    posizioniFurgoni[f.id] = pos;
     return { type: 'Feature', properties: { colore }, geometry: { type: 'Point', coordinates: pos } };
   });
   mappa.getSource('furgoni').setData({ type: 'FeatureCollection', features });
+}
+
+// "+X €" che sale dai furgoni mentre consegnano: ogni furgone mostra quanto ha incassato negli ultimi secondi
+const ultimoSoldi = {};
+function soldiSullaMappa(t, progresso) {
+  if (!mappaPronta || !S || !S.inCorso || !S.inCorso.perFurgone || !feriale(S.giorno)) return;
+  if (progresso < 0.15 || progresso > 0.85) return;          // fuori orario i furgoni sono in deposito
+  const passo = 2500, durataGiro = COSTANTI.secondiPerGiorno * 0.7 * 1000;
+  const canvas = mappa.getCanvas().getBoundingClientRect();
+  S.furgoni.forEach(f => {
+    const n = S.inCorso.perFurgone[f.id]; if (!n || !furgoneOperativo(f)) return;
+    if (t - (ultimoSoldi[f.id] || 0) < passo) return;
+    ultimoSoldi[f.id] = t + Math.random() * 400;               // sfasati, non tutti insieme
+    const pos = posizioniFurgoni[f.id]; if (!pos) return;
+    const p = mappa.project(pos);
+    if (p.x < 0 || p.y < 0 || p.x > canvas.width || p.y > canvas.height) return;
+    const euro = n * tariffa() * passo / durataGiro;
+    const el = document.createElement('div');
+    el.className = 'soldi'; el.textContent = '+' + Math.round(euro) + ' €';
+    el.style.left = (canvas.left + p.x) + 'px'; el.style.top = (canvas.top + p.y - 14) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1400);
+  });
 }

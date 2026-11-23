@@ -32,7 +32,10 @@ Il tempo scorre da solo: **ogni giornata dura 2 minuti e mezzo** (il fine settim
 - Magazzini dove vuoi: clicchi sulla mappa. Ogni zona parte dal magazzino più vicino e i km del giro dipendono dalla distanza. I magazzini si comprano e restano tuoi: 300.000 € in centro, fino a 200.000 € al bordo della città. Cassa iniziale 400.000 €
 - Furgoni diesel ed elettrici, nuovi o usati, con riquadro Ammortamento calcolato sui prezzi della settimana
 - Autisti (con esperienza che sale col tempo) e magazzinieri, con stipendio scelto tramite annuncio
-- 2 € a consegna, massimo 125 consegne per corriere, 300 pacchi al giorno per magazziniere
+- 6 € a consegna (da 5,10 a 6,90 € con la reputazione), massimo 125 consegne per corriere, 300 pacchi al giorno per magazziniere
+- Contratti dei clienti: un'offerta circa ogni giornata, da accettare entro 40 secondi. Pagano più dei pacchi normali; se non consegni tutto paghi una penale
+- Carichi speciali (merce refrigerata, merce pesante, animali vivi): pagano molto di più ma serve un furgone con l'allestimento giusto
+- Obiettivo del giorno con premio in denaro, "+€" che salgono dai furgoni sulla mappa
 - Incidenti (riparazione a carico dell'autista, premio assicurativo che sale), guasti più frequenti sull'usato
 - Busta paga e assicurazione a fine mese, giacenze che fanno scendere la reputazione
 - Furgoni animati sulla mappa, feed attività raggruppato, importi formattati in italiano
