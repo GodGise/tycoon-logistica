@@ -22,7 +22,8 @@ function vistaAzienda() {
   const utile = utileMese(S.conti.voci);
   const autisti = S.dipendenti.filter(d => d.ruolo === 'autista').length, mag = S.dipendenti.filter(d => d.ruolo === 'magazziniere').length;
   const rep = Math.round(S.reputazione), cls = rep >= 60 ? '' : rep >= 35 ? 'medio' : 'basso';
-  const ieri = S.ieri && !S.ieri.festivo ? `${intero.format(S.ieri.consegne)} consegne · ${eur.format(S.ieri.incasso)}` : 'Nessuna giornata lavorativa';
+  const inc = S.inCorso && S.inCorso.giorno === S.giorno ? S.inCorso : null;
+  const ieri = S.ieri && !S.ieri.festivo ? `${intero.format(S.ieri.consegne)} consegne · ${eur.format(inc ? inc.accreditato : S.ieri.incasso)} di ${eur.format(S.ieri.incasso)}` : 'Oggi non si lavora';
   const zone = S.zone.map(z => {
     const giri = S.furgoni.filter(f => f.zona === z.id);
     const pz = S.ieri && S.ieri.perZona && S.ieri.perZona[z.id];
@@ -31,11 +32,12 @@ function vistaAzienda() {
       <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span><span class="num">${z.pacchi} pacchi/giorno</span></div>
       <div class="metro ${cop >= 100 ? '' : cop >= 70 ? 'medio' : 'basso'}"><i style="width:${cop}%"></i></div>
       <div class="riga a-capo"><span>${giri.length ? `${giri.length} furgon${giri.length > 1 ? 'i' : 'e'} · capacità ${cap} consegne` : 'Zona non servita'} · giro ${kmGiro(z)} km</span>
-      <span class="num">${pz ? `ieri ${pz.consegne} cons.${pz.giacenza ? ` · <span class="meno">${pz.giacenza} in giacenza</span>` : ''}` : ''}</span></div>
+      <span class="num">${pz ? `oggi ${pz.consegne} cons.${pz.giacenza ? ` · <span class="meno">${pz.giacenza} in giacenza</span>` : ''}` : ''}</span></div>
     </div>`;
   }).join('');
   const p = S.prezzi;
   return `
+  <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
   <div class="kpi">
     <div><b>${S.furgoni.length}</b><span>Furgoni</span></div>
     <div><b>${autisti}</b><span>Autisti</span></div>
@@ -43,10 +45,10 @@ function vistaAzienda() {
   </div>
   <div class="scheda">
     <div class="riga"><span>Utile del mese</span>${segnato(utile)}</div>
-    <div class="riga"><span>Ieri</span><span class="num">${ieri}</span></div>
+    <div class="riga"><span>Oggi</span><span class="num" id="oggi">${ieri}</span></div>
     <div class="riga"><span>Reputazione</span><span class="num">${rep}/100</span></div>
     <div class="metro ${cls}"><i style="width:${rep}%"></i></div>
-    <div class="riga"><span>Premio assicurativo flotta</span><span class="num ${S.premio > 1.001 ? 'meno' : ''}">${S.premio > 1.001 ? '+' + Math.round((S.premio - 1) * 100) + '%' : 'base'}</span></div>
+    <div class="riga"><span>Assicurazione flotta</span><span class="num">${eur.format(S.furgoni.reduce((t, f) => t + assicurazioneFurgone(f), 0))}/mese</span></div>
   </div>
   ${vistaMagazzini()}
   <div><h2>Zone di consegna <small>${esc(S.citta.nome)} · ${S.zone.length} zone</small></h2><div style="display:grid;gap:8px">${zone}</div>
@@ -87,6 +89,7 @@ function vistaInizio() {
       <div class="riga"><span>Pacchi al giorno in tutta la città</span><span class="num">${anteprimaZone ? intero.format(anteprimaZone.reduce((a, z) => a + z.pacchi, 0)) : 0}</span></div>
     </div>
     <div class="scheda" style="border-color:var(--accento)">
+      <label style="display:grid;gap:6px"><span class="nota">Nome della tua azienda</span><input id="nome-nuova" class="campo-testo" maxlength="40" value="${esc(inizio.nome || ('Logistica ' + c.nome))}"></label>
       <h2 style="margin:0">Metti il tuo primo magazzino</h2>
       <p style="margin:0">Clicca sulla mappa nel punto dove vuoi il magazzino. Vicino al centro i giri sono più corti; in periferia arrivi meglio alle zone esterne.</p>
       <div class="riga"><span>Prezzo del magazzino</span><span class="num">${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)}</span></div>
@@ -129,7 +132,7 @@ function vistaConti() {
     <tbody>${righe || `<tr><td colspan="3">Nessun movimento questo mese.</td></tr>`}
     <tr class="totale"><td>Utile</td><td>${segnato(utileMese(S.conti.voci))}</td>${prec ? `<td>${segnato(utileMese(prec.voci))}</td>` : ''}</tr></tbody></table>
   </div>
-  <p class="nota">Stipendi e assicurazione si pagano l'ultimo giorno del mese. Le riparazioni dopo un incidente sono a carico dell'autista: all'azienda sale il premio assicurativo.</p>`;
+  <p class="nota">Stipendi e assicurazione si pagano l'ultimo giorno del mese. Le riparazioni dopo un incidente sono a carico dell'autista; all'azienda sale l'assicurazione di quel furgone (+25% a incidente) e non scende più finché non lo vendi.</p>`;
 }
 
 function vistaNegozio() {
@@ -165,6 +168,8 @@ function vistaFlotta() {
     return `<div class="scheda">
       <div class="riga"><strong>${esc(m.nome)}${f.usato ? ' <small class="nota">usato</small>' : ''}</strong><span class="badge ${m.tipo}">${m.tipo}</span></div>
       <div class="riga"><span>${intero.format(f.km)} km</span>${stato}</div>
+      <div class="riga"><span>Assicurazione</span><span class="num ${f.premio > 1 ? 'meno' : ''}">${eur.format(assicurazioneFurgone(f))}/mese${f.premio > 1 ? ` · +${Math.round((f.premio - 1) * 100)}% (${f.incidenti} incident${f.incidenti === 1 ? 'e' : 'i'})` : ''}</span></div>
+      ${f.premio >= 1.75 ? '<p class="nota" style="color:var(--avviso)">Assicurazione molto cara: forse conviene venderlo e comprarne un altro.</p>' : ''}
       <div class="due">
         <label><span class="nota">Autista</span><select data-azione="assegna" data-campo="autista" data-id="${f.id}">${optA}</select></label>
         <label><span class="nota">Zona</span><select data-azione="assegna" data-campo="zona" data-id="${f.id}">${optZ}</select></label>
@@ -209,6 +214,9 @@ function vistaPersonale() {
 const VISTE = { azienda: vistaAzienda, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale };
 
 function testata() {
+  $('#nome-azienda').textContent = S ? S.nomeAzienda : 'Tycoon Logistica';
+  $('#sotto-marchio').textContent = S ? `Tycoon Logistica · ${S.citta.nome}` : 'nome del gioco provvisorio';
+  $('#logo').textContent = S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL';
   if (!S) { $('#cassa').textContent = '–'; $('#utile-mese').textContent = 'Scegli una città per iniziare'; $('#data').textContent = 'Nuova partita'; return; }
   $('#cassa').textContent = eur.format(S.cassa);
   $('#cassa').className = 'cifra-grande' + (S.cassa < 0 ? ' meno' : '');
@@ -261,6 +269,7 @@ $('#contenuto').addEventListener('click', e => {
 });
 $('#contenuto').addEventListener('submit', async e => {
   e.preventDefault();
+  if (e.target.dataset.azione === 'rinomina') { esito(rinominaAzienda($('#input-nome').value), 'Nome aggiornato.'); $('#input-nome').blur(); return; }
   const testo = $('#cerca-citta').value.trim(); if (testo.length < 2) return;
   Object.assign(inizio, { testo, cercando: true, errore: '' }); ridisegna();
   try { inizio.risultati = await cercaCitta(testo); }
@@ -274,7 +283,8 @@ function scegliCitta(c) {
   const attendi = punto => {
     const d = distanzaKm([c.lng, c.lat], punto);
     if (d > c.raggio * COSTANTI.distanzaMaxMagazzino) { inizio.errore = `Troppo lontano dal centro (${Math.round(d)} km): avvicinati alla città.`; ridisegna(); chiediPuntoSullaMappa(attendi); return; }
-    nuovaPartita(prezziCaricati || PREZZI_RISERVA, c, punto, anteprimaZone);
+    const campo = document.getElementById('nome-nuova');
+    nuovaPartita(prezziCaricati || PREZZI_RISERVA, c, punto, anteprimaZone, (campo && campo.value.trim()) || inizio.nome);
     salva(); scheda = 'azienda'; ridisegna(); aggiornaZoneMappa();
     toast(`Magazzino comprato a ${c.nome} per ${eur.format(S.depositi[0].valore)}. Ora compra un furgone!`);
   };
@@ -286,25 +296,35 @@ $('#contenuto').addEventListener('change', e => {
   if (t.dataset.azione === 'stipendio') { S.offerta[t.dataset.ruolo] = +t.value; t.blur(); salva(); if (daRidisegnare) ridisegna(); }
 });
 $('#contenuto').addEventListener('input', e => {
-  const t = e.target; if (t.dataset.azione === 'stipendio') $('#val-' + t.dataset.ruolo).textContent = eur.format(+t.value);
+  const t = e.target;
+  if (t.id === 'nome-nuova') inizio.nome = t.value; if (t.dataset.azione === 'stipendio') $('#val-' + t.dataset.ruolo).textContent = eur.format(+t.value);
 });
 
 /* ---------- ciclo di gioco ---------- */
 // Il tempo scorre da solo: ogni giornata dura 3 minuti, il fine settimana passa in un unico blocco.
 // Il tempo trascorso nella giornata è salvato, quindi ricaricare la pagina non fa ripartire il giorno.
-let ultimoSalvataggio = 0;
+let ultimoSalvataggio = 0, ultimaTestata = 0;
 function ciclo(t) {
   if (ultimoT === null) ultimoT = t;
-  if (!S) { ultimoT = t; $('#countdown').textContent = '3:00'; $('#ora').textContent = ''; requestAnimationFrame(ciclo); return; }
+  if (!S) { ultimoT = t; $('#countdown').textContent = '2:30'; $('#ora').textContent = ''; requestAnimationFrame(ciclo); return; }
   const dt = Math.min(0.25, (t - ultimoT) / 1000); ultimoT = t;
   const durata = COSTANTI.secondiPerGiorno;
+  if (!S.inCorso || S.inCorso.giorno !== S.giorno) avviaGiornata();
   S.tempoGiorno = (S.tempoGiorno || 0) + dt;
   if (S.tempoGiorno >= durata) {
     S.tempoGiorno = 0;
     const sabato = dataDelGiorno(S.giorno).getDay() === 6;
-    simulaGiorno();
+    concludiGiornata();
     if (sabato) simulaGiorno(); // anche la domenica
+    avviaGiornata();
     salva(); ridisegnaSePossibile();
+  }
+  // gli autisti consegnano: la cassa sale durante la giornata
+  avanzaIncasso(S.tempoGiorno / durata);
+  if (t - ultimaTestata > 250) {
+    ultimaTestata = t; testata();
+    const oggi = document.getElementById('oggi');
+    if (oggi && S.ieri && !S.ieri.festivo && S.inCorso) oggi.textContent = `${intero.format(S.ieri.consegne)} consegne · ${eur.format(S.inCorso.accreditato)} di ${eur.format(S.ieri.incasso)}`;
   }
   if (t - ultimoSalvataggio > 5000) { ultimoSalvataggio = t; salva(); }
   const p = S.tempoGiorno / durata, resto = Math.ceil(durata - S.tempoGiorno);

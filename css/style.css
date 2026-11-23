@@ -90,7 +90,8 @@ select { background: var(--campo); border: 1px solid var(--bordo); border-radius
 /* avvio: scelta della città */
 .pannello.in-avvio .schede { display: none; }
 .cerca { display: flex; gap: 8px; }
-.cerca input { flex: 1; background: rgba(0,0,0,.35); border: 1px solid var(--bordo); border-radius: 10px; padding: 10px 12px; min-height: 44px; font-size: 16px; }
+.cerca input { flex: 1; min-width: 0; background: rgba(0,0,0,.35); border: 1px solid var(--bordo); border-radius: 10px; padding: 10px 12px; min-height: 44px; font-size: 16px; }
+.campo-testo { background: var(--campo); border: 0; border-radius: 10px; padding: 10px 12px; min-height: 44px; font-size: 16px; width: 100%; }
 .lista-citta { display: grid; gap: 6px; }
 .voce-citta { display: grid; text-align: left; gap: 2px; background: var(--campo); border: 1px solid var(--bordo); border-radius: 12px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
 .voce-citta:hover { background: rgba(255,255,255,.12); }

@@ -40,12 +40,13 @@ function nuovoId(pref) { S.seq += 1; return pref + S.seq; }
 
 function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); return v; }
 
-function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte) {
+function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   S = {
     citta, zone: zonePronte || generaZone(citta),
     depositi: [{ id: 'm1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
     versione: 1, seq: 0, giorno: 0,
-    cassa: COSTANTI.cassaIniziale, reputazione: 70, premio: 1,
+    nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
+    cassa: COSTANTI.cassaIniziale, reputazione: 70,
     furgoni: [], dipendenti: [],
     offerta: { autista: RUOLI.autista.stipDefault, magazziniere: RUOLI.magazziniere.stipDefault },
     candidati: { autista: [], magazziniere: [] }, annunciInArrivo: {},
@@ -56,7 +57,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte) {
   S.zone.forEach(z => S.giacenze[z.id] = 0);
   movimento('magazzini', -S.depositi[0].valore);
   generaCandidati('autista'); generaCandidati('magazziniere');
-  notizia(`Benvenuto a ${citta.nome}! Compra un furgone, assumi un autista e un magazziniere, poi assegna il furgone a una zona.`, 'info');
+  notizia(`Benvenuto, ${S.nomeAzienda}! Sei a ${citta.nome}. Compra un furgone, assumi un autista e un magazziniere, poi assegna il furgone a una zona.`, 'info');
   return S;
 }
 
@@ -138,7 +139,7 @@ function compraFurgone(idModello, usato) {
   if (S.cassa < prezzo) return 'Non hai abbastanza soldi.';
   movimento('mezzi', -prezzo);
   S.furgoni.push({ id: nuovoId('f'), modello: m.id, usato, km: usato ? casoInt(90000, 180000) : 0,
-    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno });
+    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0 });
   notizia(`Comprato ${m.nome}${usato ? ' usato' : ''} per ${prezzo} €.`, 'info');
   return null;
 }
@@ -184,14 +185,36 @@ function assegna(idFurgone, campo, valore) {
 function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0; }
 
 /* ---------- un giorno di gioco ---------- */
-function simulaGiorno() {
+// Una giornata ha due momenti: l'inizio (si decide cosa succede) e la fine (si chiudono i conti).
+// Nel mezzo l'interfaccia fa entrare l'incasso in cassa poco alla volta con avanzaIncasso().
+function simulaGiorno() { avviaGiornata(); concludiGiornata(); }
+
+function avviaGiornata() {
   const g = S.giorno;
+  if (S.inCorso && S.inCorso.giorno === g) return; // già avviata (es. dopo una ricarica della pagina)
+  S.inCorso = { giorno: g, incasso: 0, accreditato: 0, costi: {} };
   if (S.annunciInArrivo.autista === g) { generaCandidati('autista'); delete S.annunciInArrivo.autista; notizia('Sono arrivati nuovi candidati autisti.', 'info', 'cand-a'); }
   if (S.annunciInArrivo.magazziniere === g) { generaCandidati('magazziniere'); delete S.annunciInArrivo.magazziniere; notizia('Sono arrivati nuovi candidati magazzinieri.', 'info', 'cand-m'); }
 
   const d = dataDelGiorno(g);
   if (d.getDay() === 1 && g > 0) settimanale();
   if (feriale(g)) giornoLavorativo(); else S.ieri = { festivo: true, consegne: 0, incasso: 0, perZona: {} };
+}
+
+// p = quanto della giornata è passato (0..1): accredita la parte di incasso maturata finora
+function avanzaIncasso(p) {
+  const c = S.inCorso; if (!c || c.giorno !== S.giorno || !c.incasso) return;
+  const dovuto = c.incasso * Math.min(1, Math.max(0, p));
+  if (dovuto > c.accreditato) { movimento('incassi', dovuto - c.accreditato); c.accreditato = dovuto; }
+}
+
+function concludiGiornata() {
+  const g = S.giorno, d = dataDelGiorno(g);
+  if (!S.inCorso || S.inCorso.giorno !== g) avviaGiornata();
+  avanzaIncasso(1);
+  const c = S.inCorso.costi;
+  for (const k in c) if (c[k]) movimento(k, -c[k]);
+  S.inCorso = null;
 
   // fine mese: buste paga e assicurazione
   const domani = dataDelGiorno(g + 1);
@@ -244,8 +267,8 @@ function giornoLavorativo() {
       const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza);
       if (Math.random() < pKm * km) {
         f.fermo = casoInt(1, 3); f.motivo = 'incidente'; f.fermoDal = S.giorno;
-        S.premio += COSTANTI.aumentoPremioIncidente;
-        notizia(`Incidente: ${a.nome} con il ${m.nome}. Furgone fermo ${f.fermo} gg, premio assicurativo in salita. La riparazione è trattenuta dallo stipendio.`, 'male', 'inc-' + f.id);
+        f.premio = (f.premio || 1) + COSTANTI.aumentoPremioIncidente; f.incidenti = (f.incidenti || 0) + 1;
+        notizia(`Incidente: ${a.nome} con il ${m.nome}. Furgone fermo ${f.fermo} gg, assicurazione di questo furgone a ${assicurazioneFurgone(f)} €/mese. La riparazione è trattenuta dallo stipendio.`, 'male', 'inc-' + f.id);
       } else if (Math.random() < GUASTO_GIORNO[f.usato ? 'usato' : 'nuovo'] * (1 + f.km / 300000)) {
         const costo = casoInt(300, 1200);
         f.fermo = casoInt(1, 2); f.motivo = 'guasto'; f.fermoDal = S.giorno; manut += costo;
@@ -259,16 +282,16 @@ function giornoLavorativo() {
   S.furgoni.forEach(f => { if (f.fermo > 0 && f.fermoDal !== S.giorno) { f.fermo -= 1; if (f.fermo === 0) f.motivo = null; } });
 
   const incasso = consegneTot * COSTANTI.euroPerConsegna;
-  if (incasso) movimento('incassi', incasso);
-  if (carburante) movimento('carburante', -Math.round(carburante));
-  if (ricarica) movimento('ricarica', -Math.round(ricarica));
-  if (manut) movimento('manutenzione', -Math.round(manut));
+  // l'incasso entra in cassa piano piano durante la giornata, i costi a fine giornata
+  S.inCorso = { giorno: S.giorno, incasso, accreditato: 0,
+    costi: { carburante: Math.round(carburante), ricarica: Math.round(ricarica), manutenzione: Math.round(manut) } };
   S.ieri = { festivo: false, consegne: consegneTot, incasso, perZona };
   if (consegneTot) notizia(`${consegneTot} consegne, incasso ${incasso} €.`, 'buono', 'giornata');
 }
 
+function assicurazioneFurgone(f) { return Math.round(COSTANTI.assicurazioneMensile * (f.premio || 1)); }
+
 function settimanale() {
-  S.premio = Math.max(1, S.premio - COSTANTI.rientroPremioSettimanale);
   ['autista', 'magazziniere'].forEach(r => { if (!S.annunciInArrivo[r]) generaCandidati(r); });
 }
 
@@ -284,7 +307,7 @@ function fineMese(d) {
   let personale = 0;
   S.dipendenti.forEach(x => { const giorni = S.giorno - Math.max(x.assuntoGiorno, primo) + 1; personale += x.stipendio * giorni / gg; });
   if (personale) movimento('personale', -Math.round(personale));
-  const assic = Math.round(S.furgoni.length * COSTANTI.assicurazioneMensile * S.premio);
+  const assic = S.furgoni.reduce((t, f) => t + assicurazioneFurgone(f), 0);
   if (assic) movimento('assicurazione', -assic);
   const nomeMese = d.toLocaleDateString('it-IT', { month: 'long' });
   if (personale) notizia(`Busta paga di ${nomeMese}: ${Math.round(personale)} € al personale.`, 'info', 'paga');
@@ -298,9 +321,25 @@ function fineMese(d) {
 /* ---------- salvataggio ---------- */
 function salva() { try { localStorage.setItem(CHIAVE_SALVATAGGIO, JSON.stringify(S)); } catch (e) { /* niente salvataggio */ } }
 function carica() {
-  try { const t = localStorage.getItem(CHIAVE_SALVATAGGIO); if (t) { S = JSON.parse(t); return S; } } catch (e) { /* ignora */ }
+  try {
+    const t = localStorage.getItem(CHIAVE_SALVATAGGIO);
+    if (t) {
+      S = JSON.parse(t);
+      // partite salvate prima di questa versione
+      if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
+      S.furgoni.forEach(f => { if (!f.premio) f.premio = S.premio || 1; });
+      delete S.premio;
+      return S;
+    }
+  } catch (e) { /* ignora */ }
   return null;
 }
 function cancellaSalvataggio() { try { localStorage.removeItem(CHIAVE_SALVATAGGIO); } catch (e) { /* ignora */ } }
 
-if (typeof module !== 'undefined') module.exports = { get S() { return S; }, nuovaPartita, apriMagazzino, kmGiro, simulaGiorno, compraFurgone, assumi, assegna, pubblicaAnnuncio, ammortamento, utileMese, dataDelGiorno };
+if (typeof module !== 'undefined') module.exports = { get S() { return S; }, nuovaPartita, avviaGiornata, concludiGiornata, avanzaIncasso, apriMagazzino, kmGiro, simulaGiorno, compraFurgone, assumi, assegna, pubblicaAnnuncio, ammortamento, utileMese, dataDelGiorno };
+
+function rinominaAzienda(nome) {
+  nome = String(nome || '').trim().slice(0, 40);
+  if (nome.length < 2) return 'Il nome deve avere almeno 2 caratteri.';
+  S.nomeAzienda = nome; return null;
+}
