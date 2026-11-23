@@ -192,6 +192,46 @@ function vistaInizio() {
     <p class="nota">Ricerca: © OpenStreetMap, Nominatim.</p>`;
 }
 
+// Scheda Giri: per ogni zona quanti pacchi ci sono e quanti aspettano in deposito
+function vistaGiri() {
+  const pz = (S.ieri && S.ieri.perZona) || {};
+  const jolly = S.furgoni.filter(f => f.zona === ZONA_JOLLY);
+  const dove = S.inCorso && S.inCorso.jolly || {};
+  const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id))
+    .map(z => ({ z, d: pz[z.id] || null, attesa: S.giacenze[z.id] || 0 }))
+    .sort((a, b) => b.attesa - a.attesa);
+  const totAttesa = servite.reduce((t, x) => t + x.attesa, 0);
+  const righe = servite.map(({ z, d, attesa }) => {
+    const furgoni = S.furgoni.filter(f => f.zona === z.id).length;
+    const cap = d ? d.capacita : furgoni * COSTANTI.maxConsegneCorriere;
+    const arrivo = d ? d.arrivo : z.pacchi;
+    const pieno = cap ? Math.min(100, Math.round(arrivo / cap * 100)) : 100;
+    return `<div class="scheda giro ${attesa > 0 ? 'in-ritardo' : ''}">
+      <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span>
+        <span class="num ${attesa > 0 ? 'meno' : 'piu'}"><b>${intero.format(attesa)}</b> in attesa</span></div>
+      <div class="metro ${pieno > 100 || attesa > 0 ? 'basso' : pieno > 85 ? 'medio' : ''}"><i style="width:${Math.min(100, pieno)}%"></i></div>
+      <div class="griglia-giro">
+        <div><b>${intero.format(arrivo)}</b><span>pacchi oggi</span></div>
+        <div><b>${d ? intero.format(d.consegne) : '–'}</b><span>consegnati</span></div>
+        <div><b>${furgoni}</b><span>furgon${furgoni === 1 ? 'e' : 'i'} · ${intero.format(cap)} posti</span></div>
+        <div><b>${d && d.jolly ? '+' + intero.format(d.jolly) : '–'}</b><span>dal jolly</span></div>
+      </div>
+      ${d && d.smistati < d.arrivo ? `<p class="nota meno">${intero.format(d.arrivo - d.smistati)} pacchi non smistati: servono più magazzinieri.</p>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="scheda">
+      <div class="riga"><h2 style="margin:0">Pacchi in attesa in deposito</h2><span class="num ${totAttesa ? 'meno' : 'piu'}"><b>${intero.format(totAttesa)}</b></span></div>
+      <p class="nota">Sono i pacchi rimasti in magazzino che domani si aggiungono a quelli nuovi. Oltre un giorno di ritardo i clienti annullano gli ordini e la reputazione scende.</p>
+    </div>
+    <div class="scheda jolly-box">
+      <div class="riga"><h2 style="margin:0">Jolly</h2><span class="badge">${jolly.length} furgon${jolly.length === 1 ? 'e' : 'i'}</span></div>
+      ${jolly.length ? jolly.map(f => { const z = dove[f.id] ? zona(dove[f.id]) : null, a = dipendente(f.autistaId);
+        return `<div class="riga"><span>${esc(modello(f.modello).nome)} · ${a ? esc(a.nome) : 'senza autista'}</span><span class="num">${!furgoneOperativo(f) ? '<span class="meno">fermo</span>' : z ? 'oggi in ' + esc(z.nome) : 'in deposito'}</span></div>`; }).join('')
+        : '<p class="nota">Nessun jolly. Nella scheda Flotta scegli "Jolly" come zona di un furgone: ogni mattina andrà da solo nella zona con più pacchi in attesa e la svuoterà. Utile anche quando un furgone è fermo per un incidente.</p>'}
+    </div>
+    ${righe || '<p class="nota">Nessuna zona servita: assegna un furgone a una zona nella scheda Flotta.</p>'}`;
+}
+
 function vistaAttivita() {
   if (!S.feed.length) return '<p class="nota">Ancora nessuna attività.</p>';
   const gruppi = [];
@@ -247,7 +287,7 @@ function vistaFlotta() {
       const altro = S.furgoni.find(x => x.autistaId === a.id && x.id !== f.id);
       return `<option value="${a.id}" ${f.autistaId === a.id ? 'selected' : ''}>${esc(a.nome)}${altro ? ' (su altro furgone)' : ''}</option>`;
     })].join('');
-    const optZ = ['<option value="">In deposito</option>', ...S.zone.map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}</option>`)].join('');
+    const optZ = ['<option value="">In deposito</option>', `<option value="${ZONA_JOLLY}" ${f.zona === ZONA_JOLLY ? 'selected' : ''}>Jolly: va dove ci sono più pacchi</option>`, ...S.zone.map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}</option>`)].join('');
     return `<div class="scheda">
       <div class="riga"><strong>${esc(m.nome)}${f.usato ? ' <small class="nota">usato</small>' : ''}</strong><span class="badge ${m.tipo}">${m.tipo}</span></div>
       ${f.allestimento && f.allestimento !== 'standard' ? `<div class="riga"><span>Allestimento</span><span class="badge speciale">${ALLESTIMENTI[f.allestimento].nome}</span></div>` : ''}
@@ -272,7 +312,7 @@ function vistaPersonale() {
     const lista = staff.map(d => `<div class="scheda">
       <div class="riga"><strong>${esc(d.nome)}</strong><span class="num">${eur.format(d.stipendio)}/mese</span></div>
       ${ruolo === 'autista' ? `<div class="riga"><span>Esperienza</span><span class="num">${Math.round(d.esperienza)}/100</span></div><div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
-      <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
+      <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id && f.zona === ZONA_JOLLY) ? '<b style="color:#ffd60a">Jolly</b>' : S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
       <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia</button></div>
     </div>`).join('');
     const cand = S.candidati[ruolo].map(c => `<div class="scheda">
@@ -295,7 +335,7 @@ function vistaPersonale() {
   }).join('');
 }
 
-const VISTE = { azienda: vistaAzienda, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale };
+const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale };
 
 function testata() {
   $('#nome-azienda').textContent = S ? S.nomeAzienda : 'Tycoon Logistica';
