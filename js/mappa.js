@@ -4,7 +4,7 @@ const STILE_MAPPA = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style
 let mappa = null, mappaPronta = false;
 let anteprimaZone = null;          // zone mostrate mentre si sceglie la città, prima di iniziare
 let markerDepositi = [], attesaClick = null;
-function zoneAttuali() { return S ? S.zone : (anteprimaZone || []); }
+function zoneAttuali() { return S ? S.zone.concat(anteprimaZone || []) : (anteprimaZone || []); }
 const percorsi = {}; // id furgone -> { giorno, punti }
 const posizioniFurgoni = {}; // id furgone -> [lng, lat] attuale
 
@@ -78,19 +78,22 @@ function avviaMappa(contenitore, quandoFallisce) {
       if (!attesaClick) return;
       const cb = attesaClick; annullaPuntoSullaMappa(); cb([e.lngLat.lng, e.lngLat.lat]);
     });
-    inquadraZone();
+    inquadraZone('c1');
     const avviso = document.getElementById('avviso-mappa'); if (avviso) avviso.hidden = true;
-    window.addEventListener('resize', () => { clearTimeout(inquadraZone._t); inquadraZone._t = setTimeout(inquadraZone, 250); });
+    window.addEventListener('resize', () => { clearTimeout(inquadraZone._t); inquadraZone._t = setTimeout(() => inquadraZone('c1'), 250); });
     mappaPronta = true;
   });
 }
 
 // Inquadra le zone lasciando spazio al pannello. Il margine si adatta alla finestra,
 // così su schermi stretti la mappa non si allontana fino a mostrare tutto il Friuli.
-function inquadraZone() {
+function inquadraZone(cittaId) {
   if (!mappa) return;
-  if (!zoneAttuali().length) return;
-  const tutti = zoneAttuali().flatMap(z => z.poligono), xs = tutti.map(p => p[0]), ys = tutti.map(p => p[1]);
+  // con una città indicata inquadra solo le sue zone; in anteprima (scelta città) solo quelle nuove
+  let lista = anteprimaZone && anteprimaZone.length ? anteprimaZone : zoneAttuali();
+  if (cittaId && !(anteprimaZone && anteprimaZone.length)) lista = lista.filter(z => (z.cittaId || 'c1') === cittaId);
+  if (!lista.length) return;
+  const tutti = lista.flatMap(z => z.poligono), xs = tutti.map(p => p[0]), ys = tutti.map(p => p[1]);
   const W = mappa.getContainer().clientWidth, H = mappa.getContainer().clientHeight;
   const stretto = W <= 760;
   const pannello = stretto ? 0 : Math.min(450, W * 0.45);
@@ -155,14 +158,17 @@ function aggiornaFurgoniMappa(progresso) {
   const primo = S.depositi[0], dep0 = [primo.lng, primo.lat];
   const lavora = feriale(S.giorno);
   const features = S.furgoni.map((f, i) => {
-    let pos = [dep0[0] + 0.0012 + (i % 4) * 0.0006, dep0[1] - 0.0004 - Math.floor(i / 4) * 0.0005];
+    // in deposito: nel magazzino della città del furgone (o nel primo, se non è assegnato)
+    const cittaF = !f.zona ? 'c1' : isJolly(f) ? cittaJolly(f) : ((zona(f.zona) || {}).cittaId || 'c1');
+    const casa = S.depositi.find(x => (x.cittaId || 'c1') === cittaF) || primo;
+    let pos = [casa.lng + 0.0012 + (i % 4) * 0.0006, casa.lat - 0.0004 - Math.floor(i / 4) * 0.0005];
     let colore = '#8a96a3';
     // un jolly va nella zona che gli è toccata oggi (se nessuna, resta in deposito)
-    const idZona = f.zona === ZONA_JOLLY ? (S.inCorso && S.inCorso.jolly && S.inCorso.jolly[f.id]) : f.zona;
+    const idZona = isJolly(f) ? (S.inCorso && S.inCorso.jolly && S.inCorso.jolly[f.id]) : f.zona;
     const z = idZona && zona(idZona);
     if (z && furgoneOperativo(f) && lavora) {
-      colore = f.zona === ZONA_JOLLY ? '#ffd60a' : z.colore;
-      const m = magazzinoVicino(z.centro).magazzino, dep = [m.lng, m.lat];
+      colore = isJolly(f) ? '#ffd60a' : z.colore;
+      const m = magazzinoVicino(z.centro, z.cittaId || 'c1').magazzino, dep = [m.lng, m.lat];
       if (!percorsi[f.id] || percorsi[f.id].giorno !== S.giorno || percorsi[f.id].dep !== m.id) {
         percorsi[f.id] = { giorno: S.giorno, dep: m.id, punti: [dep, ...Array.from({ length: 6 }, () => puntoCasuale(z.poligono)), dep] };
       }

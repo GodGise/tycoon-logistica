@@ -23,11 +23,26 @@ function dataDelGiorno(g) { const d = new Date(DATA_INIZIO); d.setDate(d.getDate
 function chiaveMese(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function feriale(g) { const w = dataDelGiorno(g).getDay(); return w !== 0 && w !== 6; }
 function modello(id) { return CATALOGO.find(m => m.id === id); }
-function zona(id) { return id === ZONA_JOLLY ? { id: ZONA_JOLLY, nome: 'Jolly', colore: '#ffffff' } : S.zone.find(z => z.id === id); }
+function zona(id) { return id && String(id).startsWith(ZONA_JOLLY) ? { id, nome: 'Jolly', colore: '#ffffff' } : S.zone.find(z => z.id === id); }
+// jolly: 'jolly' per la città principale, 'jolly:c2' per una filiale
+function isJolly(f) { return typeof f.zona === 'string' && f.zona.startsWith(ZONA_JOLLY); }
+function cittaJolly(f) { return (f.zona.split(':')[1]) || 'c1'; }
+
+/* ---------- città: la principale (S.citta) e le filiali ---------- */
+function tutteCitta() { return [S.citta, ...(S.filiali || [])]; }
+function cittaDi(id) { return tutteCitta().find(c => c.id === (id || 'c1')) || S.citta; }
+function idCitta(o) { return (o && o.cittaId) || 'c1'; }
+function cittaVicina(lngLat) {
+  let best = S.citta, d = Infinity;
+  tutteCitta().forEach(c => { const k = distanzaKm([c.lng, c.lat], lngLat); if (k < d) { d = k; best = c; } });
+  return { citta: best, km: d };
+}
+function nomeZona(z) { return (S.filiali && S.filiali.length) ? `${z.nome} · ${cittaDi(z.cittaId).nome}` : z.nome; }
 // magazzino più vicino a un punto e km stradali del giro giornaliero di una zona
-function magazzinoVicino(punto) {
+function magazzinoVicino(punto, cittaId) {
   let m = null, d = Infinity;
-  S.depositi.forEach(x => { const k = distanzaKm([x.lng, x.lat], punto); if (k < d) { d = k; m = x; } });
+  const propri = cittaId ? S.depositi.filter(x => idCitta(x) === cittaId) : [];
+  (propri.length ? propri : S.depositi).forEach(x => { const k = distanzaKm([x.lng, x.lat], punto); if (k < d) { d = k; m = x; } });
   return { magazzino: m, km: d };
 }
 // prezzo di un magazzino: 300.000 € in centro, scende fino a 200.000 € al bordo della città
@@ -36,7 +51,7 @@ function prezzoMagazzino(citta, lngLat) {
   const p = COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t;
   return Math.round(p / 5000) * 5000;
 }
-function kmGiro(z) { return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * magazzinoVicino(z.centro).km); }
+function kmGiro(z) { return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * magazzinoVicino(z.centro, idCitta(z)).km); }
 function dipendente(id) { return S.dipendenti.find(d => d.id === id); }
 function nuovoId(pref) { S.seq += 1; return pref + S.seq; }
 
@@ -44,8 +59,8 @@ function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); r
 
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   S = {
-    citta, zone: zonePronte || generaZone(citta),
-    depositi: [{ id: 'm1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
+    citta: Object.assign(citta, { id: 'c1' }), filiali: [], zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
+    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
     cassa: COSTANTI.cassaIniziale, reputazione: 70,
@@ -157,16 +172,16 @@ function vendiFurgone(id) {
   notizia(`Venduto ${modello(f.modello).nome} per ${ricavo} €.`, 'info');
 }
 function puoiMettereMagazzino(lngLat) {
-  const d = distanzaKm([S.citta.lng, S.citta.lat], lngLat);
-  return d <= S.citta.raggio * COSTANTI.distanzaMaxMagazzino ? null : `Troppo lontano dalla città (${Math.round(d)} km dal centro).`;
+  const { citta, km } = cittaVicina(lngLat);
+  return km <= citta.raggio * COSTANTI.distanzaMaxMagazzino ? null : `Troppo lontano dalle tue città (${Math.round(km)} km dal centro di ${citta.nome}).`;
 }
 function apriMagazzino(lngLat) {
   const err = puoiMettereMagazzino(lngLat); if (err) return err;
-  const prezzo = prezzoMagazzino(S.citta, lngLat);
+  const cittaM = cittaVicina(lngLat).citta, prezzo = prezzoMagazzino(cittaM, lngLat);
   if (S.cassa < prezzo) return `Qui un magazzino costa ${prezzo.toLocaleString('it-IT')} €: non hai abbastanza soldi.`;
   movimento('magazzini', -prezzo);
   const n = S.depositi.length + 1;
-  S.depositi.push({ id: nuovoId('m'), nome: 'Magazzino ' + n, lng: lngLat[0], lat: lngLat[1], valore: prezzo });
+  S.depositi.push({ id: nuovoId('m'), cittaId: cittaM.id, nome: 'Magazzino ' + n + (S.filiali.length ? ' ' + cittaM.nome : ''), lng: lngLat[0], lat: lngLat[1], valore: prezzo });
   notizia(`Comprato il Magazzino ${n} per ${prezzo.toLocaleString('it-IT')} €. Ogni zona parte dal magazzino più vicino.`, 'buono');
   return null;
 }
@@ -236,9 +251,7 @@ function concludiGiornata() {
 }
 
 function giornoLavorativo() {
-  const magazzinieri = S.dipendenti.filter(x => x.ruolo === 'magazziniere').length;
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));  // i jolly non aprono zone nuove
-  const capSmistamento = Math.round(magazzinieri * COSTANTI.pacchiMagazziniere * effetto.smistamento());
   forseEvento();
   const sciopero = effetto.sciopero();
   if (sciopero) notizia('Sciopero: oggi i furgoni restano in deposito.', 'male', 'sciopero');
@@ -250,11 +263,18 @@ function giornoLavorativo() {
   let totale = 0;
   servite.forEach(z => { arrivo[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + S.giacenze[z.id]; totale += arrivo[z.id]; });
   S.zone.forEach(z => { if (!arrivo[z.id]) S.giacenze[z.id] = 0; });
-  const quota = totale > 0 ? Math.min(1, capSmistamento / totale) : 0;
-  const smistatiOggi = Math.floor(totale * quota);
-  S.dipendenti.filter(x => x.ruolo === 'magazziniere').forEach(x => { stat(x, 'giorni', 1); stat(x, 'pacchi', smistatiOggi / magazzinieri); });
-  if (servite.length && magazzinieri === 0) notizia('Nessun magazziniere: i pacchi restano nel magazzino e i furgoni non partono.', 'male', 'no-mag');
-  else if (quota < 1) notizia('Magazzino intasato: i magazzinieri non riescono a smistare tutti i pacchi.', 'male', 'intasato');
+  // smistamento: ogni città ha i suoi magazzinieri
+  const quota = {}, multi = S.filiali && S.filiali.length;
+  tutteCitta().forEach(c => {
+    const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && idCitta(x) === c.id);
+    const cap = Math.round(mags.length * COSTANTI.pacchiMagazziniere * effetto.smistamento());
+    const tot = servite.filter(z => idCitta(z) === c.id).reduce((t, z) => t + arrivo[z.id], 0);
+    quota[c.id] = tot > 0 ? Math.min(1, cap / tot) : 0;
+    mags.forEach(x => { stat(x, 'giorni', 1); stat(x, 'pacchi', Math.floor(tot * quota[c.id]) / mags.length); });
+    const dove = multi ? c.nome + ': ' : '';
+    if (tot > 0 && !mags.length) notizia(`${dove}nessun magazziniere, i pacchi restano nel magazzino e i furgoni non partono.`, 'male', 'no-mag-' + c.id);
+    else if (quota[c.id] < 1) notizia(`${dove}magazzino intasato, i magazzinieri non riescono a smistare tutti i pacchi.`, 'male', 'intasato-' + c.id);
+  });
 
   let incassoZone = 0, consegneTot = 0, consegneNormali = 0, carburante = 0, ricarica = 0, manut = 0, giacenzeTot = 0;
   const perZona = {}, perFurgone = {}, chiusi = [], jollyOggi = {};
@@ -263,7 +283,7 @@ function giornoLavorativo() {
   // 1) ogni zona con i suoi furgoni: prima i contratti, poi i pacchi normali
   const ris = {};
   servite.forEach(z => {
-    const smistati = Math.floor(arrivo[z.id] * quota);
+    const smistati = Math.floor(arrivo[z.id] * quota[idCitta(z)]);
     const giri = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f));
     const ec = eseguiContratti(z, giri, giri.reduce((t, f) => t + capacitaFurgone(f), 0));
     chiusi.push(...ec.chiusi);
@@ -273,10 +293,10 @@ function giornoLavorativo() {
   });
 
   // 2) i jolly vanno da soli nella zona con più pacchi pronti in deposito che nessuno porta
-  const jolly = sciopero ? [] : S.furgoni.filter(f => f.zona === ZONA_JOLLY && furgoneOperativo(f));
+  const jolly = sciopero ? [] : S.furgoni.filter(f => isJolly(f) && furgoneOperativo(f));
   jolly.forEach(f => {
     let meglio = null, attesa = 0;
-    Object.values(ris).forEach(r => { const pronti = r.smistati - r.consegne; if (pronti > attesa) { attesa = pronti; meglio = r; } });
+    Object.values(ris).forEach(r => { if (idCitta(r.z) !== cittaJolly(f)) return; const pronti = r.smistati - r.consegne; if (pronti > attesa) { attesa = pronti; meglio = r; } });
     if (!meglio) { jollyOggi[f.id] = null; return; }
     const extra = Math.min(attesa, capacitaFurgone(f));
     meglio.consegne += extra; meglio.jolly.push({ f, n: extra });
@@ -310,7 +330,7 @@ function giornoLavorativo() {
     const totZona = consegne - daJolly + consegneCtr;
     const lavori = giri.map((f, i) => ({ f, mie: Math.floor(totZona / giri.length) + (i < totZona % giri.length ? 1 : 0) }))
       .concat(r.jolly.map(j => ({ f: j.f, mie: j.n })));
-    stat(magazzinoVicino(z.centro).magazzino, 'pacchi', r.smistati);
+    stat(magazzinoVicino(z.centro, idCitta(z)).magazzino, 'pacchi', r.smistati);
     lavori.forEach(({ f, mie }) => {
       perFurgone[f.id] = mie;
       const km = Math.round(kmGiro(z) * effetto.km(z.id) * (ha(f, 'navigatore') ? 0.92 : 1) * (0.7 + 0.3 * Math.min(1, mie / 100)));
@@ -399,6 +419,8 @@ function carica() {
       S = JSON.parse(t);
       // partite salvate prima di questa versione
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
+      if (!S.citta.id) S.citta.id = 'c1';
+      if (!S.filiali) S.filiali = [];
       if (!S.contrattiAttivi) S.contrattiAttivi = [];
       // conti: aggiunge le voci nuove e ripara i valori rotti (NaN) delle versioni precedenti
       const ripara = v => { Object.keys(VOCI).forEach(k => { if (!Number.isFinite(v[k])) v[k] = 0; }); for (const k in v) if (!Number.isFinite(v[k])) v[k] = 0; };
@@ -450,3 +472,31 @@ function recuperaOffline() {
   delete S.recuperoOffline;
   return { secondi, ridotto: (Date.now() - S.salvatoIl) / 1000 > OFFLINE_MAX_SECONDI, giorni: S.giorno - prima.giorno, consegne, differenza: S.cassa - prima.cassa };
 }
+
+/* ---------- filiali in altre città ---------- */
+const FILIALE = { costo: 50000, furgoni: 5, reputazione: 60 };
+function requisitiFiliale() {
+  const mancano = [];
+  if (S.furgoni.length < FILIALE.furgoni) mancano.push(`almeno ${FILIALE.furgoni} furgoni (ne hai ${S.furgoni.length})`);
+  if (S.reputazione < FILIALE.reputazione) mancano.push(`reputazione almeno ${FILIALE.reputazione} (ora ${Math.round(S.reputazione)})`);
+  if (S.cassa < FILIALE.costo + COSTANTI.prezzoMagazzinoMin) mancano.push(`almeno ${(FILIALE.costo + COSTANTI.prezzoMagazzinoMin).toLocaleString('it-IT')} € in cassa`);
+  return mancano;
+}
+function apriFiliale(citta, lngLat, zonePronte) {
+  const manca = requisitiFiliale(); if (manca.length) return 'Ti servono ' + manca.join(', ') + '.';
+  if (tutteCitta().some(c => distanzaKm([c.lng, c.lat], [citta.lng, citta.lat]) < c.raggio + citta.raggio)) return 'Questa città è troppo vicina a una dove sei già.';
+  const id = 'c' + (S.filiali.length + 2);
+  const nuova = Object.assign({}, citta, { id });
+  const d = distanzaKm([citta.lng, citta.lat], lngLat);
+  if (d > citta.raggio * COSTANTI.distanzaMaxMagazzino) return `Troppo lontano dal centro di ${citta.nome} (${Math.round(d)} km).`;
+  const prezzo = prezzoMagazzino(nuova, lngLat);
+  if (S.cassa < FILIALE.costo + prezzo) return `Servono ${(FILIALE.costo + prezzo).toLocaleString('it-IT')} € (apertura + magazzino).`;
+  movimento('magazzini', -(FILIALE.costo + prezzo));
+  S.filiali.push(nuova);
+  const zone = (zonePronte || generaZone(nuova)).map(z => Object.assign(z, { id: id + '-' + z.id, cittaId: id }));
+  zone.forEach(z => { S.zone.push(z); S.giacenze[z.id] = 0; });
+  S.depositi.push({ id: nuovoId('m'), cittaId: id, nome: 'Magazzino ' + citta.nome, lng: lngLat[0], lat: lngLat[1], valore: prezzo });
+  notizia(`Aperta la filiale di ${citta.nome}! Assumi magazzinieri per la nuova città e assegna i furgoni alle sue zone.`, 'buono');
+  return null;
+}
+function spostaMagazziniere(id, cittaId) { const d = dipendente(id); if (d) d.cittaId = cittaId; }

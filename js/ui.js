@@ -13,7 +13,8 @@ const fmtData = g => dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'sh
 let scheda = 'azienda', ultimoT = null, daRidisegnare = true;
 let negozioUsato = false, negozioAperto = false, negozioAllestimento = 'standard';
 let prezziCaricati = null, posizionando = false;
-let dettaglio = null; // { tipo: 'furgone' | 'dipendente' | 'magazzino', id }
+let dettaglio = null;
+let cittaVista = 'c1';  // città mostrata nella lista zone della scheda Azienda // { tipo: 'furgone' | 'dipendente' | 'magazzino', id }
 const inizio = { fase: 'citta', risultati: null, citta: null, cercando: false, errore: '' };
 
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('vis'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('vis'), 2600); }
@@ -26,7 +27,9 @@ function vistaAzienda() {
   const rep = Math.round(S.reputazione), cls = rep >= 60 ? '' : rep >= 35 ? 'medio' : 'basso';
   const inc = S.inCorso && S.inCorso.giorno === S.giorno ? S.inCorso : null;
   const ieri = S.ieri && !S.ieri.festivo ? `${intero.format(S.ieri.consegne)} consegne · ${eur.format(inc ? inc.accreditato : S.ieri.incasso)} di ${eur.format(S.ieri.incasso)}` : 'Oggi non si lavora';
-  const zone = S.zone.map(z => {
+  const multi = S.filiali && S.filiali.length;
+  if (!tutteCitta().some(c => c.id === cittaVista)) cittaVista = 'c1';
+  const zone = S.zone.filter(z => idCitta(z) === cittaVista).map(z => {
     const giri = S.furgoni.filter(f => f.zona === z.id);
     const pz = S.ieri && S.ieri.perZona && S.ieri.perZona[z.id];
     const cap = giri.length * COSTANTI.maxConsegneCorriere, cop = cap ? Math.min(100, Math.round(cap / z.pacchi * 100)) : 0;
@@ -56,7 +59,10 @@ function vistaAzienda() {
   ${vistaMagazzini()}
   ${vistaMiglioramenti()}
   ${vistaTraguardi()}
-  <div><h2>Zone di consegna <small>${esc(S.citta.nome)} · ${S.zone.length} zone</small></h2><div style="display:grid;gap:8px">${zone}</div>
+  ${vistaFiliali()}
+  <div><h2>Zone di consegna <small>${esc(cittaDi(cittaVista).nome)} · ${S.zone.filter(z => idCitta(z) === cittaVista).length} zone</small></h2>
+  ${multi ? `<div class="interruttore a-capo" style="margin-bottom:8px">${tutteCitta().map(c => `<button data-azione="vedi-citta" data-id="${c.id}" aria-pressed="${c.id === cittaVista}">${esc(c.nome)}</button>`).join('')}</div>` : ''}
+  <div style="display:grid;gap:8px">${zone}</div>
   <p class="nota" style="margin-top:8px">Un corriere fa al massimo ${COSTANTI.maxConsegneCorriere} consegne al giorno; un magazziniere smista ${COSTANTI.pacchiMagazziniere} pacchi.</p></div>
   <div class="scheda">
     <h2 style="margin:0">Prezzi della settimana <small>${esc(p.settimana || '')}</small></h2>
@@ -74,7 +80,7 @@ function vistaObiettivoEContratti() {
   const ob = o ? `<div class="scheda obiettivo"><div class="riga"><span>Obiettivo di ${quando(o.giorno)}</span><b class="piu">+${eur.format(o.premio)}</b></div><div>${esc(o.testo)}</div></div>` : '';
   const ctr = S.contrattiAttivi.length ? `<div class="scheda"><h2 style="margin:0">Contratti firmati</h2>${S.contrattiAttivi.map(c => {
     const pronti = furgoniAdatti(c.zona, c.tipo).length;
-    return `<div class="riga a-capo"><span><b style="color:var(--testo)">${esc(c.cliente)}</b> · ${c.pacchi} ${TIPI_CARICO[c.tipo].unita} · ${esc(zona(c.zona).nome)} · ${quando(c.giorno)}</span>
+    return `<div class="riga a-capo"><span><b style="color:var(--testo)">${esc(c.cliente)}</b> · ${c.pacchi} ${TIPI_CARICO[c.tipo].unita} · ${esc(nomeZona(zona(c.zona)))} · ${quando(c.giorno)}</span>
       <span class="num ${pronti ? 'piu' : 'meno'}">${pronti ? eur.format(c.totale) : (c.tipo === 'standard' ? 'nessun furgone in zona!' : 'serve furgone ' + ALLESTIMENTI[c.tipo].nome.toLowerCase() + '!')}</span></div>`;
   }).join('')}</div>` : '';
   return ob + ctr;
@@ -92,7 +98,7 @@ function disegnaOfferta() {
       ? (pronti ? `Hai ${pronti} furgon${pronti > 1 ? 'i' : 'e'} in questa zona` : 'Nessun furgone in questa zona: assegnane uno prima del giorno di consegna')
       : (pronti ? `Hai un furgone ${ALLESTIMENTI[o.tipo].nome.toLowerCase()} in questa zona` : `Serve un furgone ${ALLESTIMENTI[o.tipo].nome.toLowerCase()} assegnato a questa zona`);
     el.innerHTML = `<div class="offerta-testa"><span class="badge ${o.tipo === 'standard' ? '' : 'speciale'}">${t.nome}</span><span class="nota">Nuovo contratto</span></div>
-      <div class="offerta-corpo"><div><b>${esc(o.cliente)}</b><div class="nota">${o.pacchi} ${t.unita} in zona ${esc(z.nome)} · ${o.giorno === S.giorno + 1 ? 'domani' : dataDelGiorno(o.giorno).toLocaleDateString('it-IT', { weekday: 'long' })} · ${eurCent.format(o.paga)} l'uno</div></div>
+      <div class="offerta-corpo"><div><b>${esc(o.cliente)}</b><div class="nota">${o.pacchi} ${t.unita} in zona ${esc(nomeZona(z))} · ${o.giorno === S.giorno + 1 ? 'domani' : dataDelGiorno(o.giorno).toLocaleDateString('it-IT', { weekday: 'long' })} · ${eurCent.format(o.paga)} l'uno</div></div>
       <div class="offerta-totale">${eur.format(o.totale)}</div></div>
       <div class="nota ${pronti ? 'piu' : 'meno'}">${requisito}. Se non consegni tutto paghi una penale.</div>
       <div class="metro"><i id="offerta-tempo"></i></div>
@@ -153,9 +159,23 @@ document.addEventListener('click', e => {
   esito(null, testo);
 });
 
+function vistaFiliali() {
+  const manca = requisitiFiliale();
+  const lista = tutteCitta().map(c => {
+    const furgoni = S.furgoni.filter(f => f.zona && (isJolly(f) ? cittaJolly(f) === c.id : idCitta(zona(f.zona)) === c.id)).length;
+    const mags = S.dipendenti.filter(d => d.ruolo === 'magazziniere' && idCitta(d) === c.id).length;
+    return `<div class="riga"><span><b style="color:var(--testo)">${esc(c.nome)}</b>${c.id === 'c1' ? ' · sede' : ''} · ${furgoni} furgon${furgoni === 1 ? 'e' : 'i'} · ${mags} magazzinier${mags === 1 ? 'e' : 'i'}</span>
+      <button class="btn piccolo" data-azione="vedi-citta" data-id="${c.id}">Vedi</button></div>`;
+  }).join('');
+  return `<div class="scheda"><h2 style="margin:0">Città <small>${tutteCitta().length === 1 ? 'solo la sede' : tutteCitta().length + ' città'}</small></h2>${lista}
+    ${manca.length ? `<p class="nota">Per aprire una filiale in un'altra città ti servono ${manca.join(', ')}.</p><button class="btn" disabled>Apri una filiale</button>`
+      : `<button class="btn primario" data-azione="apri-filiale">Apri una filiale (${eur.format(FILIALE.costo)} + magazzino)</button>`}
+  </div>`;
+}
+
 function vistaMagazzini() {
   const lista = S.depositi.map((m, i) => {
-    const zoneServite = S.zone.filter(z => magazzinoVicino(z.centro).magazzino.id === m.id && S.furgoni.some(f => f.zona === z.id)).length;
+    const zoneServite = S.zone.filter(z => magazzinoVicino(z.centro, idCitta(z)).magazzino.id === m.id && S.furgoni.some(f => f.zona === z.id)).length;
     return `<div class="riga"><span><b style="color:var(--testo)">${i + 1}</b> · <button class="titolo-link piccolo" data-azione="dettaglio" data-tipo="magazzino" data-id="${m.id}">${esc(m.nome)} ›</button> · ${zoneServite} zon${zoneServite === 1 ? 'a' : 'e'} servit${zoneServite === 1 ? 'a' : 'e'}</span>
       ${S.depositi.length > 1 ? `<button class="btn piccolo" data-azione="vendi-magazzino" data-id="${m.id}">Vendi per ${eur.format(valoreMagazzino(m) * COSTANTI.rivenditaMagazzino)}</button>` : `<span class="num">${eur.format(valoreMagazzino(m))}</span>`}</div>`;
   }).join('');
@@ -170,6 +190,21 @@ function vistaMagazzini() {
 }
 
 function vistaInizio() {
+  const filiale = inizio.modo === 'filiale';
+  if (inizio.fase === 'magazzino' && filiale) {
+    const c = inizio.citta;
+    return `<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>
+    <div class="scheda"><h2 style="margin:0">Filiale di ${esc(c.nome)}</h2><p class="nota">${esc(c.dettaglio || '')}</p>
+      <div class="riga"><span>Zone create in automatico</span><span class="num">${anteprimaZone ? anteprimaZone.length : 0}</span></div>
+      <div class="riga"><span>Pacchi al giorno in tutta la città</span><span class="num">${anteprimaZone ? intero.format(anteprimaZone.reduce((a, z) => a + z.pacchi, 0)) : 0}</span></div></div>
+    <div class="scheda"><h2 style="margin:0">Metti il magazzino della filiale</h2>
+      <p style="margin:0">Clicca sulla mappa dove vuoi il magazzino di ${esc(c.nome)}.</p>
+      <div class="riga"><span>Apertura della filiale</span><span class="num">${eur.format(FILIALE.costo)}</span></div>
+      <div class="riga"><span>Magazzino</span><span class="num">${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)}</span></div>
+      <div class="riga"><span>In cassa</span><span class="num">${eur.format(S.cassa)}</span></div>
+      ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}</div>
+    <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
+  }
   if (inizio.fase === 'magazzino') {
     const c = inizio.citta;
     return `<div class="scheda">
@@ -191,21 +226,21 @@ function vistaInizio() {
   }
   const voce = (c, i, gruppo) => `<button class="voce-citta" data-azione="scegli-citta" data-gruppo="${gruppo}" data-i="${i}"><b>${esc(c.nome)}</b><span>${esc(c.dettaglio || '')}</span></button>`;
   const risultati = inizio.risultati;
-  return `<div style="display:grid;gap:10px">
-      <h2 style="margin:0;font-size:22px">Dove apri la tua azienda?</h2>
-      <p class="nota" style="margin:0">Scegli una città qualsiasi: le zone di consegna si creano da sole, a cerchi intorno al centro.</p>
+  return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : ''}<div style="display:grid;gap:10px">
+      <h2 style="margin:0;font-size:22px">${filiale ? 'In quale città apri la filiale?' : 'Dove apri la tua azienda?'}</h2>
+      <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : 'Scegli una città qualsiasi: le zone di consegna si creano da sole, a cerchi intorno al centro.'}</p>
       <form class="cerca" data-azione="cerca"><input id="cerca-citta" type="search" placeholder="Cerca una città…" autocomplete="off" value="${esc(inizio.testo || '')}"><button class="btn primario" type="submit" ${inizio.cercando ? 'disabled' : ''}>${inizio.cercando ? 'Cerco…' : 'Cerca'}</button></form>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}
     </div>
     ${risultati ? `<div class="lista-citta">${risultati.length ? risultati.map((c, i) => voce(c, i, 'r')).join('') : '<p class="nota">Nessuna città trovata.</p>'}</div>` : ''}
-    <div><h2>Oppure parti da qui</h2><div class="lista-citta">${CITTA_SUGGERITE.map((c, i) => voce(c, i, 's')).join('')}</div></div>
+    <div><h2>Oppure ${filiale ? 'scegli' : 'parti'} da qui</h2><div class="lista-citta">${CITTA_SUGGERITE.filter(c => !S || !tutteCitta().some(x => x.nome === c.nome)).map(c => voce(c, CITTA_SUGGERITE.indexOf(c), 's')).join('')}</div></div>
     <p class="nota">Ricerca: © OpenStreetMap, Nominatim.</p>`;
 }
 
 // Scheda Giri: per ogni zona quanti pacchi ci sono e quanti aspettano in deposito
 function vistaGiri() {
   const pz = (S.ieri && S.ieri.perZona) || {};
-  const jolly = S.furgoni.filter(f => f.zona === ZONA_JOLLY);
+  const jolly = S.furgoni.filter(f => isJolly(f));
   const dove = S.inCorso && S.inCorso.jolly || {};
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id))
     .map(z => ({ z, d: pz[z.id] || null, attesa: S.giacenze[z.id] || 0 }))
@@ -217,7 +252,7 @@ function vistaGiri() {
     const arrivo = d ? d.arrivo : z.pacchi;
     const pieno = cap ? Math.min(100, Math.round(arrivo / cap * 100)) : 100;
     return `<div class="scheda giro ${attesa > 0 ? 'in-ritardo' : ''}">
-      <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span>
+      <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(nomeZona(z))}</span>
         <span class="num ${attesa > 0 ? 'meno' : 'piu'}"><b>${intero.format(attesa)}</b> in attesa</span></div>
       <div class="metro ${pieno > 100 || attesa > 0 ? 'basso' : pieno > 85 ? 'medio' : ''}"><i style="width:${Math.min(100, pieno)}%"></i></div>
       <div class="griglia-giro">
@@ -236,7 +271,7 @@ function vistaGiri() {
     <div class="scheda jolly-box">
       <div class="riga"><h2 style="margin:0">Jolly</h2><span class="badge">${jolly.length} furgon${jolly.length === 1 ? 'e' : 'i'}</span></div>
       ${jolly.length ? jolly.map(f => { const z = dove[f.id] ? zona(dove[f.id]) : null, a = dipendente(f.autistaId);
-        return `<div class="riga"><span>${esc(modello(f.modello).nome)} · ${a ? esc(a.nome) : 'senza autista'}</span><span class="num">${!furgoneOperativo(f) ? '<span class="meno">fermo</span>' : z ? 'oggi in ' + esc(z.nome) : 'in deposito'}</span></div>`; }).join('')
+        return `<div class="riga"><span>${esc(modello(f.modello).nome)} · ${a ? esc(a.nome) : 'senza autista'}</span><span class="num">${!furgoneOperativo(f) ? '<span class="meno">fermo</span>' : z ? 'oggi in ' + esc(nomeZona(z)) : 'in deposito'}</span></div>`; }).join('')
         : '<p class="nota">Nessun jolly. Nella scheda Flotta scegli "Jolly" come zona di un furgone: ogni mattina andrà da solo nella zona con più pacchi in attesa e la svuoterà. Utile anche quando un furgone è fermo per un incidente.</p>'}
     </div>
     ${righe || '<p class="nota">Nessuna zona servita: assegna un furgone a una zona nella scheda Flotta.</p>'}`;
@@ -263,7 +298,7 @@ function dettaglioFurgone(f) {
     <div><b>${capacitaFurgone(f)}</b><span>pacchi per giro</span></div>
     <div><b>${eurCent.format(c.energia + c.manutenzione)}</b><span>costo al km</span></div>
     <div><b>${eur.format(assicurazioneFurgone(f))}</b><span>assicurazione/mese</span></div></div>`;
-  const stato = f.fermo > 0 ? `fermo ${f.fermo} gg (${f.motivo})` : furgoneOperativo(f) ? (f.zona === ZONA_JOLLY ? 'jolly' : 'in zona ' + zona(f.zona).nome) : 'non operativo';
+  const stato = f.fermo > 0 ? `fermo ${f.fermo} gg (${f.motivo})` : furgoneOperativo(f) ? (isJolly(f) ? 'jolly' : 'in zona ' + nomeZona(zona(f.zona))) : 'non operativo';
   const pot = Object.entries(POTENZIAMENTI_FURGONE).map(([k, p]) => `<div class="miglioramento"><div><b>${p.nome}</b><div class="nota">${p.descr}</div></div>
     ${ha(f, k) ? '<span class="badge">Montato</span>' : `<button class="btn piccolo" data-azione="potenzia" data-id="${f.id}" data-p="${k}" ${S.cassa < p.costo ? 'disabled' : ''}>${eur.format(p.costo)}</button>`}</div>`).join('');
   return `${testaDettaglio(esc(m.nome) + (f.usato ? ' <small class="nota">usato</small>' : ''), `${m.tipo} · ${ALLESTIMENTI[f.allestimento || 'standard'].nome.toLowerCase()} · ${intero.format(f.km)} km · ${stato}${a ? ' · autista ' + esc(a.nome) : ''}`, 'Flotta')}
@@ -283,7 +318,7 @@ function dettaglioDipendente(d) {
   const giorniAz = S.giorno - d.assuntoGiorno;
   const costoUnita = per => { const n = leggiStat(d, per, autista ? 'consegne' : 'pacchi'); return n ? leggiStat(d, per, 'stipendio') / n : 0; };
   const corsoTra = d.ultimoCorso !== undefined ? CORSO_AUTISTA.pausaGiorni - (S.giorno - d.ultimoCorso) : 0;
-  return `${testaDettaglio(esc(d.nome), `${RUOLI[d.ruolo].nome} · in azienda da ${giorniAz} giorn${giorniAz === 1 ? 'o' : 'i'}${f ? ' · ' + esc(modello(f.modello).nome) + (f.zona === ZONA_JOLLY ? ' (jolly)' : f.zona ? ' in ' + esc(zona(f.zona).nome) : '') : ''}`, 'Personale')}
+  return `${testaDettaglio(esc(d.nome), `${RUOLI[d.ruolo].nome} · in azienda da ${giorniAz} giorn${giorniAz === 1 ? 'o' : 'i'}${f ? ' · ' + esc(modello(f.modello).nome) + (isJolly(f) ? ' (jolly)' : f.zona ? ' in ' + esc(zona(f.zona).nome) : '') : ''}`, 'Personale')}
     <div class="kpi">
       <div><b>${eur.format(d.stipendio)}</b><span>stipendio/mese</span></div>
       ${autista ? `<div><b>${Math.round(d.esperienza)}</b><span>esperienza /100</span></div>` : `<div><b>${intero.format(Math.round(COSTANTI.pacchiMagazziniere * effetto.smistamento()))}</b><span>pacchi al giorno</span></div>`}
@@ -303,9 +338,9 @@ function dettaglioDipendente(d) {
     </div>`;
 }
 function dettaglioMagazzino(mz) {
-  const zone = S.zone.filter(z => magazzinoVicino(z.centro).magazzino.id === mz.id);
+  const zone = S.zone.filter(z => magazzinoVicino(z.centro, idCitta(z)).magazzino.id === mz.id);
   const servite = zone.filter(z => S.furgoni.some(f => f.zona === z.id));
-  const furgoni = S.furgoni.filter(f => f.zona && f.zona !== ZONA_JOLLY && servite.some(z => z.id === f.zona)).length;
+  const furgoni = S.furgoni.filter(f => f.zona && !isJolly(f) && servite.some(z => z.id === f.zona)).length;
   return `${testaDettaglio(esc(mz.nome), `${zone.length} zone vicine · ${servite.length} servite · ${furgoni} furgon${furgoni === 1 ? 'e' : 'i'} partono da qui`, 'Azienda')}
     <div class="kpi">
       <div><b>${eur.format(valoreMagazzino(mz))}</b><span>pagato</span></div>
@@ -452,7 +487,11 @@ function vistaFlotta() {
       const altro = S.furgoni.find(x => x.autistaId === a.id && x.id !== f.id);
       return `<option value="${a.id}" ${f.autistaId === a.id ? 'selected' : ''}>${esc(a.nome)}${altro ? ' (su altro furgone)' : ''}</option>`;
     })].join('');
-    const optZ = ['<option value="">In deposito</option>', `<option value="${ZONA_JOLLY}" ${f.zona === ZONA_JOLLY ? 'selected' : ''}>Jolly: va dove ci sono più pacchi</option>`, ...S.zone.map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}</option>`)].join('');
+    const optZ = '<option value="">In deposito</option>' + tutteCitta().map(c => {
+      const j = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id;
+      const opts = `<option value="${j}" ${f.zona === j ? 'selected' : ''}>Jolly: va dove ci sono più pacchi</option>` + S.zone.filter(z => idCitta(z) === c.id).map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}</option>`).join('');
+      return tutteCitta().length > 1 ? `<optgroup label="${esc(c.nome)}">${opts}</optgroup>` : opts;
+    }).join('');
     return `<div class="scheda">
       <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="furgone" data-id="${f.id}">${esc(m.nome)}${f.usato ? ' <small class="nota">usato</small>' : ''} ›</button><span class="badge ${m.tipo}">${m.tipo}</span></div>
       ${f.allestimento && f.allestimento !== 'standard' ? `<div class="riga"><span>Allestimento</span><span class="badge speciale">${ALLESTIMENTI[f.allestimento].nome}</span></div>` : ''}
@@ -477,7 +516,8 @@ function vistaPersonale() {
     const lista = staff.map(d => `<div class="scheda">
       <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="dipendente" data-id="${d.id}">${esc(d.nome)} ›</button><span class="num">${eur.format(d.stipendio)}/mese</span></div>
       ${ruolo === 'autista' ? `<div class="riga"><span>Esperienza</span><span class="num">${Math.round(d.esperienza)}/100</span></div><div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
-      <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id && f.zona === ZONA_JOLLY) ? '<b style="color:#ffd60a">Jolly</b>' : S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
+      ${ruolo === 'magazziniere' && S.filiali && S.filiali.length ? `<label><span class="nota">Lavora a</span><select data-azione="citta-mag" data-id="${d.id}">${tutteCitta().map(c => `<option value="${c.id}" ${idCitta(d) === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>` : ''}
+      <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id && isJolly(f)) ? '<b style="color:#ffd60a">Jolly</b>' : S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
       <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia</button></div>
     </div>`).join('');
     const cand = S.candidati[ruolo].map(c => `<div class="scheda">
@@ -504,7 +544,7 @@ const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita,
 
 function testata() {
   $('#nome-azienda').textContent = S ? S.nomeAzienda : 'Tycoon Logistica';
-  $('#sotto-marchio').textContent = S ? `Tycoon Logistica · ${S.citta.nome}` : 'nome del gioco provvisorio';
+  $('#sotto-marchio').textContent = S ? `Tycoon Logistica · ${S.citta.nome}${S.filiali && S.filiali.length ? ' + ' + S.filiali.length + ' filial' + (S.filiali.length > 1 ? 'i' : 'e') : ''}` : 'nome del gioco provvisorio';
   $('#logo').textContent = S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL';
   if (!S) { $('#cassa').textContent = '–'; $('#utile-mese').textContent = 'Scegli una città per iniziare'; $('#data').textContent = 'Nuova partita'; return; }
   $('#cassa').textContent = eur.format(S.cassa);
@@ -516,8 +556,8 @@ function testata() {
 function ridisegna() {
   testata();
   const c = $('#contenuto'), scroll = c.scrollTop;
-  document.querySelector('.pannello').classList.toggle('in-avvio', !S);
-  c.innerHTML = S ? (dettaglio ? vistaDettaglio() : VISTE[scheda]()) : vistaInizio();
+  document.querySelector('.pannello').classList.toggle('in-avvio', !S || inizio.modo === 'filiale');
+  c.innerHTML = !S || inizio.modo === 'filiale' ? vistaInizio() : dettaglio ? vistaDettaglio() : VISTE[scheda]();
   const chiave = scheda + (dettaglio ? ':' + dettaglio.id : '');
   if (c.dataset.scheda !== chiave) { c.dataset.scheda = chiave; c.classList.remove('entra'); void c.offsetWidth; c.classList.add('entra'); }
   c.scrollTop = scroll;
@@ -567,6 +607,9 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'apri-filiale': Object.assign(inizio, { modo: 'filiale', fase: 'citta', risultati: null, citta: null, errore: '' }); $('#contenuto').scrollTop = 0; ridisegna(); break;
+    case 'annulla-filiale': annullaPuntoSullaMappa(); Object.assign(inizio, { modo: null, fase: 'citta', citta: null, errore: '' }); anteprimaZone = null; aggiornaZoneMappa(); inquadraZone(cittaVista); ridisegna(); break;
+    case 'vedi-citta': cittaVista = b.dataset.id; inquadraZone(cittaVista); ridisegna(); break;
     case 'chiudi-dettaglio': dettaglio = null; $('#contenuto').scrollTop = 0; ridisegna(); break;
     case 'potenzia': esito(compraPotenziamento(id, b.dataset.p), 'Potenziamento montato!'); break;
     case 'corso': esito(corsoAutista(id), 'Corso fatto: esperienza aumentata.'); break;
@@ -600,6 +643,18 @@ function scegliCitta(c) {
   if (!c) return;
   Object.assign(inizio, { fase: 'magazzino', citta: c, errore: '' });
   mostraCitta(c); ridisegna();
+  if (inizio.modo === 'filiale') {
+    const attendiF = punto => {
+      const err = apriFiliale(c, punto, anteprimaZone);
+      if (err) { inizio.errore = err; ridisegna(); chiediPuntoSullaMappa(attendiF); return; }
+      const nuova = S.filiali[S.filiali.length - 1];
+      Object.assign(inizio, { modo: null, fase: 'citta', citta: null, risultati: null, errore: '' }); anteprimaZone = null;
+      cittaVista = nuova.id; salva(); scheda = 'azienda'; ridisegna(); aggiornaZoneMappa();
+      toast(`Filiale di ${nuova.nome} aperta! Assumi magazzinieri per la nuova città.`);
+    };
+    chiediPuntoSullaMappa(attendiF);
+    return;
+  }
   const attendi = punto => {
     const d = distanzaKm([c.lng, c.lat], punto);
     if (d > c.raggio * COSTANTI.distanzaMaxMagazzino) { inizio.errore = `Troppo lontano dal centro (${Math.round(d)} km): avvicinati alla città.`; ridisegna(); chiediPuntoSullaMappa(attendi); return; }
@@ -613,6 +668,7 @@ function scegliCitta(c) {
 $('#contenuto').addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.azione === 'assegna') { assegna(t.dataset.id, t.dataset.campo, t.value); t.blur(); esito(); }
+  if (t.dataset.azione === 'citta-mag') { spostaMagazziniere(t.dataset.id, t.value); t.blur(); esito(null, 'Magazziniere spostato.'); }
   if (t.dataset.azione === 'stipendio') { S.offerta[t.dataset.ruolo] = +t.value; t.blur(); salva(); if (daRidisegnare) ridisegna(); }
 });
 $('#contenuto').addEventListener('input', e => {
