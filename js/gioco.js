@@ -153,14 +153,14 @@ function licenzia(id) {
 }
 
 /* ---------- flotta ---------- */
-function prezzoAcquisto(m, usato, all = 'standard') { return Math.round(m.prezzo * (usato ? SCONTO_USATO : 1)) + ALLESTIMENTI[all].costo; }
-function compraFurgone(idModello, usato, allestimento = 'standard') {
-  const m = modello(idModello), prezzo = prezzoAcquisto(m, usato, allestimento);
+function prezzoAcquisto(m, usato) { return Math.round(m.prezzo * (usato ? SCONTO_USATO : 1)); }
+function compraFurgone(idModello, usato) {
+  const m = modello(idModello), prezzo = prezzoAcquisto(m, usato);
   if (S.cassa < prezzo) return 'Non hai abbastanza soldi.';
   movimento('mezzi', -prezzo);
   S.furgoni.push({ id: nuovoId('f'), modello: m.id, usato, km: usato ? casoInt(90000, 180000) : 0,
-    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0, allestimento });
-  notizia(`Comprato ${m.nome}${usato ? ' usato' : ''}${allestimento !== 'standard' ? ' ' + ALLESTIMENTI[allestimento].nome.toLowerCase() : ''} per ${prezzo.toLocaleString('it-IT')} €.`, 'info');
+    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0 });
+  notizia(`Comprato ${m.nome}${usato ? ' usato' : ''} per ${prezzo.toLocaleString('it-IT')} €.`, 'info');
   return null;
 }
 function vendiFurgone(id) {
@@ -428,7 +428,10 @@ function carica() {
       if (!Number.isFinite(S.cassa)) S.cassa = 0;
       if (!S.miglioramenti) S.miglioramenti = {};
       if (!S.effetti) S.effetti = {};
-      S.furgoni.forEach(f => { if (!f.allestimento) f.allestimento = 'standard'; });
+      // allestimenti e carichi speciali tolti: i contratti già firmati diventano pacchi express
+      S.furgoni.forEach(f => { delete f.allestimento; });
+      (S.contrattiAttivi || []).forEach(c => { c.tipo = 'standard'; });
+      if (S.offertaContratto) S.offertaContratto.tipo = 'standard';
       S.furgoni.forEach(f => { if (!f.premio) f.premio = S.premio || 1; });
       delete S.premio;
       return S;
