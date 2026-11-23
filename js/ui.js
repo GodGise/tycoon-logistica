@@ -119,7 +119,7 @@ function disegnaEvento() {
   if (!ev) { if (el.dataset.tipo === 'evento') { el.hidden = true; el.dataset.tipo = ''; el.dataset.id = ''; } return; }
   if (el.dataset.id !== ev.id) {
     el.dataset.id = ev.id; el.dataset.tipo = 'evento'; el.hidden = false;
-    el.innerHTML = `<div class="finestra-corpo"><span class="badge speciale">Imprevisto</span><h2>${esc(ev.titolo)}</h2><p>${esc(ev.testo)}</p>
+    el.innerHTML = `<div class="finestra-corpo vetro"><span class="badge speciale">Imprevisto</span><h2>${esc(ev.titolo)}</h2><p>${esc(ev.testo)}</p>
       <div class="metro"><i id="evento-tempo"></i></div><p class="nota">Se non decidi, si applica l'ultima scelta.</p>
       <div class="scelte">${ev.scelte.map((s, i) => `<button class="btn ${i === 0 ? 'primario' : ''}" data-scelta="${i}">${esc(s)}</button>`).join('')}</div></div>`;
   }
@@ -128,7 +128,7 @@ function disegnaEvento() {
 function mostraRiepilogoOffline(r) {
   const el = $('#finestra'); el.dataset.tipo = 'offline'; el.hidden = false;
   const ore = Math.floor(r.secondi / 3600), min = Math.round(r.secondi % 3600 / 60);
-  el.innerHTML = `<div class="finestra-corpo"><span class="badge">Bentornato</span><h2>Mentre eri via</h2>
+  el.innerHTML = `<div class="finestra-corpo vetro"><span class="badge">Bentornato</span><h2>Mentre eri via</h2>
     <p>Sono passat${ore ? 'e ' + ore + ' or' + (ore > 1 ? 'e' : 'a') + ' e ' : 'i '}${min} minuti${r.ridotto ? ' (si recuperano al massimo 2 ore)' : ''}: <b>${r.giorni} giorni</b> di lavoro per la tua azienda.</p>
     <div class="riga"><span>Consegne</span><span class="num">${intero.format(r.consegne)}</span></div>
     <div class="riga"><span>Cassa</span>${segnato(r.differenza)}</div>
@@ -313,11 +313,28 @@ function ridisegna() {
   const c = $('#contenuto'), scroll = c.scrollTop;
   document.querySelector('.pannello').classList.toggle('in-avvio', !S);
   c.innerHTML = S ? VISTE[scheda]() : vistaInizio();
+  if (c.dataset.scheda !== scheda) { c.dataset.scheda = scheda; c.classList.remove('entra'); void c.offsetWidth; c.classList.add('entra'); }
   c.scrollTop = scroll;
   document.querySelectorAll('.schede button').forEach(b => b.setAttribute('aria-selected', b.dataset.scheda === scheda));
+  muoviIndicatore();
   aggiornaZoneMappa();
   daRidisegnare = false;
 }
+// la "goccia" di vetro sotto la scheda selezionata scivola da una scheda all'altra
+function muoviIndicatore() {
+  const b = document.querySelector('.schede button[aria-selected="true"]'), ind = document.querySelector('.schede .indicatore');
+  if (!b || !ind) return;
+  ind.style.width = b.offsetWidth + 'px'; ind.style.transform = `translateX(${b.offsetLeft}px)`;
+}
+window.addEventListener('resize', muoviIndicatore);
+// riflesso di luce che segue il puntatore sulle superfici di vetro
+document.addEventListener('pointermove', e => {
+  const v = e.target.closest && e.target.closest('.vetro, .finestra-corpo'); if (!v) return;
+  const r = v.getBoundingClientRect();
+  v.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+  v.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+});
+
 // non ridisegnare mentre il giocatore sta usando un menu o uno slider
 function ridisegnaSePossibile() {
   const a = document.activeElement;
