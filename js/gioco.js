@@ -3,10 +3,10 @@
 const DATA_INIZIO = new Date(2027, 0, 4); // lunedì 4 gennaio 2027
 const CHIAVE_SALVATAGGIO = 'tycoon-logistica-v02';
 const VOCI = {
-  incassi: 'Consegne', vendite: 'Vendita mezzi',
+  incassi: 'Consegne', vendite: 'Vendite (mezzi e magazzini)',
   personale: 'Personale', carburante: 'Carburante', ricarica: 'Ricarica',
-  manutenzione: 'Manutenzione', assicurazione: 'Assicurazione', affitti: 'Affitto magazzini', mezzi: 'Acquisto mezzi',
-  magazzini: 'Nuovi magazzini', annunci: 'Annunci di lavoro',
+  manutenzione: 'Manutenzione', assicurazione: 'Assicurazione', mezzi: 'Acquisto mezzi',
+  magazzini: 'Acquisto magazzini', annunci: 'Annunci di lavoro',
 };
 const VOCI_ENTRATA = ['incassi', 'vendite'];
 
@@ -28,6 +28,12 @@ function magazzinoVicino(punto) {
   S.depositi.forEach(x => { const k = distanzaKm([x.lng, x.lat], punto); if (k < d) { d = k; m = x; } });
   return { magazzino: m, km: d };
 }
+// prezzo di un magazzino: 300.000 € in centro, scende fino a 200.000 € al bordo della città
+function prezzoMagazzino(citta, lngLat) {
+  const t = limita(distanzaKm([citta.lng, citta.lat], lngLat) / (citta.raggio * 1.15), 0, 1);
+  const p = COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t;
+  return Math.round(p / 5000) * 5000;
+}
 function kmGiro(z) { return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * magazzinoVicino(z.centro).km); }
 function dipendente(id) { return S.dipendenti.find(d => d.id === id); }
 function nuovoId(pref) { S.seq += 1; return pref + S.seq; }
@@ -37,7 +43,7 @@ function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); r
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte) {
   S = {
     citta, zone: zonePronte || generaZone(citta),
-    depositi: [{ id: 'm1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1] }],
+    depositi: [{ id: 'm1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
     versione: 1, seq: 0, giorno: 0,
     cassa: COSTANTI.cassaIniziale, reputazione: 70, premio: 1,
     furgoni: [], dipendenti: [],
@@ -48,6 +54,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte) {
     feed: [], prezzi: prezzi || PREZZI_RISERVA, tempoGiorno: 0,
   };
   S.zone.forEach(z => S.giacenze[z.id] = 0);
+  movimento('magazzini', -S.depositi[0].valore);
   generaCandidati('autista'); generaCandidati('magazziniere');
   notizia(`Benvenuto a ${citta.nome}! Compra un furgone, assumi un autista e un magazziniere, poi assegna il furgone a una zona.`, 'info');
   return S;
@@ -148,17 +155,22 @@ function puoiMettereMagazzino(lngLat) {
 }
 function apriMagazzino(lngLat) {
   const err = puoiMettereMagazzino(lngLat); if (err) return err;
-  if (S.cassa < COSTANTI.costoNuovoMagazzino) return 'Non hai abbastanza soldi per un nuovo magazzino.';
-  movimento('magazzini', -COSTANTI.costoNuovoMagazzino);
+  const prezzo = prezzoMagazzino(S.citta, lngLat);
+  if (S.cassa < prezzo) return `Qui un magazzino costa ${prezzo.toLocaleString('it-IT')} €: non hai abbastanza soldi.`;
+  movimento('magazzini', -prezzo);
   const n = S.depositi.length + 1;
-  S.depositi.push({ id: nuovoId('m'), nome: 'Magazzino ' + n, lng: lngLat[0], lat: lngLat[1] });
-  notizia(`Aperto il Magazzino ${n}. Ogni zona parte dal magazzino più vicino.`, 'buono');
+  S.depositi.push({ id: nuovoId('m'), nome: 'Magazzino ' + n, lng: lngLat[0], lat: lngLat[1], valore: prezzo });
+  notizia(`Comprato il Magazzino ${n} per ${prezzo.toLocaleString('it-IT')} €. Ogni zona parte dal magazzino più vicino.`, 'buono');
   return null;
 }
-function chiudiMagazzino(id) {
+function valoreMagazzino(m) { return m.valore || COSTANTI.prezzoMagazzinoMin; }
+function vendiMagazzino(id) {
   if (S.depositi.length <= 1) return 'Ti serve almeno un magazzino.';
-  S.depositi = S.depositi.filter(m => m.id !== id);
-  notizia('Magazzino chiuso.', 'info');
+  const m = S.depositi.find(x => x.id === id); if (!m) return null;
+  const ricavo = Math.round(valoreMagazzino(m) * COSTANTI.rivenditaMagazzino);
+  movimento('vendite', ricavo);
+  S.depositi = S.depositi.filter(x => x.id !== id);
+  notizia(`Venduto ${m.nome} per ${ricavo.toLocaleString('it-IT')} €.`, 'info');
   return null;
 }
 
@@ -274,12 +286,9 @@ function fineMese(d) {
   if (personale) movimento('personale', -Math.round(personale));
   const assic = Math.round(S.furgoni.length * COSTANTI.assicurazioneMensile * S.premio);
   if (assic) movimento('assicurazione', -assic);
-  const affitto = S.depositi.length * COSTANTI.affittoMagazzino;
-  movimento('affitti', -affitto);
   const nomeMese = d.toLocaleDateString('it-IT', { month: 'long' });
   if (personale) notizia(`Busta paga di ${nomeMese}: ${Math.round(personale)} € al personale.`, 'info', 'paga');
   if (assic) notizia(`Assicurazione flotta di ${nomeMese}: ${assic} €.`, 'info', 'assic');
-  notizia(`Affitto di ${S.depositi.length} magazzin${S.depositi.length > 1 ? 'i' : 'o'}: ${affitto} €.`, 'info', 'affitto');
   S.storico.unshift({ mese: S.conti.mese, voci: S.conti.voci });
   S.storico.length = Math.min(S.storico.length, 12);
   S.conti = { mese: chiaveMese(dataDelGiorno(S.giorno + 1)), voci: vociVuote() };

@@ -2,7 +2,7 @@
    Tutti i numeri qui sono PROVVISORI: vanno tarati durante i test. */
 
 const COSTANTI = {
-  cassaIniziale: 80000,
+  cassaIniziale: 400000,          // basta per il primo magazzino (fino a 300.000 €), un furgone e i primi stipendi
   euroPerConsegna: 2,
   maxConsegneCorriere: 125,       // oltre restano pacchi in giacenza
   pacchiMagazziniere: 300,        // pacchi smistati al giorno da un magazziniere
@@ -16,8 +16,10 @@ const COSTANTI = {
   oneriDeposito: 0.10,            // €/kWh in più sul PUN: ricarica lenta in deposito
   oneriColonnina: 0.45,           // €/kWh in più sul PUN: colonnina veloce (non ancora usata)
   valoreRivendita: 0.5,
-  costoNuovoMagazzino: 5000,      // allestimento di un magazzino in più
-  affittoMagazzino: 1200,         // al mese, per ogni magazzino
+  // i magazzini si comprano e restano tuoi: in centro costano di più, in periferia meno
+  prezzoMagazzinoMax: 300000,     // in pieno centro
+  prezzoMagazzinoMin: 200000,     // al bordo della città
+  rivenditaMagazzino: 0.7,        // vendendolo recuperi il 70% del prezzo
   distanzaMaxMagazzino: 1.6,      // in multipli del raggio della città
   fattoreStrada: 1.3,             // km su strada rispetto alla linea d'aria
 };

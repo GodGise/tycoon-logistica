@@ -29,7 +29,7 @@ Il tempo scorre da solo: **ogni giornata dura 3 minuti** (il fine settimana pass
 
 - Mappa scura di Udine (MapLibre + stile Dark Matter di CARTO su dati OpenStreetMap), pannello in vetro con le schede Azienda, Attività, Conti, Flotta, Personale
 - Qualsiasi città: la cerchi (OpenStreetMap Nominatim) e le zone si creano da sole a cerchi e spicchi intorno al centro (5 zone per le città piccole, 13 per quelle grandi)
-- Magazzini dove vuoi: clicchi sulla mappa. Ogni zona parte dal magazzino più vicino e i km del giro dipendono dalla distanza. Affitto 1.200 €/mese a magazzino, 5.000 € per aprirne uno in più
+- Magazzini dove vuoi: clicchi sulla mappa. Ogni zona parte dal magazzino più vicino e i km del giro dipendono dalla distanza. I magazzini si comprano e restano tuoi: 300.000 € in centro, fino a 200.000 € al bordo della città. Cassa iniziale 400.000 €
 - Furgoni diesel ed elettrici, nuovi o usati, con riquadro Ammortamento calcolato sui prezzi della settimana
 - Autisti (con esperienza che sale col tempo) e magazzinieri, con stipendio scelto tramite annuncio
 - 2 € a consegna, massimo 125 consegne per corriere, 300 pacchi al giorno per magazziniere
