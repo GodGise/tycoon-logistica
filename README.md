@@ -35,6 +35,9 @@ Il tempo scorre da solo: **ogni giornata dura 2 minuti e mezzo** (il fine settim
 - 6 € a consegna (da 5,10 a 6,90 € con la reputazione), massimo 125 consegne per corriere, 300 pacchi al giorno per magazziniere
 - Contratti dei clienti: un'offerta circa ogni giornata, da accettare entro 40 secondi. Pagano più dei pacchi normali; se non consegni tutto paghi una penale
 - Carichi speciali (merce refrigerata, merce pesante, animali vivi): pagano molto di più ma serve un furgone con l'allestimento giusto
+- Eventi rari con una decisione da prendere entro 60 secondi: scioperi, strade chiuse, controlli della Stradale, pacchi smarriti, richieste di aumento, neve, accordi con i clienti, offerte per i tuoi furgoni
+- Miglioramenti da comprare: nastro di smistamento, software per i percorsi, pubblicità, corso di guida sicura, officina interna
+- A gioco chiuso l'azienda continua a lavorare (fino a 2 ore reali recuperate) e al ritorno compare il riepilogo
 - Obiettivo del giorno con premio in denaro, "+€" che salgono dai furgoni sulla mappa
 - Incidenti (riparazione a carico dell'autista, premio assicurativo che sale), guasti più frequenti sull'usato
 - Busta paga e assicurazione a fine mese, giacenze che fanno scendere la reputazione

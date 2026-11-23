@@ -6,7 +6,7 @@ const VOCI = {
   incassi: 'Consegne', contratti: 'Contratti', premi: 'Premi obiettivi', vendite: 'Vendite (mezzi e magazzini)',
   personale: 'Personale', carburante: 'Carburante', ricarica: 'Ricarica',
   manutenzione: 'Manutenzione', assicurazione: 'Assicurazione', mezzi: 'Acquisto mezzi',
-  magazzini: 'Acquisto magazzini', penali: 'Penali contratti', annunci: 'Annunci di lavoro',
+  magazzini: 'Acquisto magazzini', miglioramenti: 'Miglioramenti', penali: 'Penali contratti', eventi: 'Imprevisti', annunci: 'Annunci di lavoro',
 };
 const VOCI_ENTRATA = ['incassi', 'contratti', 'premi', 'vendite'];
 
@@ -53,7 +53,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
     giacenze: {}, ieri: null,
     conti: { mese: chiaveMese(DATA_INIZIO), voci: vociVuote() }, storico: [],
     feed: [], prezzi: prezzi || PREZZI_RISERVA, tempoGiorno: 0,
-    offertaContratto: null, contrattiAttivi: [], obiettivo: null,
+    offertaContratto: null, contrattiAttivi: [], obiettivo: null, miglioramenti: {}, effetti: {}, evento: null,
   };
   S.zone.forEach(z => S.giacenze[z.id] = 0);
   movimento('magazzini', -S.depositi[0].valore);
@@ -229,25 +229,29 @@ function concludiGiornata() {
 function giornoLavorativo() {
   const magazzinieri = S.dipendenti.filter(x => x.ruolo === 'magazziniere').length;
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));
-  const capSmistamento = magazzinieri * COSTANTI.pacchiMagazziniere;
+  const capSmistamento = Math.round(magazzinieri * COSTANTI.pacchiMagazziniere * effetto.smistamento());
+  forseEvento();
+  const sciopero = effetto.sciopero();
+  if (sciopero) notizia('Sciopero: oggi i furgoni restano in deposito.', 'male', 'sciopero');
+  if (effetto.capacita() < 1) notizia('Neve: oggi i furgoni vanno piano e fanno meno consegne.', 'male', 'neve');
   const repFatt = 0.85 + S.reputazione / 100 * 0.3;
 
   // pacchi in arrivo per zona (nuovi + giacenze)
   const arrivo = {};
   let totale = 0;
-  servite.forEach(z => { arrivo[z.id] = Math.round(z.pacchi * repFatt * caso(0.9, 1.1)) + S.giacenze[z.id]; totale += arrivo[z.id]; });
+  servite.forEach(z => { arrivo[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + S.giacenze[z.id]; totale += arrivo[z.id]; });
   S.zone.forEach(z => { if (!arrivo[z.id]) S.giacenze[z.id] = 0; });
   const quota = totale > 0 ? Math.min(1, capSmistamento / totale) : 0;
   if (servite.length && magazzinieri === 0) notizia('Nessun magazziniere: i pacchi restano nel magazzino e i furgoni non partono.', 'male', 'no-mag');
   else if (quota < 1) notizia('Magazzino intasato: i magazzinieri non riescono a smistare tutti i pacchi.', 'male', 'intasato');
 
-  let consegneTot = 0, consegneNormali = 0, carburante = 0, ricarica = 0, manut = 0, giacenzeTot = 0;
+  let incassoZone = 0, consegneTot = 0, consegneNormali = 0, carburante = 0, ricarica = 0, manut = 0, giacenzeTot = 0;
   const perZona = {}, perFurgone = {}, chiusi = [];
   servite.forEach(z => {
     const smistati = Math.floor(arrivo[z.id] * quota);
-    const giri = S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f));
+    const giri = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f));
     // prima i contratti, poi i pacchi normali
-    const ec = eseguiContratti(z, giri, giri.length * COSTANTI.maxConsegneCorriere);
+    const ec = eseguiContratti(z, giri, Math.floor(giri.length * COSTANTI.maxConsegneCorriere * effetto.capacita()));
     chiusi.push(...ec.chiusi);
     const consegneCtr = ec.chiusi.reduce((t, c) => t + c.fatti, 0);
     const consegne = Math.min(smistati, ec.capacita);
@@ -255,10 +259,10 @@ function giornoLavorativo() {
     const persi = Math.max(0, restano - z.pacchi);       // oltre un giorno di giacenza gli ordini si perdono
     S.giacenze[z.id] = restano - persi;
     perZona[z.id] = { arrivo: arrivo[z.id], consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id], giri: giri.length };
-    consegneTot += consegne + consegneCtr; consegneNormali += consegne; giacenzeTot += S.giacenze[z.id];
+    consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
 
     if (restano > 0 && giri.length) notizia(`Zona ${z.nome}: pacchi in giacenza, la reputazione scende.`, 'male', 'giac-' + z.id);
-    if (!giri.length) notizia(`Zona ${z.nome}: nessun furgone operativo oggi.`, 'male', 'ferma-' + z.id);
+    if (!giri.length && !sciopero) notizia(`Zona ${z.nome}: nessun furgone operativo oggi.`, 'male', 'ferma-' + z.id);
     // reputazione: scende solo se resta indietro più del 10% dei pacchi della zona, sale se si consegna tutto
     const soglia = z.pacchi * 0.1;
     S.reputazione = limita(S.reputazione + (restano > soglia ? -Math.min(2, restano / 50) : restano > 0 ? 0 : 0.4), 0, 100);
@@ -268,7 +272,7 @@ function giornoLavorativo() {
     giri.forEach((f, i) => {
       const mie = Math.floor(totZona / giri.length) + (i < totZona % giri.length ? 1 : 0);
       perFurgone[f.id] = mie;
-      const km = Math.round(kmGiro(z) * (0.7 + 0.3 * Math.min(1, mie / 100)));
+      const km = Math.round(kmGiro(z) * effetto.km(z.id) * (0.7 + 0.3 * Math.min(1, mie / 100)));
       const m = modello(f.modello), c = costoKm(m, f.usato);
       if (m.tipo === 'diesel') carburante += km * c.energia; else ricarica += km * c.energia;
       manut += km * c.manutenzione;
@@ -276,14 +280,14 @@ function giornoLavorativo() {
       const a = dipendente(f.autistaId);
       a.esperienza = Math.min(100, a.esperienza + 0.15);
       // incidente: dipende dall'esperienza
-      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza);
+      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti();
       if (Math.random() < pKm * km) {
         f.fermo = casoInt(1, 3); f.motivo = 'incidente'; f.fermoDal = S.giorno;
         f.premio = (f.premio || 1) + COSTANTI.aumentoPremioIncidente; f.incidenti = (f.incidenti || 0) + 1;
         notizia(`Incidente: ${a.nome} con il ${m.nome}. Furgone fermo ${f.fermo} gg, assicurazione di questo furgone a ${assicurazioneFurgone(f)} €/mese. La riparazione è trattenuta dallo stipendio.`, 'male', 'inc-' + f.id);
       } else if (Math.random() < GUASTO_GIORNO[f.usato ? 'usato' : 'nuovo'] * (1 + f.km / 300000)) {
-        const costo = casoInt(300, 1200);
-        f.fermo = casoInt(1, 2); f.motivo = 'guasto'; f.fermoDal = S.giorno; manut += costo;
+        const costo = Math.round(casoInt(300, 1200) * effetto.guasti());
+        f.fermo = Math.max(1, casoInt(1, 2) - (livello('officina') ? 1 : 0)); f.motivo = 'guasto'; f.fermoDal = S.giorno; manut += costo;
         notizia(`Guasto al ${m.nome}${f.usato ? ' usato' : ''}: ${costo} € di officina, fermo ${f.fermo} gg.`, 'male', 'gua-' + f.id);
       }
     });
@@ -294,7 +298,7 @@ function giornoLavorativo() {
   S.furgoni.forEach(f => { if (f.fermo > 0 && f.fermoDal !== S.giorno) { f.fermo -= 1; if (f.fermo === 0) f.motivo = null; } });
 
   chiusi.push(...contrattiNonServiti());
-  const incasso = Math.round(consegneNormali * tariffa());
+  const incasso = Math.round(incassoZone);
   const premio = valutaObiettivo(consegneTot, giacenzeTot);
   nuovoObiettivo(consegneTot, giacenzeTot);
   // l'incasso delle consegne entra in cassa piano piano durante la giornata;
@@ -335,7 +339,7 @@ function fineMese(d) {
 }
 
 /* ---------- salvataggio ---------- */
-function salva() { try { localStorage.setItem(CHIAVE_SALVATAGGIO, JSON.stringify(S)); } catch (e) { /* niente salvataggio */ } }
+function salva() { if (S) S.salvatoIl = Date.now(); try { localStorage.setItem(CHIAVE_SALVATAGGIO, JSON.stringify(S)); } catch (e) { /* niente salvataggio */ } }
 function carica() {
   try {
     const t = localStorage.getItem(CHIAVE_SALVATAGGIO);
@@ -344,6 +348,8 @@ function carica() {
       // partite salvate prima di questa versione
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
       if (!S.contrattiAttivi) S.contrattiAttivi = [];
+      if (!S.miglioramenti) S.miglioramenti = {};
+      if (!S.effetti) S.effetti = {};
       S.furgoni.forEach(f => { if (!f.allestimento) f.allestimento = 'standard'; });
       S.furgoni.forEach(f => { if (!f.premio) f.premio = S.premio || 1; });
       delete S.premio;
@@ -360,4 +366,31 @@ function rinominaAzienda(nome) {
   nome = String(nome || '').trim().slice(0, 40);
   if (nome.length < 2) return 'Il nome deve avere almeno 2 caratteri.';
   S.nomeAzienda = nome; return null;
+}
+
+/* ---------- tempo passato a gioco chiuso ---------- */
+const OFFLINE_MAX_SECONDI = 2 * 60 * 60;   // si recuperano al massimo 2 ore reali
+// Fa passare il tempo trascorso mentre il gioco era chiuso, con la stessa simulazione di sempre
+// (niente offerte di contratto ed eventi: quelli richiedono il giocatore). Restituisce un riepilogo.
+function recuperaOffline() {
+  if (!S || !S.salvatoIl) return null;
+  const secondi = Math.min(OFFLINE_MAX_SECONDI, (Date.now() - S.salvatoIl) / 1000);
+  if (secondi < 60) return null;
+  const prima = { cassa: S.cassa, giorno: S.giorno, consegne: 0 };
+  const durata = COSTANTI.secondiPerGiorno;
+  S.recuperoOffline = true;
+  S.offertaContratto = null;
+  let resto = secondi, consegne = 0;
+  while (resto > 0) {
+    if (!S.inCorso || S.inCorso.giorno !== S.giorno) avviaGiornata();
+    const mancano = durata - (S.tempoGiorno || 0);
+    if (resto < mancano) { S.tempoGiorno = (S.tempoGiorno || 0) + resto; avanzaIncasso(S.tempoGiorno / durata); break; }
+    resto -= mancano; S.tempoGiorno = 0;
+    consegne += (S.ieri && !S.ieri.festivo) ? S.ieri.consegne : 0;
+    const sabato = dataDelGiorno(S.giorno).getDay() === 6;
+    concludiGiornata();
+    if (sabato) simulaGiorno();
+  }
+  delete S.recuperoOffline;
+  return { secondi, ridotto: (Date.now() - S.salvatoIl) / 1000 > OFFLINE_MAX_SECONDI, giorni: S.giorno - prima.giorno, consegne, differenza: S.cassa - prima.cassa };
 }
