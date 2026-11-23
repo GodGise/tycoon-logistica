@@ -221,6 +221,10 @@ function concludiGiornata() {
   for (const k in c) if (c[k]) movimento(k, -c[k]);
   (S.inCorso.contratti || []).forEach(x => { if (x.ricavo) movimento('contratti', x.ricavo); if (x.penale) movimento('penali', -x.penale); notiziaContratto(x); });
   if (S.inCorso.premio) movimento('premi', S.inCorso.premio);
+  // serie della cassa per i grafici (ultimi 180 giorni)
+  S.serieCassa = S.serieCassa || [];
+  S.serieCassa.push([g, Math.round(S.cassa)]);
+  if (S.serieCassa.length > 180) S.serieCassa.splice(0, S.serieCassa.length - 180);
   S.inCorso = null;
 
   // fine mese: buste paga e assicurazione
@@ -288,6 +292,7 @@ function giornoLavorativo() {
     const persi = Math.max(0, restano - z.pacchi);       // oltre un giorno di giacenza gli ordini si perdono
     S.giacenze[z.id] = restano - persi;
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0);
+    stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
     perZona[z.id] = { arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
       giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly };
     consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
@@ -375,7 +380,7 @@ function fineMese(d) {
   if (assic) notizia(`Assicurazione flotta di ${nomeMese}: ${assic} €.`, 'info', 'assic');
   S.furgoni.forEach(f => stat(f, 'assicurazione', assicurazioneFurgone(f)));
   S.dipendenti.forEach(x => stat(x, 'stipendio', x.stipendio * (S.giorno - Math.max(x.assuntoGiorno, primo) + 1) / gg));
-  [...S.furgoni, ...S.dipendenti, ...S.depositi].forEach(chiudiMeseStat);
+  [...S.furgoni, ...S.dipendenti, ...S.depositi, ...S.zone].forEach(chiudiMeseStat);
   S.storico.unshift({ mese: S.conti.mese, voci: S.conti.voci });
   S.storico.length = Math.min(S.storico.length, 12);
   S.conti = { mese: chiaveMese(dataDelGiorno(S.giorno + 1)), voci: vociVuote() };

@@ -321,6 +321,70 @@ function apriDettaglio(tipo, id) {
 }
 window.apriDettaglio = apriDettaglio;
 
+/* ---------- grafici (scheda Conti) ---------- */
+const nomeMeseBreve = k => { const [a, m] = k.split('-'); return new Date(+a, +m - 1, 1).toLocaleDateString('it-IT', { month: 'short' }); };
+const compatto = n => { const a = Math.abs(n); return (n < 0 ? '−' : '') + (a >= 1e6 ? (a / 1e6).toLocaleString('it-IT', { maximumFractionDigits: 1 }) + ' mln' : a >= 1e3 ? Math.round(a / 1e3) + 'k' : Math.round(a)) + ' €'; };
+function graficoCassa() {
+  const s = S.serieCassa || [];
+  if (s.length < 2) return `<div class="scheda"><h2 style="margin:0">Cassa giorno per giorno</h2><p class="nota">Il grafico compare dopo qualche giornata di lavoro.</p></div>`;
+  const W = 360, H = 150, sx = 8, dx = 44, top = 10, bot = 22;
+  const vals = s.map(p => p[1]), min = Math.min(0, ...vals), max = Math.max(...vals);
+  const x = i => dx + i * (W - dx - sx) / (s.length - 1), y = v => top + (max - v) / ((max - min) || 1) * (H - top - bot);
+  const punti = s.map((p, i) => `${x(i).toFixed(1)},${y(p[1]).toFixed(1)}`).join(' ');
+  const area = `${x(0)},${y(Math.max(min, 0))} ${punti} ${x(s.length - 1)},${y(Math.max(min, 0))}`;
+  const ticks = [max, (max + min) / 2, min].map(v => `<line x1="${dx}" x2="${W - sx}" y1="${y(v)}" y2="${y(v)}" class="griglia-g"/><text x="${dx - 6}" y="${y(v) + 4}" text-anchor="end" class="asse-g">${compatto(v)}</text>`).join('');
+  const zero = min < 0 ? `<line x1="${dx}" x2="${W - sx}" y1="${y(0)}" y2="${y(0)}" class="zero-g"/>` : '';
+  const primo = fmtData(s[0][0]).split(' ').slice(1, 3).join(' '), ultimo = fmtData(s[s.length - 1][0]).split(' ').slice(1, 3).join(' ');
+  return `<div class="scheda"><div class="riga"><h2 style="margin:0">Cassa giorno per giorno</h2><span class="num">${eur.format(vals[vals.length - 1])}</span></div>
+    <div class="grafico" data-serie="cassa"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cassa negli ultimi ${s.length} giorni, da ${eur.format(vals[0])} a ${eur.format(vals[vals.length - 1])}">
+      ${ticks}${zero}<polygon points="${area}" class="area-g"/><polyline points="${punti}" class="linea-g"/>
+      <text x="${dx}" y="${H - 6}" class="asse-g">${primo}</text><text x="${W - sx}" y="${H - 6}" text-anchor="end" class="asse-g">${ultimo}</text>
+      <line class="mirino" x1="0" x2="0" y1="${top}" y2="${H - bot}" visibility="hidden"/><circle class="punto-g" r="4" visibility="hidden"/>
+    </svg><div class="tooltip-g" hidden></div></div></div>`;
+}
+function graficoUtileMesi() {
+  const mesi = [...(S.storico || [])].reverse().concat([{ mese: S.conti.mese, voci: S.conti.voci, inCorso: true }]).slice(-12);
+  if (mesi.length < 2 && !Object.values(S.conti.voci).some(v => v)) return '';
+  // utile operativo: senza gli investimenti (furgoni, magazzini, miglioramenti) e senza le vendite di mezzi
+  const operativo = v => utileMese(v) + (v.mezzi || 0) + (v.magazzini || 0) + (v.miglioramenti || 0) - (v.vendite || 0);
+  const dati = mesi.map(m => ({ k: m.mese, v: operativo(m.voci), inCorso: m.inCorso }));
+  const maxAbs = Math.max(1, ...dati.map(d => Math.abs(d.v)));
+  return `<div class="scheda"><h2 style="margin:0">Utile operativo mese per mese</h2>
+    <div class="barre-mesi ${dati.every(d => d.v >= 0) ? 'solo-pos' : ''}">${dati.map(d => `<div class="mese-b ${d.inCorso ? 'in-corso' : ''}" title="${nomeMeseBreve(d.k)}: ${d.v >= 0 ? '+' : '−'}${eur.format(Math.abs(d.v))}${d.inCorso ? ' (in corso)' : ''}">
+      <div class="meta-su">${d.v > 0 ? `<i class="pos" style="height:${Math.max(3, d.v / maxAbs * 100)}%"></i>` : ''}</div>
+      <div class="meta-giu">${d.v < 0 ? `<i class="neg" style="height:${Math.max(3, -d.v / maxAbs * 100)}%"></i>` : ''}</div>
+      <span>${nomeMeseBreve(d.k)}</span></div>`).join('')}</div>
+    <p class="nota">Quanto rende il lavoro, senza contare gli acquisti di furgoni, magazzini e miglioramenti. Verde guadagno, rosso perdita; l'ultima colonna è il mese in corso. Passa sopra una barra per il valore.</p></div>`;
+}
+function graficoZone() {
+  const righe = S.zone.map(z => ({ z, v: leggiStat(z, 'mese', 'incasso'), p: leggiStat(z, 'prec', 'incasso'), c: leggiStat(z, 'mese', 'consegne') }))
+    .filter(r => r.v || r.p).sort((a, b) => b.v - a.v);
+  if (!righe.length) return '';
+  const max = Math.max(...righe.map(r => r.v), 1);
+  return `<div class="scheda"><h2 style="margin:0">Le zone che rendono di più <small>questo mese</small></h2>
+    ${righe.map(r => `<div class="zona-b"><div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${r.z.colore}"></i>${esc(r.z.nome)}</span><span class="num">${eur.format(r.v)} · ${intero.format(r.c)} cons.</span></div>
+      <div class="barra-z"><i style="width:${r.v / max * 100}%"></i></div></div>`).join('')}
+    <p class="nota">Incasso delle consegne normali, senza contratti.</p></div>`;
+}
+// tooltip del grafico della cassa
+document.addEventListener('pointermove', e => {
+  const g = e.target.closest && e.target.closest('.grafico[data-serie="cassa"]'); if (!g || !S || !S.serieCassa) return;
+  const svg = g.querySelector('svg'), r = svg.getBoundingClientRect(), s = S.serieCassa;
+  const W = 360, dx = 44, sx = 8, px = (e.clientX - r.left) / r.width * W;
+  const i = Math.max(0, Math.min(s.length - 1, Math.round((px - dx) / (W - dx - sx) * (s.length - 1))));
+  const vals = s.map(p => p[1]), min = Math.min(0, ...vals), max = Math.max(...vals), H = 150, top = 10, bot = 22;
+  const x = dx + i * (W - dx - sx) / (s.length - 1), y = top + (max - s[i][1]) / ((max - min) || 1) * (H - top - bot);
+  const m = svg.querySelector('.mirino'), c = svg.querySelector('.punto-g'), t = g.querySelector('.tooltip-g');
+  m.setAttribute('x1', x); m.setAttribute('x2', x); m.setAttribute('visibility', 'visible');
+  c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('visibility', 'visible');
+  t.hidden = false; t.innerHTML = `<b>${eur.format(s[i][1])}</b><span>${fmtData(s[i][0])}</span>`;
+  t.style.left = Math.min(r.width - 120, Math.max(0, x / W * r.width - 60)) + 'px';
+});
+document.addEventListener('pointerout', e => {
+  const g = e.target.closest && e.target.closest('.grafico'); if (!g || g.contains(e.relatedTarget)) return;
+  g.querySelectorAll('.mirino,.punto-g').forEach(el => el.setAttribute('visibility', 'hidden')); const t = g.querySelector('.tooltip-g'); if (t) t.hidden = true;
+});
+
 function vistaAttivita() {
   if (!S.feed.length) return '<p class="nota">Ancora nessuna attività.</p>';
   const gruppi = [];
@@ -341,6 +405,9 @@ function vistaConti() {
     <tbody>${righe || `<tr><td colspan="3">Nessun movimento questo mese.</td></tr>`}
     <tr class="totale"><td>Utile</td><td>${segnato(utileMese(S.conti.voci))}</td>${prec ? `<td>${segnato(utileMese(prec.voci))}</td>` : ''}</tr></tbody></table>
   </div>
+  ${graficoCassa()}
+  ${graficoUtileMesi()}
+  ${graficoZone()}
   <p class="nota">Stipendi e assicurazione si pagano l'ultimo giorno del mese. Contratti, premi e penali si incassano o pagano a fine giornata. Le riparazioni dopo un incidente sono a carico dell'autista; all'azienda sale l'assicurazione di quel furgone (+25% a incidente) e non scende più finché non lo vendi.</p>`;
 }
 
