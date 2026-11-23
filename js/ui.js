@@ -65,13 +65,14 @@ function vistaMagazzini() {
   const lista = S.depositi.map((m, i) => {
     const zoneServite = S.zone.filter(z => magazzinoVicino(z.centro).magazzino.id === m.id && S.furgoni.some(f => f.zona === z.id)).length;
     return `<div class="riga"><span><b style="color:var(--testo)">${i + 1}</b> · ${esc(m.nome)} · ${zoneServite} zon${zoneServite === 1 ? 'a' : 'e'} servit${zoneServite === 1 ? 'a' : 'e'}</span>
-      ${S.depositi.length > 1 ? `<button class="btn piccolo" data-azione="chiudi-magazzino" data-id="${m.id}">Chiudi</button>` : ''}</div>`;
+      ${S.depositi.length > 1 ? `<button class="btn piccolo" data-azione="vendi-magazzino" data-id="${m.id}">Vendi per ${eur.format(valoreMagazzino(m) * COSTANTI.rivenditaMagazzino)}</button>` : `<span class="num">${eur.format(valoreMagazzino(m))}</span>`}</div>`;
   }).join('');
   return `<div class="scheda">
-    <h2 style="margin:0">Magazzini <small>${eur.format(COSTANTI.affittoMagazzino)}/mese l'uno</small></h2>
+    <h2 style="margin:0">Magazzini <small>di tua proprietà</small></h2>
     ${lista}
     ${posizionando ? `<p class="nota" style="color:var(--accento)">Clicca sulla mappa dove vuoi il nuovo magazzino.</p><button class="btn" data-azione="annulla-magazzino">Annulla</button>`
-      : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < COSTANTI.costoNuovoMagazzino ? 'disabled' : ''}>Apri un magazzino (${eur.format(COSTANTI.costoNuovoMagazzino)})</button>`}
+      : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < COSTANTI.prezzoMagazzinoMin ? 'disabled' : ''}>Compra un magazzino (${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)})</button>`}
+    <p class="nota">Costa di più in centro e meno verso la periferia. Una volta comprato è tuo: niente affitto.</p>
     <p class="nota">Ogni zona parte dal magazzino più vicino: più è lontano, più km fanno i furgoni ogni giorno.</p>
   </div>`;
 }
@@ -88,6 +89,9 @@ function vistaInizio() {
     <div class="scheda" style="border-color:var(--accento)">
       <h2 style="margin:0">Metti il tuo primo magazzino</h2>
       <p style="margin:0">Clicca sulla mappa nel punto dove vuoi il magazzino. Vicino al centro i giri sono più corti; in periferia arrivi meglio alle zone esterne.</p>
+      <div class="riga"><span>Prezzo del magazzino</span><span class="num">${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)}</span></div>
+      <div class="riga"><span>Cassa iniziale</span><span class="num">${eur.format(COSTANTI.cassaIniziale)}</span></div>
+      <p class="nota">In centro costa 300.000 €, verso il bordo della città scende fino a 200.000 €. Quello che resta ti serve per furgoni e stipendi.</p>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}
     </div>
     <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
@@ -251,7 +255,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'nuovo-magazzino': posizionando = true; ridisegna(); chiediPuntoSullaMappa(punto => {
       posizionando = false; esito(apriMagazzino(punto), 'Magazzino aperto.'); aggiornaDepositiMappa(); }); break;
     case 'annulla-magazzino': posizionando = false; annullaPuntoSullaMappa(); ridisegna(); break;
-    case 'chiudi-magazzino': if (b.dataset.conferma) { esito(chiudiMagazzino(id), 'Magazzino chiuso.'); aggiornaDepositiMappa(); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
+    case 'vendi-magazzino': if (b.dataset.conferma) { esito(vendiMagazzino(id), 'Magazzino venduto.'); aggiornaDepositiMappa(); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'nuova': if (b.dataset.conferma) { cancellaSalvataggio(); S = null; anteprimaZone = null; Object.assign(inizio, { fase: 'citta', risultati: null, citta: null, errore: '' }); aggiornaZoneMappa(); ridisegna(); } else { b.dataset.conferma = 1; b.textContent = 'Sicuro? Perdi la partita attuale. Clicca di nuovo.'; } break;
   }
 });
@@ -272,7 +276,7 @@ function scegliCitta(c) {
     if (d > c.raggio * COSTANTI.distanzaMaxMagazzino) { inizio.errore = `Troppo lontano dal centro (${Math.round(d)} km): avvicinati alla città.`; ridisegna(); chiediPuntoSullaMappa(attendi); return; }
     nuovaPartita(prezziCaricati || PREZZI_RISERVA, c, punto, anteprimaZone);
     salva(); scheda = 'azienda'; ridisegna(); aggiornaZoneMappa();
-    toast(`Magazzino aperto a ${c.nome}. Ora compra un furgone!`);
+    toast(`Magazzino comprato a ${c.nome} per ${eur.format(S.depositi[0].valore)}. Ora compra un furgone!`);
   };
   chiediPuntoSullaMappa(attendi);
 }
