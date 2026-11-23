@@ -59,7 +59,7 @@ function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); r
 
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   S = {
-    citta: Object.assign(citta, { id: 'c1' }), filiali: [], zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
+    citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
     depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
@@ -272,7 +272,24 @@ function giornoLavorativo() {
   // pacchi in arrivo per zona (nuovi + giacenze)
   const arrivo = {};
   let totale = 0;
-  servite.forEach(z => { arrivo[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + S.giacenze[z.id]; totale += arrivo[z.id]; });
+  // picchi di ordini: ogni giorno in qualche zona di ogni città arrivano più pacchi del solito.
+  // Sono il lavoro del jolly: abbastanza da tenerlo occupato, non tanto da intasare tutto.
+  const picco = {};
+  tutteCitta().forEach(c => {
+    const zc = servite.filter(z => idCitta(z) === c.id); if (zc.length < 2) return;
+    const quante = Math.max(1, Math.round(zc.length / 5));
+    let extraCitta = 0;
+    [...zc].sort(() => Math.random() - 0.5).slice(0, quante).forEach(z => {
+      const extra = Math.min(Math.round(z.pacchi * caso(0.35, 0.6)), 1.5 * COSTANTI.maxConsegneCorriere - extraCitta);
+      if (extra > 0) { picco[z.id] = extra; extraCitta += extra; }
+    });
+  });
+  servite.forEach(z => { arrivo[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + (picco[z.id] || 0) + S.giacenze[z.id]; totale += arrivo[z.id]; });
+  const zonePicco = Object.keys(picco).map(id => zona(id));
+  if (zonePicco.length) {
+    const haJolly = S.furgoni.some(f => isJolly(f) && furgoneOperativo(f));
+    notizia(`Picco di ordini in ${zonePicco.map(z => nomeZona(z)).join(', ')} (+${Object.values(picco).reduce((a, b) => a + b, 0)} pacchi). ${haJolly ? 'Ci pensa il jolly.' : 'Un furgone jolly li porterebbe via.'}`, haJolly ? 'info' : 'male', 'picco');
+  }
   S.zone.forEach(z => { if (!arrivo[z.id]) S.giacenze[z.id] = 0; });
   // smistamento: ogni città ha i suoi magazzinieri
   const quota = {}, multi = S.filiali && S.filiali.length;
@@ -308,13 +325,17 @@ function giornoLavorativo() {
 
   // 2) i jolly vanno da soli nella zona con più pacchi pronti in deposito che nessuno porta
   const jolly = sciopero ? [] : S.furgoni.filter(f => isJolly(f) && furgoneOperativo(f));
+  // il jolly va nella zona con più pacchi pronti; se gli resta posto passa anche a una seconda zona
   jolly.forEach(f => {
-    let meglio = null, attesa = 0;
-    Object.values(ris).forEach(r => { if (idCitta(r.z) !== cittaJolly(f)) return; const pronti = r.smistati - r.consegne; if (pronti > attesa) { attesa = pronti; meglio = r; } });
-    if (!meglio) { jollyOggi[f.id] = null; return; }
-    const extra = Math.min(attesa, capacitaFurgone(f));
-    meglio.consegne += extra; meglio.jolly.push({ f, n: extra });
-    jollyOggi[f.id] = meglio.z.id;
+    let posto = capacitaFurgone(f); jollyOggi[f.id] = null;
+    for (let giro = 0; giro < 2 && posto > 10; giro++) {
+      let meglio = null, attesa = 0;
+      Object.values(ris).forEach(r => { if (idCitta(r.z) !== cittaJolly(f)) return; const pronti = r.smistati - r.consegne; if (pronti > attesa) { attesa = pronti; meglio = r; } });
+      if (!meglio) break;
+      const extra = Math.min(attesa, posto);
+      meglio.consegne += extra; meglio.jolly.push({ f, n: extra }); posto -= extra;
+      if (!jollyOggi[f.id]) jollyOggi[f.id] = meglio.z.id;
+    }
   });
   if (jolly.length) {
     const usati = Object.values(jollyOggi).filter(Boolean).length;
@@ -329,7 +350,7 @@ function giornoLavorativo() {
     S.giacenze[z.id] = restano - persi;
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0);
     stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
-    perZona[z.id] = { arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
+    perZona[z.id] = { picco: picco[z.id] || 0, arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
       giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly, fuori: r.fuori, sciopero: !!sciopero };
     consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
 
@@ -436,6 +457,8 @@ function carica() {
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
       if (!S.citta.id) S.citta.id = 'c1';
       if (!S.filiali) S.filiali = [];
+      // grafica delle zone v2: più grandi sulla mappa (pacchi e km invariati)
+      if ((S.versioneZone || 1) < 2) { tutteCitta().forEach(c => ridisegnaZone(S.zone.filter(z => idCitta(z) === c.id), c)); S.versioneZone = 2; }
       if (!S.contrattiAttivi) S.contrattiAttivi = [];
       // conti: aggiunge le voci nuove e ripara i valori rotti (NaN) delle versioni precedenti
       const ripara = v => { Object.keys(VOCI).forEach(k => { if (!Number.isFinite(v[k])) v[k] = 0; }); for (const k in v) if (!Number.isFinite(v[k])) v[k] = 0; };
