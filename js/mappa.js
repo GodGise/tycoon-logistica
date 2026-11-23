@@ -38,7 +38,7 @@ function geoZone() {
 function geoEtichette() {
   return { type: 'FeatureCollection', features: zoneAttuali().map(z => ({ type: 'Feature',
     properties: { nome: z.nome, info: S && S.ieri && S.ieri.perZona && S.ieri.perZona[z.id] ? `${S.ieri.perZona[z.id].consegne} consegne oggi` : `${z.pacchi} pacchi/giorno` },
-    geometry: { type: 'Point', coordinates: z.centro || centroide(z.poligono) } })) };
+    geometry: { type: 'Point', coordinates: z.etichetta || z.centro || centroide(z.poligono) } })) };
 }
 
 function avviaMappa(contenitore, quandoFallisce) {
@@ -52,17 +52,26 @@ function avviaMappa(contenitore, quandoFallisce) {
   mappa.on('load', () => {
     coloriStileApple();
     mappa.addSource('zone', { type: 'geojson', data: geoZone() });
+    // stile Apple Maps: riempimento morbido, bagliore del colore sul bordo delle zone servite,
+    // zone separate da un sottile "taglio" scuro invece di linee tratteggiate
     mappa.addLayer({ id: 'zone-fill', type: 'fill', source: 'zone',
-      paint: { 'fill-color': ['get', 'colore'], 'fill-opacity': ['case', ['==', ['get', 'servita'], 1], 0.22, 0.07] } });
+      paint: { 'fill-color': ['get', 'colore'], 'fill-opacity': ['case', ['==', ['get', 'servita'], 1], 0.26, 0.10], 'fill-antialias': true } });
     mappa.addLayer({ id: 'zone-line', type: 'line', source: 'zone', filter: ['==', ['get', 'servita'], 1],
-      paint: { 'line-color': ['get', 'colore'], 'line-width': 2.5, 'line-opacity': 0.9 } });
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': ['get', 'colore'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 7], 'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 5], 'line-opacity': 0.75 } });
     mappa.addLayer({ id: 'zone-line-libere', type: 'line', source: 'zone', filter: ['==', ['get', 'servita'], 0],
-      paint: { 'line-color': ['get', 'colore'], 'line-width': 1.5, 'line-opacity': 0.45, 'line-dasharray': [2, 2] } });
+      layout: { 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'colore'], 'line-width': 1.2, 'line-opacity': 0.35 } });
+    mappa.addLayer({ id: 'zone-taglio', type: 'line', source: 'zone',
+      layout: { 'line-join': 'round' },
+      paint: { 'line-color': '#1c1c1e', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 3.5], 'line-opacity': 0.9 } });
     mappa.addSource('etichette', { type: 'geojson', data: geoEtichette() });
     mappa.addLayer({ id: 'etichette', type: 'symbol', source: 'etichette',
-      layout: { 'text-field': ['format', ['get', 'nome'], { 'font-scale': 1.0 }, '\n', {}, ['get', 'info'], { 'font-scale': 0.8 }],
-        'text-font': ['Open Sans Bold', 'Noto Sans Bold'], 'text-size': 14, 'text-allow-overlap': false },
-      paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(0,0,0,0.85)', 'text-halo-width': 1.6 } });
+      layout: { 'text-field': ['format', ['upcase', ['get', 'nome']], { 'font-scale': 0.9, 'text-color': '#ffffff' }, '\n', {},
+          ['get', 'info'], { 'font-scale': 0.82, 'text-color': 'rgba(235,235,245,0.72)' }],
+        'text-font': ['Open Sans Bold', 'Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 10, 11, 14, 14],
+        'text-letter-spacing': 0.04, 'text-line-height': 1.3, 'text-allow-overlap': false },
+      paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(28,28,30,0.9)', 'text-halo-width': 1.4, 'text-halo-blur': 0.5 } });
     mappa.addSource('furgoni', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     mappa.addLayer({ id: 'furgoni-alone', type: 'circle', source: 'furgoni',
       paint: { 'circle-radius': 11, 'circle-color': ['get', 'colore'], 'circle-opacity': 0.25, 'circle-blur': 0.6 } });

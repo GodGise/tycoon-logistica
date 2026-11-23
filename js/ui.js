@@ -309,11 +309,11 @@ function vistaInizio() {
     </div>
     <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
   }
-  const voce = (c, i, gruppo) => `<button class="voce-citta" data-azione="scegli-citta" data-gruppo="${gruppo}" data-i="${i}"><b>${esc(c.nome)}</b><span>${esc(c.dettaglio || '')}</span></button>`;
+  const voce = (c, i, gruppo) => `<button class="voce-citta" data-azione="scegli-citta" data-gruppo="${gruppo}" data-i="${i}" ${c.troppoPiccola ? 'disabled' : ''}><b>${esc(c.nome)}</b><span>${esc(c.dettaglio || '')}${c.troppoPiccola ? ` · <span class="meno">${esc(c.troppoPiccola)}: servono almeno ${intero.format(ABITANTI_MINIMI)} abitanti</span>` : c.abitanti ? ' · ' + intero.format(c.abitanti) + ' abitanti' : ''}</span></button>`;
   const risultati = inizio.risultati;
   return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : vistaAccount()}<div style="display:grid;gap:10px">
       <h2 style="margin:0;font-size:22px">${filiale ? 'In quale città apri la filiale?' : 'Dove apri la tua azienda?'}</h2>
-      <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : 'Scegli una città qualsiasi: le zone di consegna si creano da sole, a cerchi intorno al centro.'}</p>
+      <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : `Scegli una città con almeno ${intero.format(ABITANTI_MINIMI)} abitanti: le zone di consegna si creano da sole, a cerchi intorno al centro.`}</p>
       <form class="cerca" data-azione="cerca"><input id="cerca-citta" type="search" placeholder="Cerca una città…" autocomplete="off" value="${esc(inizio.testo || '')}"><button class="btn primario" type="submit" ${inizio.cercando ? 'disabled' : ''}>${inizio.cercando ? 'Cerco…' : 'Cerca'}</button></form>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}
     </div>
@@ -354,6 +354,7 @@ function vistaGiri() {
       cause.push(`<b>Furgoni</b>: ${Object.entries(conta).map(([m, n]) => `${n} furgon${n > 1 ? 'i' : 'e'} ${m}`).join(', ')}, quindi ne ${partiti === 1 ? 'è partito' : 'sono partiti'} ${partiti} su ${assegnati.length}.${fuori.some(m => m === 'senza autista') ? ' Assegna un autista nella scheda Flotta.' : fuori.some(m => m.includes('guasto')) ? ' Riparalo con il riquadro in alto a destra.' : ' Un jolly può coprirlo.'}`);
     }
     if (cap && liberi < 0 && jollyN < -liberi) cause.push(`<b>Posti</b>: i furgoni partiti sono pieni, mancano ${intero.format(-liberi - jollyN)} posti. Aggiungi un furgone a questa zona o metti un jolly.`);
+    const notaPicco = d && d.picco ? `<p class="nota">Picco di ordini oggi: +${intero.format(d.picco)} pacchi. È il lavoro del jolly.</p>` : '';
     const spiegazione = attesa > 0 && cause.length
       ? `<div class="perche"><b>Perché restano pacchi</b><ul>${cause.map(c => `<li>${c}</li>`).join('')}</ul></div>`
       : attesa > 0 ? '<p class="nota">I pacchi in attesa sono di ieri: oggi verranno consegnati per primi.</p>'
@@ -369,7 +370,7 @@ function vistaGiri() {
         <div><b>${partiti === assegnati.length ? partiti : partiti + '/' + assegnati.length}</b><span>furgoni partiti</span></div>
         <div><b>${jollyN ? '+' + intero.format(jollyN) : '–'}</b><span>dal jolly</span></div>
       </div>
-      ${spiegazione}
+      ${notaPicco}${spiegazione}
     </div>`;
   }).join('');
   return `<div class="scheda">
@@ -771,7 +772,7 @@ $('#contenuto').addEventListener('submit', async e => {
   inizio.cercando = false; ridisegna();
 });
 function scegliCitta(c) {
-  if (!c) return;
+  if (!c || c.troppoPiccola) return;
   Object.assign(inizio, { fase: 'magazzino', citta: c, errore: '' });
   mostraCitta(c); ridisegna();
   if (inizio.modo === 'filiale') {
