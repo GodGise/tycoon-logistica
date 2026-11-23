@@ -71,7 +71,24 @@ function raggioDaRiquadro(bbox) {
 }
 
 // Ricerca della città con Nominatim (gratuito, dati OpenStreetMap). Una richiesta per ricerca.
-const ABITANTI_MINIMI = 100000;   // sedi e filiali solo nelle città grandi
+const ABITANTI_MINIMI = 100000;   // sedi e filiali: città grandi...
+// ...oppure capoluoghi di provincia, dove ha una sede la rete dei corrieri come GLS (oltre 160 sedi in Italia)
+const CAPOLUOGHI = ('agrigento alessandria ancona andria aosta arezzo ascoli piceno asti avellino bari barletta belluno benevento bergamo biella bologna ' +
+  'bolzano brescia brindisi cagliari caltanissetta campobasso carbonia caserta catania catanzaro chieti como cosenza cremona crotone cuneo enna fermo ' +
+  'ferrara firenze foggia forli frosinone genova gorizia grosseto imperia isernia la spezia l aquila latina lecce lecco livorno lodi lucca macerata ' +
+  'mantova massa matera messina milano modena monza napoli novara nuoro oristano padova palermo parma pavia perugia pesaro pescara piacenza pisa ' +
+  'pistoia pordenone potenza prato ragusa ravenna reggio calabria reggio emilia rieti rimini roma rovigo salerno sassari savona siena siracusa sondrio ' +
+  'taranto teramo terni torino trani trapani trento treviso trieste udine urbino varese venezia verbania vercelli verona vibo valentia vicenza viterbo')
+  .split(' ');
+const NOMI_DOPPI = ['ascoli piceno', 'la spezia', 'l aquila', 'reggio calabria', 'reggio emilia', 'vibo valentia'];
+// le parole dei nomi doppi non valgono da sole (es. "Reggio", "Piceno")
+const PEZZI_DOPPI = NOMI_DOPPI.flatMap(n => n.split(' '));
+CAPOLUOGHI.splice(0, CAPOLUOGHI.length, ...CAPOLUOGHI.filter(n => !PEZZI_DOPPI.includes(n)));
+function normalizzaNome(n) {
+  return n.split(/ - |\//)[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, ' ').trim()
+    .replace(/^reggio nell emilia$/, 'reggio emilia').replace(/^reggio di calabria$/, 'reggio calabria').replace(/^monza.*/, 'monza').replace(/^pesaro.*/, 'pesaro');
+}
+function eCapoluogo(nome) { const n = normalizzaNome(nome); return NOMI_DOPPI.includes(n) || CAPOLUOGHI.includes(n); }
 function abitanti(d) { const p = d.extratags && d.extratags.population; const n = parseInt(String(p || '').replace(/[^0-9]/g, ''), 10); return n > 0 ? n : null; }
 async function cercaCitta(testo) {
   const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&extratags=1&accept-language=it&q=' + encodeURIComponent(testo);
@@ -83,12 +100,14 @@ async function cercaCitta(testo) {
       const ab = abitanti(d);
       return { nome: d.name || d.display_name.split(',')[0], dettaglio: d.display_name.split(',').slice(1, 4).join(',').trim(),
         lng: +d.lon, lat: +d.lat, raggio: raggioDaRiquadro(d.boundingbox), abitanti: ab,
-        troppoPiccola: !ab ? 'abitanti non noti' : ab < ABITANTI_MINIMI ? `${ab.toLocaleString('it-IT')} abitanti` : null };
+        troppoPiccola: eCapoluogo(d.name || '') || (ab && ab >= ABITANTI_MINIMI) ? null
+          : ab ? `${ab.toLocaleString('it-IT')} abitanti e non è capoluogo` : 'non è capoluogo di provincia' };
     })
     .sort((a, b) => (!!a.troppoPiccola - !!b.troppoPiccola) || (b.abitanti || 0) - (a.abitanti || 0));
 }
 
 const CITTA_SUGGERITE = [
+  { nome: 'Udine', dettaglio: 'Friuli-Venezia Giulia', lng: 13.2350, lat: 46.0626, raggio: 4.5 },
   { nome: 'Milano', dettaglio: 'Lombardia', lng: 9.1900, lat: 45.4642, raggio: 9 },
   { nome: 'Trieste', dettaglio: 'Friuli-Venezia Giulia', lng: 13.7768, lat: 45.6495, raggio: 5 },
   { nome: 'Venezia', dettaglio: 'Veneto (Mestre)', lng: 12.2389, lat: 45.4920, raggio: 5.5 },

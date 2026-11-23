@@ -8,7 +8,10 @@ const eurCent = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'E
 const intero = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0, useGrouping: true });
 const segnato = n => `<span class="num ${n >= 0 ? 'piu' : 'meno'}">${n >= 0 ? '+' : '−'}${eur.format(Math.abs(n))}</span>`;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const fmtData = g => dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+// solo il giorno della settimana: niente numero, mese o anno
+const nomeGiorno = g => { const s = dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'long' }); return s[0].toUpperCase() + s.slice(1); };
+const fmtData = g => S && g === S.giorno ? 'Oggi · ' + nomeGiorno(g) : S && g === S.giorno - 1 ? 'Ieri · ' + nomeGiorno(g) : nomeGiorno(g);
+const fmtFaGiorni = g => { const n = S ? S.giorno - g : 0; return n <= 0 ? 'oggi' : n === 1 ? 'ieri' : n + ' giorni fa'; };
 
 let scheda = 'azienda', ultimoT = null, daRidisegnare = true;
 let negozioUsato = false, negozioAperto = false;
@@ -309,11 +312,11 @@ function vistaInizio() {
     </div>
     <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
   }
-  const voce = (c, i, gruppo) => `<button class="voce-citta" data-azione="scegli-citta" data-gruppo="${gruppo}" data-i="${i}" ${c.troppoPiccola ? 'disabled' : ''}><b>${esc(c.nome)}</b><span>${esc(c.dettaglio || '')}${c.troppoPiccola ? ` · <span class="meno">${esc(c.troppoPiccola)}: servono almeno ${intero.format(ABITANTI_MINIMI)} abitanti</span>` : c.abitanti ? ' · ' + intero.format(c.abitanti) + ' abitanti' : ''}</span></button>`;
+  const voce = (c, i, gruppo) => `<button class="voce-citta" data-azione="scegli-citta" data-gruppo="${gruppo}" data-i="${i}" ${c.troppoPiccola ? 'disabled' : ''}><b>${esc(c.nome)}</b><span>${esc(c.dettaglio || '')}${c.troppoPiccola ? ` · <span class="meno">${esc(c.troppoPiccola)}: servono un capoluogo o ${intero.format(ABITANTI_MINIMI)} abitanti</span>` : c.abitanti ? ' · ' + intero.format(c.abitanti) + ' abitanti' : ''}</span></button>`;
   const risultati = inizio.risultati;
   return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : vistaAccount()}<div style="display:grid;gap:10px">
       <h2 style="margin:0;font-size:22px">${filiale ? 'In quale città apri la filiale?' : 'Dove apri la tua azienda?'}</h2>
-      <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : `Scegli una città con almeno ${intero.format(ABITANTI_MINIMI)} abitanti: le zone di consegna si creano da sole, a cerchi intorno al centro.`}</p>
+      <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : 'Scegli un capoluogo di provincia o una città con più di 100.000 abitanti: le zone di consegna si creano da sole, a cerchi intorno al centro.'}</p>
       <form class="cerca" data-azione="cerca"><input id="cerca-citta" type="search" placeholder="Cerca una città…" autocomplete="off" value="${esc(inizio.testo || '')}"><button class="btn primario" type="submit" ${inizio.cercando ? 'disabled' : ''}>${inizio.cercando ? 'Cerco…' : 'Cerca'}</button></form>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}
     </div>
@@ -488,7 +491,7 @@ function graficoCassa() {
   const area = `${x(0)},${y(Math.max(min, 0))} ${punti} ${x(s.length - 1)},${y(Math.max(min, 0))}`;
   const ticks = [max, (max + min) / 2, min].map(v => `<line x1="${dx}" x2="${W - sx}" y1="${y(v)}" y2="${y(v)}" class="griglia-g"/><text x="${dx - 6}" y="${y(v) + 4}" text-anchor="end" class="asse-g">${compatto(v)}</text>`).join('');
   const zero = min < 0 ? `<line x1="${dx}" x2="${W - sx}" y1="${y(0)}" y2="${y(0)}" class="zero-g"/>` : '';
-  const primo = fmtData(s[0][0]).split(' ').slice(1, 3).join(' '), ultimo = fmtData(s[s.length - 1][0]).split(' ').slice(1, 3).join(' ');
+  const primo = fmtFaGiorni(s[0][0]), ultimo = fmtFaGiorni(s[s.length - 1][0]);
   return `<div class="scheda"><div class="riga"><h2 style="margin:0">Cassa giorno per giorno</h2><span class="num">${eur.format(vals[vals.length - 1])}</span></div>
     <div class="grafico" data-serie="cassa"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cassa negli ultimi ${s.length} giorni, da ${eur.format(vals[0])} a ${eur.format(vals[vals.length - 1])}">
       ${ticks}${zero}<polygon points="${area}" class="area-g"/><polyline points="${punti}" class="linea-g"/>
@@ -531,7 +534,7 @@ document.addEventListener('pointermove', e => {
   const m = svg.querySelector('.mirino'), c = svg.querySelector('.punto-g'), t = g.querySelector('.tooltip-g');
   m.setAttribute('x1', x); m.setAttribute('x2', x); m.setAttribute('visibility', 'visible');
   c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('visibility', 'visible');
-  t.hidden = false; t.innerHTML = `<b>${eur.format(s[i][1])}</b><span>${fmtData(s[i][0])}</span>`;
+  t.hidden = false; t.innerHTML = `<b>${eur.format(s[i][1])}</b><span>${nomeGiorno(s[i][0])} · ${fmtFaGiorni(s[i][0])}</span>`;
   t.style.left = Math.min(r.width - 120, Math.max(0, x / W * r.width - 60)) + 'px';
 });
 document.addEventListener('pointerout', e => {
@@ -657,7 +660,7 @@ function testata() {
   $('#cassa').className = 'cifra-grande' + (S.cassa < 0 ? ' meno' : '');
   const u = utileMese(S.conti.voci);
   $('#utile-mese').innerHTML = `${segnato(u)} <span style="color:var(--testo-2)">questo mese</span>`;
-  $('#data').textContent = dataDelGiorno(S.giorno).getDay() === 6 ? 'Fine settimana ' + dataDelGiorno(S.giorno).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) : fmtData(S.giorno);
+  $('#data').textContent = dataDelGiorno(S.giorno).getDay() === 6 ? 'Fine settimana' : nomeGiorno(S.giorno);
 }
 function ridisegna() {
   testata();
