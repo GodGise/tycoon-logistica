@@ -367,13 +367,19 @@ function muoviIndicatore() {
   ind.style.width = b.offsetWidth + 'px'; ind.style.transform = `translateX(${b.offsetLeft}px)`;
 }
 window.addEventListener('resize', muoviIndicatore);
-// riflesso di luce che segue il puntatore sulle superfici di vetro
+// riflesso di luce leggero che segue il puntatore sulle superfici di vetro e svanisce quando esci
+let vetroAttivo = null;
 document.addEventListener('pointermove', e => {
-  const v = e.target.closest && e.target.closest('.vetro, .finestra-corpo'); if (!v) return;
+  const v = e.target.closest && e.target.closest('.vetro, .finestra-corpo');
+  if (vetroAttivo && vetroAttivo !== v) vetroAttivo.style.setProperty('--luce', 0);
+  vetroAttivo = v;
+  if (!v) return;
   const r = v.getBoundingClientRect();
   v.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
   v.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+  v.style.setProperty('--luce', 1);
 });
+document.addEventListener('pointerleave', () => { if (vetroAttivo) { vetroAttivo.style.setProperty('--luce', 0); vetroAttivo = null; } });
 
 // non ridisegnare mentre il giocatore sta usando un menu o uno slider
 function ridisegnaSePossibile() {
