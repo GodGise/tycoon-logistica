@@ -152,9 +152,11 @@ function aggiornaFurgoniMappa(progresso) {
   const features = S.furgoni.map((f, i) => {
     let pos = [dep0[0] + 0.0012 + (i % 4) * 0.0006, dep0[1] - 0.0004 - Math.floor(i / 4) * 0.0005];
     let colore = '#8a96a3';
-    const z = f.zona && zona(f.zona);
+    // un jolly va nella zona che gli è toccata oggi (se nessuna, resta in deposito)
+    const idZona = f.zona === ZONA_JOLLY ? (S.inCorso && S.inCorso.jolly && S.inCorso.jolly[f.id]) : f.zona;
+    const z = idZona && zona(idZona);
     if (z && furgoneOperativo(f) && lavora) {
-      colore = z.colore;
+      colore = f.zona === ZONA_JOLLY ? '#ffd60a' : z.colore;
       const m = magazzinoVicino(z.centro).magazzino, dep = [m.lng, m.lat];
       if (!percorsi[f.id] || percorsi[f.id].giorno !== S.giorno || percorsi[f.id].dep !== m.id) {
         percorsi[f.id] = { giorno: S.giorno, dep: m.id, punti: [dep, ...Array.from({ length: 6 }, () => puntoCasuale(z.poligono)), dep] };

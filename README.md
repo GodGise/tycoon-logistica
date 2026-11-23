@@ -38,6 +38,8 @@ Il tempo scorre da solo: **ogni giornata dura 2 minuti e mezzo** (il fine settim
 - Eventi rari con una decisione da prendere entro 60 secondi: scioperi, strade chiuse, controlli della Stradale, pacchi smarriti, richieste di aumento, neve, accordi con i clienti, offerte per i tuoi furgoni
 - Miglioramenti da comprare: nastro di smistamento, software per i percorsi, pubblicità, corso di guida sicura, officina interna
 - A gioco chiuso l'azienda continua a lavorare (fino a 2 ore reali recuperate) e al ritorno compare il riepilogo
+- Jolly: un furgone con zona "Jolly" va ogni mattina da solo nella zona con più pacchi in attesa in deposito
+- Scheda Giri: per ogni zona pacchi del giorno, consegnati, posti sui furgoni e pacchi che aspettano in deposito
 - Obiettivo del giorno con premio in denaro, "+€" che salgono dai furgoni sulla mappa
 - Incidenti (riparazione a carico dell'autista, premio assicurativo che sale), guasti più frequenti sull'usato
 - Busta paga e assicurazione a fine mese, giacenze che fanno scendere la reputazione
