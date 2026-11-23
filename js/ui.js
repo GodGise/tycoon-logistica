@@ -11,7 +11,7 @@ const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const fmtData = g => dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
 let scheda = 'azienda', ultimoT = null, daRidisegnare = true;
-let negozioUsato = false, negozioAperto = false, negozioAllestimento = 'standard';
+let negozioUsato = false, negozioAperto = false;
 let prezziCaricati = null, posizionando = false;
 let dettaglio = null;
 let cittaVista = 'c1';  // città mostrata nella lista zone della scheda Azienda // { tipo: 'furgone' | 'dipendente' | 'magazzino', id }
@@ -81,7 +81,7 @@ function vistaObiettivoEContratti() {
   const ctr = S.contrattiAttivi.length ? `<div class="scheda"><h2 style="margin:0">Contratti firmati</h2>${S.contrattiAttivi.map(c => {
     const pronti = furgoniAdatti(c.zona, c.tipo).length;
     return `<div class="riga a-capo"><span><b style="color:var(--testo)">${esc(c.cliente)}</b> · ${c.pacchi} ${TIPI_CARICO[c.tipo].unita} · ${esc(nomeZona(zona(c.zona)))} · ${quando(c.giorno)}</span>
-      <span class="num ${pronti ? 'piu' : 'meno'}">${pronti ? eur.format(c.totale) : (c.tipo === 'standard' ? 'nessun furgone in zona!' : 'serve furgone ' + ALLESTIMENTI[c.tipo].nome.toLowerCase() + '!')}</span></div>`;
+      <span class="num ${pronti ? 'piu' : 'meno'}">${pronti ? eur.format(c.totale) : 'nessun furgone in zona!'}</span></div>`;
   }).join('')}</div>` : '';
   return ob + ctr;
 }
@@ -94,10 +94,8 @@ function disegnaOfferta() {
   if (el.dataset.id !== o.id) {
     el.dataset.id = o.id; el.hidden = false;
     const pronti = furgoniAdatti(o.zona, o.tipo).length;
-    const requisito = o.tipo === 'standard'
-      ? (pronti ? `Hai ${pronti} furgon${pronti > 1 ? 'i' : 'e'} in questa zona` : 'Nessun furgone in questa zona: assegnane uno prima del giorno di consegna')
-      : (pronti ? `Hai un furgone ${ALLESTIMENTI[o.tipo].nome.toLowerCase()} in questa zona` : `Serve un furgone ${ALLESTIMENTI[o.tipo].nome.toLowerCase()} assegnato a questa zona`);
-    el.innerHTML = `<div class="offerta-testa"><span class="badge ${o.tipo === 'standard' ? '' : 'speciale'}">${t.nome}</span><span class="nota">Nuovo contratto</span></div>
+    const requisito = pronti ? `Hai ${pronti} furgon${pronti > 1 ? 'i' : 'e'} in questa zona` : 'Nessun furgone in questa zona: assegnane uno prima del giorno di consegna';
+    el.innerHTML = `<div class="offerta-testa"><span class="badge">${t.nome}</span><span class="nota">Nuovo contratto</span></div>
       <div class="offerta-corpo"><div><b>${esc(o.cliente)}</b><div class="nota">${o.pacchi} ${t.unita} in zona ${esc(nomeZona(z))} · ${o.giorno === S.giorno + 1 ? 'domani' : dataDelGiorno(o.giorno).toLocaleDateString('it-IT', { weekday: 'long' })} · ${eurCent.format(o.paga)} l'uno</div></div>
       <div class="offerta-totale">${eur.format(o.totale)}</div></div>
       <div class="nota ${pronti ? 'piu' : 'meno'}">${requisito}. Se non consegni tutto paghi una penale.</div>
@@ -301,7 +299,7 @@ function dettaglioFurgone(f) {
   const stato = f.fermo > 0 ? `fermo ${f.fermo} gg (${f.motivo})` : furgoneOperativo(f) ? (isJolly(f) ? 'jolly' : 'in zona ' + nomeZona(zona(f.zona))) : 'non operativo';
   const pot = Object.entries(POTENZIAMENTI_FURGONE).map(([k, p]) => `<div class="miglioramento"><div><b>${p.nome}</b><div class="nota">${p.descr}</div></div>
     ${ha(f, k) ? '<span class="badge">Montato</span>' : `<button class="btn piccolo" data-azione="potenzia" data-id="${f.id}" data-p="${k}" ${S.cassa < p.costo ? 'disabled' : ''}>${eur.format(p.costo)}</button>`}</div>`).join('');
-  return `${testaDettaglio(esc(m.nome) + (f.usato ? ' <small class="nota">usato</small>' : ''), `${m.tipo} · ${ALLESTIMENTI[f.allestimento || 'standard'].nome.toLowerCase()} · ${intero.format(f.km)} km · ${stato}${a ? ' · autista ' + esc(a.nome) : ''}`, 'Flotta')}
+  return `${testaDettaglio(esc(m.nome) + (f.usato ? ' <small class="nota">usato</small>' : ''), `${m.tipo} · ${intero.format(f.km)} km · ${stato}${a ? ' · autista ' + esc(a.nome) : ''}`, 'Flotta')}
     ${kpi}
     <div class="scheda">${tabellaStat(f, [
       ['Giorni di lavoro', 'giorni', 'num'], ['Consegne', 'consegne', 'num'], ['Km', 'km', 'num'],
@@ -460,7 +458,7 @@ function vistaNegozio() {
   const box = `<div class="ammortamento">Ammortamento: con i prezzi di questa settimana l'e-Pacato si ripaga rispetto al Pacato Fiatt in
     <b>${isFinite(a.settimane) ? a.settimane + ' settimane di gioco' : 'mai'}</b> (risparmio di ${eur.format(a.risparmio)} a settimana su ${a.kmSettimana} km).</div>`;
   const lista = CATALOGO.filter(m => !(negozioUsato && m.tipo === 'elettrico')).map(m => {
-    const prezzo = prezzoAcquisto(m, negozioUsato, negozioAllestimento), c = costoKm(m, negozioUsato);
+    const prezzo = prezzoAcquisto(m, negozioUsato), c = costoKm(m, negozioUsato);
     return `<div class="scheda">
       <div class="riga"><strong>${esc(m.nome)}</strong><span class="badge ${m.tipo}">${m.tipo}</span></div>
       <div class="riga"><span>${dec1.format(m.consumo)} ${m.tipo === 'diesel' ? 'l' : 'kWh'}/100 km · costo ${eur2.format(c.energia + c.manutenzione)}/km</span><span class="num"><b>${eur.format(prezzo)}</b></span></div>
@@ -469,9 +467,6 @@ function vistaNegozio() {
   }).join('');
   return `<div class="riga"><h2 style="margin:0">Compra un furgone</h2><button class="btn piccolo" data-azione="chiudi-negozio">Chiudi</button></div>
     <div class="interruttore"><button data-azione="usato" data-v="0" aria-pressed="${!negozioUsato}">Nuovo</button><button data-azione="usato" data-v="1" aria-pressed="${negozioUsato}">Usato</button></div>
-    <div><span class="nota">Allestimento</span>
-    <div class="interruttore a-capo">${Object.entries(ALLESTIMENTI).map(([k, a]) => `<button data-azione="allestimento" data-v="${k}" aria-pressed="${negozioAllestimento === k}">${a.nome}${a.costo ? ' +' + eur.format(a.costo) : ''}</button>`).join('')}</div>
-    <p class="nota" style="margin-top:6px">${ALLESTIMENTI[negozioAllestimento].descr}${negozioAllestimento !== 'standard' ? '. Serve per i contratti con carichi speciali, che pagano molto di più.' : '.'}</p></div>
     ${negozioUsato ? '<p class="nota">L\'usato costa molto meno ma si rompe più spesso: ottimo come furgone di riserva.</p>' : box}
     ${lista}
     <p class="nota">Prezzi provvisori, da verificare con i listini reali.</p>`;
@@ -494,7 +489,6 @@ function vistaFlotta() {
     }).join('');
     return `<div class="scheda">
       <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="furgone" data-id="${f.id}">${esc(m.nome)}${f.usato ? ' <small class="nota">usato</small>' : ''} ›</button><span class="badge ${m.tipo}">${m.tipo}</span></div>
-      ${f.allestimento && f.allestimento !== 'standard' ? `<div class="riga"><span>Allestimento</span><span class="badge speciale">${ALLESTIMENTI[f.allestimento].nome}</span></div>` : ''}
       <div class="riga"><span>${intero.format(f.km)} km</span>${stato}</div>
       <div class="riga"><span>Assicurazione</span><span class="num ${f.premio > 1 ? 'meno' : ''}">${eur.format(assicurazioneFurgone(f))}/mese${f.premio > 1 ? ` · +${Math.round((f.premio - 1) * 100)}% (${f.incidenti} incident${f.incidenti === 1 ? 'e' : 'i'})` : ''}</span></div>
       ${f.premio >= 1.75 ? '<p class="nota" style="color:var(--avviso)">Assicurazione molto cara: forse conviene venderlo e comprarne un altro.</p>' : ''}
@@ -615,8 +609,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'corso': esito(corsoAutista(id), 'Corso fatto: esperienza aumentata.'); break;
     case 'aumento': if (b.dataset.conferma) esito(aumentoDipendente(id), 'Aumento concesso.'); else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'migliora': esito(compraMiglioramento(id), 'Miglioramento comprato!'); break;
-    case 'allestimento': negozioAllestimento = b.dataset.v; ridisegna(); break;
-    case 'compra': { const err = compraFurgone(id, negozioUsato, negozioAllestimento); if (!err) negozioAperto = false; esito(err, 'Furgone comprato: ora assegnagli un autista e una zona.'); break; }
+    case 'compra': { const err = compraFurgone(id, negozioUsato); if (!err) negozioAperto = false; esito(err, 'Furgone comprato: ora assegnagli un autista e una zona.'); break; }
     case 'vendi': if (b.dataset.conferma) { vendiFurgone(id); esito(null, 'Furgone venduto.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi la vendita?'; } break;
     case 'assumi': esito(assumi(id, b.dataset.ruolo), 'Assunto!'); break;
     case 'licenzia': if (b.dataset.conferma) { licenzia(id); esito(null, 'Dipendente licenziato.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;

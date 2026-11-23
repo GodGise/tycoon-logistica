@@ -42,13 +42,6 @@ const CATALOGO = [
   { id: 'sprinta',  nome: 'Mercedez Sprinta', tipo: 'diesel',  prezzo: 42000, consumo: 8.0, manutKm: 0.068 },
   { id: 'mastre',   nome: 'Renò Mastre',    tipo: 'diesel',    prezzo: 31000, consumo: 8.9, manutKm: 0.066 },
 ];
-// Allestimenti: servono per i carichi speciali dei contratti, che pagano molto di più
-const ALLESTIMENTI = {
-  standard: { nome: 'Standard', costo: 0, descr: 'Pacchi normali' },
-  frigo:    { nome: 'Refrigerato', costo: 9000, descr: 'Farmaci e alimenti freschi' },
-  sponda:   { nome: 'Con sponda idraulica', costo: 4000, descr: 'Mobili ed elettrodomestici' },
-  animali:  { nome: 'Per animali vivi', costo: 12000, descr: 'Animali da allevamenti e cliniche' },
-};
 const SCONTO_USATO = 0.45;          // l'usato costa il 45% del nuovo
 const GUASTO_GIORNO = { nuovo: 0.003, usato: 0.018 };
 

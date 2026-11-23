@@ -1,19 +1,13 @@
-/* Tycoon Logistica – contratti dei clienti (con conto alla rovescia), carichi speciali e obiettivo del giorno. */
+/* Tycoon Logistica – contratti dei clienti (con conto alla rovescia) e obiettivo del giorno. */
 
 // Clienti inventati (nomi storpiati, nessun marchio vero)
 const CLIENTI = {
   standard: ['Zalandò', 'Amazzonia Shop', 'TechPoint', 'Libreria Mondatori', 'Sportissimo', 'Casa&Co', 'Profumeria Bellini'],
-  frigo: ['Farmacia Centrale', 'Gelateria Friulana', 'BioFresco', 'Latteria del Torre', 'Pescheria Adriatica'],
-  sponda: ['Ikeo', 'Elettromondo', 'Mobilificio Zanin', 'Brico Mania', 'Cucine Moretti'],
-  animali: ['Allevamento Prà Verde', 'Canile Amici a 4 Zampe', 'Maneggio San Giorgio', 'Clinica Veterinaria Fabris', 'Fattoria Didattica Moro'],
 };
 
 // Tipi di carico: paga per pacco (o per trasporto) e quanti pacchi
 const TIPI_CARICO = {
   standard: { nome: 'Pacchi express', paga: [9, 12], pacchi: [20, 80], unita: 'pacchi' },
-  frigo:    { nome: 'Merce refrigerata', paga: [18, 24], pacchi: [20, 60], unita: 'colli' },
-  sponda:   { nome: 'Merce pesante', paga: [28, 38], pacchi: [8, 25], unita: 'consegne' },
-  animali:  { nome: 'Animali vivi', paga: [55, 80], pacchi: [4, 12], unita: 'trasporti' },
 };
 
 const OFFERTA = {
@@ -22,17 +16,15 @@ const OFFERTA = {
   durata: 40,             // secondi per accettare
   maxAttivi: 3,
   quotaPenale: 0.3,       // penale = 30% del valore non consegnato
-  probSpeciale: 0.3,
 };
 
 function prossimoFeriale(g) { let x = g + 1; while (!feriale(x)) x++; return x; }
 function furgoniAdatti(zonaId, tipo) {
-  return S.furgoni.filter(f => f.zona === zonaId && (tipo === 'standard' || f.allestimento === tipo));
+  return S.furgoni.filter(f => f.zona === zonaId);
 }
 
 function generaOfferta() {
-  const speciale = Math.random() < OFFERTA.probSpeciale;
-  const tipo = speciale ? scegli(['frigo', 'sponda', 'animali']) : 'standard';
+  const tipo = 'standard';
   const t = TIPI_CARICO[tipo];
   // preferisce le zone servite, ma a volte propone zone nuove
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));
@@ -72,7 +64,7 @@ function aggiornaOfferte(dt) {
 function eseguiContratti(z, giri, capacita) {
   const chiusi = [];
   S.contrattiAttivi.filter(c => c.zona === z.id && c.giorno === S.giorno).forEach(c => {
-    const adatto = c.tipo === 'standard' ? giri.length > 0 : giri.some(f => f.allestimento === c.tipo);
+    const adatto = giri.length > 0;
     const fatti = adatto ? Math.min(c.pacchi, capacita) : 0;
     capacita -= fatti;
     const ricavo = Math.round(fatti * c.paga);
@@ -97,9 +89,9 @@ function contrattiNonServiti() {
 }
 
 function notiziaContratto(c) {
-  if (c.fatti === c.pacchi) { S.contrattiCompletati = (S.contrattiCompletati || 0) + 1; S.speciali = S.speciali || {}; S.speciali[c.tipo] = true; }
+  if (c.fatti === c.pacchi) { S.contrattiCompletati = (S.contrattiCompletati || 0) + 1; }
   if (c.fatti === c.pacchi) notizia(`Contratto ${c.cliente} completato: +${c.ricavo.toLocaleString('it-IT')} €.`, 'buono', 'ctr-' + c.id);
-  else if (!c.adatto) notizia(`Contratto ${c.cliente} fallito: ${c.tipo === 'standard' ? 'nessun furgone in zona' : 'serviva un furgone ' + ALLESTIMENTI[c.tipo].nome.toLowerCase()}. Penale ${c.penale.toLocaleString('it-IT')} €.`, 'male', 'ctr-' + c.id);
+  else if (!c.adatto) notizia(`Contratto ${c.cliente} fallito: nessun furgone in zona. Penale ${c.penale.toLocaleString('it-IT')} €.`, 'male', 'ctr-' + c.id);
   else notizia(`Contratto ${c.cliente} consegnato a metà (${c.fatti}/${c.pacchi}): +${c.ricavo.toLocaleString('it-IT')} €, penale ${c.penale.toLocaleString('it-IT')} €.`, 'male', 'ctr-' + c.id);
 }
 
