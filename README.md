@@ -39,6 +39,7 @@ Il tempo scorre da solo: **ogni giornata dura 2 minuti e mezzo** (il fine settim
 - Miglioramenti da comprare: nastro di smistamento, software per i percorsi, pubblicità, corso di guida sicura, officina interna
 - A gioco chiuso l'azienda continua a lavorare (fino a 2 ore reali recuperate) e al ritorno compare il riepilogo
 - Jolly: un furgone con zona "Jolly" va ogni mattina da solo nella zona con più pacchi in attesa in deposito
+- 19 traguardi con medaglia e premio in denaro (scheda Azienda)
 - Grafici nella scheda Conti: cassa giorno per giorno, utile operativo mese per mese, zone che rendono di più
 - Schede di dettaglio: tocca un furgone, un dipendente o un magazzino (anche sulla mappa) per statistiche del mese, del mese scorso e totali, potenziamenti e azioni
 - Scheda Giri: per ogni zona pacchi del giorno, consegnati, posti sui furgoni e pacchi che aspettano in deposito

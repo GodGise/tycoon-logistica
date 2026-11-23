@@ -151,6 +151,7 @@ function compraFurgone(idModello, usato, allestimento = 'standard') {
 function vendiFurgone(id) {
   const f = S.furgoni.find(x => x.id === id); if (!f) return;
   const ricavo = Math.round(f.valore * COSTANTI.valoreRivendita);
+  S.consegneVendute = (S.consegneVendute || 0) + leggiStat(f, 'tot', 'consegne');
   movimento('vendite', ricavo);
   S.furgoni = S.furgoni.filter(x => x.id !== id);
   notizia(`Venduto ${modello(f.modello).nome} per ${ricavo} €.`, 'info');
@@ -221,6 +222,7 @@ function concludiGiornata() {
   for (const k in c) if (c[k]) movimento(k, -c[k]);
   (S.inCorso.contratti || []).forEach(x => { if (x.ricavo) movimento('contratti', x.ricavo); if (x.penale) movimento('penali', -x.penale); notiziaContratto(x); });
   if (S.inCorso.premio) movimento('premi', S.inCorso.premio);
+  controllaTraguardi();
   // serie della cassa per i grafici (ultimi 180 giorni)
   S.serieCassa = S.serieCassa || [];
   S.serieCassa.push([g, Math.round(S.cassa)]);
@@ -345,6 +347,7 @@ function giornoLavorativo() {
 
   chiusi.push(...contrattiNonServiti());
   const incasso = Math.round(incassoZone);
+  if (servite.length) S.serieSenzaGiacenze = giacenzeTot === 0 ? (S.serieSenzaGiacenze || 0) + 1 : 0;
   const premio = valutaObiettivo(consegneTot, giacenzeTot);
   nuovoObiettivo(consegneTot, giacenzeTot);
   // l'incasso delle consegne entra in cassa piano piano durante la giornata;

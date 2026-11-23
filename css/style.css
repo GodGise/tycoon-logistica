@@ -336,3 +336,16 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .barre-mesi.solo-pos { height: 110px; }
 .barre-mesi.solo-pos .mese-b { grid-template-rows: 1fr auto; }
 .barre-mesi.solo-pos .meta-giu { display: none; }
+
+/* traguardi */
+.medaglie { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.medaglia { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: start; padding: 10px; border-radius: 14px;
+  background: rgba(0,0,0,0.22); opacity: .7; }
+.medaglia .disco { grid-row: span 3; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 15px;
+  background: rgba(255,255,255,0.08); color: var(--testo-2); }
+.medaglia b { font-size: 13px; line-height: 1.25; }
+.medaglia span:not(.disco) { font-size: 12px; color: var(--testo-2); line-height: 1.3; }
+.medaglia em { font-style: normal; font-size: 12px; color: var(--entrata); font-weight: 600; }
+.medaglia.presa { opacity: 1; background: linear-gradient(180deg, rgba(255,214,10,0.18), rgba(255,214,10,0.06)); }
+.medaglia.presa .disco { background: linear-gradient(160deg, #ffe066, #ffb340); color: #3a2a00; box-shadow: 0 2px 8px rgba(255,179,64,.4); }
+.medaglia.presa em { color: var(--testo-2); }
