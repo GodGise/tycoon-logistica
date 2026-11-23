@@ -182,7 +182,7 @@ tr.totale td { font-weight: 700; font-size: 16px; }
    tutto fatto in CSS: nessuna risorsa grafica Apple.
    ========================================================================== */
 :root {
-  --vetro: rgba(24, 24, 28, 0.42);
+  --vetro: rgba(26, 26, 30, 0.78);   /* più opaco: il testo resta leggibile sopra la mappa */
   --vetro-forte: rgba(30, 30, 34, 0.62);
   --bordo-luce: rgba(255, 255, 255, 0.22);
   --accento: #0a84ff;
@@ -191,12 +191,13 @@ tr.totale td { font-weight: 700; font-size: 16px; }
   --uscita: #ff453a;
   --avviso: #ffb340;
   --raggio: 16px;
+  --testo-2: rgba(235, 235, 245, 0.78);
 }
 .vetro {
   position: fixed;
   background: linear-gradient(160deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.05)), var(--vetro);
-  -webkit-backdrop-filter: blur(22px) saturate(1.9) brightness(1.08);
-  backdrop-filter: blur(22px) saturate(1.9) brightness(1.08);
+  -webkit-backdrop-filter: blur(34px) saturate(1.6);
+  backdrop-filter: blur(34px) saturate(1.6);
   border: 1px solid var(--bordo-luce);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.40),       /* filo di luce in alto */
@@ -205,8 +206,6 @@ tr.totale td { font-weight: 700; font-size: 16px; }
     0 18px 50px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25);
   isolation: isolate;
 }
-/* rifrazione: solo Chromium la applica; gli altri ignorano la riga e restano sul vetro sfocato */
-.pannello.vetro, .hud.vetro, .offerta.vetro { backdrop-filter: url(#rifrazione) blur(22px) saturate(1.9) brightness(1.08); }
 /* riflesso che segue il puntatore */
 .vetro::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
@@ -288,3 +287,7 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .giro.in-ritardo { box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), inset 0 0 0 1px rgba(255,69,58,0.35); }
 .jolly-box { background: linear-gradient(180deg, rgba(255,214,10,0.16), rgba(255,214,10,0.05)); }
 .schede button { padding-left: 6px; padding-right: 6px; }
+
+/* leggibilità: schede interne leggermente più scure del pannello, pulsanti disattivati in grigio */
+.scheda, .kpi div { background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025)), rgba(0,0,0,0.12); }
+.btn:disabled { color: var(--testo-2); opacity: .55; }
