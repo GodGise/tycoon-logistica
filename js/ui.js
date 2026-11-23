@@ -595,7 +595,9 @@ function vistaFlotta() {
     })].join('');
     const optZ = '<option value="">In deposito</option>' + tutteCitta().map(c => {
       const j = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id;
-      const opts = `<option value="${j}" ${f.zona === j ? 'selected' : ''}>Jolly: va dove ci sono più pacchi</option>` + S.zone.filter(z => idCitta(z) === c.id).map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}</option>`).join('');
+      // tra parentesi: quanti autisti (furgoni con autista) lavorano già in quella zona
+      const quanti = id => { const n = S.furgoni.filter(x => x.zona === id && x.autistaId).length; return ` (${n} autist${n === 1 ? 'a' : 'i'})`; };
+      const opts = `<option value="${j}" ${f.zona === j ? 'selected' : ''}>Jolly: va dove ci sono più pacchi${quanti(j)}</option>` + S.zone.filter(z => idCitta(z) === c.id).map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}${quanti(z.id)}</option>`).join('');
       return tutteCitta().length > 1 ? `<optgroup label="${esc(c.nome)}">${opts}</optgroup>` : opts;
     }).join('');
     return `<div class="scheda">
