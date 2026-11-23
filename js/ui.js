@@ -678,6 +678,29 @@ function muoviIndicatore() {
   ind.style.width = b.offsetWidth + 'px'; ind.style.transform = `translateX(${b.offsetLeft}px)`;
 }
 window.addEventListener('resize', muoviIndicatore);
+
+/* ---------- telefono: il pannello è un foglio che si alza e si abbassa ---------- */
+const FOGLI = ['basso', 'medio', 'alto'];
+function impostaFoglio(s) {
+  const p = document.querySelector('.pannello'); if (p.dataset.foglio === s) return;
+  p.dataset.foglio = s; setTimeout(muoviIndicatore, 360);
+}
+(() => {
+  const p = document.querySelector('.pannello'), m = p.querySelector('.maniglia'), testa = p.querySelector('.testa');
+  let y0 = null, mosso = false;
+  const giu = e => { if (!matchMedia('(max-width: 760px)').matches) return; y0 = e.clientY; mosso = false; };
+  const muovi = e => { if (y0 !== null && Math.abs(e.clientY - y0) > 8) mosso = true; };
+  const su = e => {
+    if (y0 === null) return;
+    const dy = e.clientY - y0, i = FOGLI.indexOf(p.dataset.foglio); y0 = null;
+    if (dy < -35) impostaFoglio(FOGLI[Math.min(2, i + 1)]);
+    else if (dy > 35) impostaFoglio(FOGLI[Math.max(0, i - 1)]);
+    else if (!mosso && e.currentTarget === m) impostaFoglio(p.dataset.foglio === 'basso' ? 'medio' : p.dataset.foglio === 'medio' ? 'alto' : 'basso');
+  };
+  [m, testa].forEach(el => { el.addEventListener('pointerdown', giu); el.addEventListener('pointermove', muovi); el.addEventListener('pointerup', su); el.addEventListener('pointercancel', () => { y0 = null; }); });
+  // toccando una scheda col foglio abbassato, il foglio si alza
+  p.querySelector('.schede').addEventListener('click', () => { if (p.dataset.foglio === 'basso') impostaFoglio('medio'); });
+})();
 // riflesso di luce leggero che segue il puntatore sulle superfici di vetro e svanisce quando esci
 let vetroAttivo = null;
 document.addEventListener('pointermove', e => {
