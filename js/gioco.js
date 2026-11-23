@@ -68,7 +68,8 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
 function movimento(voce, importo) {
   // importo positivo = entrata, negativo = uscita
   S.cassa += importo;
-  S.conti.voci[voce] += Math.abs(importo);
+  // (|| 0): le partite salvate prima di una nuova voce dei conti non ce l'hanno ancora
+  S.conti.voci[voce] = (S.conti.voci[voce] || 0) + Math.abs(importo);
 }
 function notizia(testo, tipo = 'info', chiave = testo) {
   const ultimo = S.feed.find(f => f.giorno === S.giorno && f.chiave === chiave);
@@ -378,6 +379,10 @@ function carica() {
       // partite salvate prima di questa versione
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
       if (!S.contrattiAttivi) S.contrattiAttivi = [];
+      // conti: aggiunge le voci nuove e ripara i valori rotti (NaN) delle versioni precedenti
+      const ripara = v => { Object.keys(VOCI).forEach(k => { if (!Number.isFinite(v[k])) v[k] = 0; }); for (const k in v) if (!Number.isFinite(v[k])) v[k] = 0; };
+      ripara(S.conti.voci); (S.storico || []).forEach(m => ripara(m.voci));
+      if (!Number.isFinite(S.cassa)) S.cassa = 0;
       if (!S.miglioramenti) S.miglioramenti = {};
       if (!S.effetti) S.effetti = {};
       S.furgoni.forEach(f => { if (!f.allestimento) f.allestimento = 'standard'; });
