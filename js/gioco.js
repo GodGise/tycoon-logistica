@@ -203,7 +203,18 @@ function assegna(idFurgone, campo, valore) {
     f.autistaId = valore || null;
   } else f.zona = valore || null;
 }
-function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0; }
+function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0 && !f.daRiparare; }
+
+/* ---------- guasti: il furgone resta fermo finché non lo fai riparare ---------- */
+function furgoniDaRiparare() { return S ? S.furgoni.filter(f => f.daRiparare > 0) : []; }
+function ripara(id) {
+  const f = S.furgoni.find(x => x.id === id); if (!f || !f.daRiparare) return 'Questo furgone non è guasto.';
+  if (S.cassa < f.daRiparare) return `Servono ${f.daRiparare.toLocaleString('it-IT')} € per la riparazione.`;
+  movimento('manutenzione', -f.daRiparare); stat(f, 'manutenzione', f.daRiparare);
+  notizia(`${modello(f.modello).nome} riparato per ${f.daRiparare.toLocaleString('it-IT')} €: dalla prossima giornata torna a lavorare.`, 'info');
+  f.daRiparare = 0; f.fermo = 0; f.motivo = null;
+  return null;
+}
 
 /* ---------- un giorno di gioco ---------- */
 // Una giornata ha due momenti: l'inizio (si decide cosa succede) e la fine (si chiudono i conti).
@@ -357,16 +368,17 @@ function giornoLavorativo() {
         notizia(`Incidente: ${a.nome} con il ${m.nome}. Furgone fermo ${f.fermo} gg, assicurazione di questo furgone a ${assicurazioneFurgone(f)} €/mese. La riparazione è trattenuta dallo stipendio.`, 'male', 'inc-' + f.id);
       } else if (Math.random() < GUASTO_GIORNO[f.usato ? 'usato' : 'nuovo'] * (1 + f.km / 300000) * (ha(f, 'tagliandi') ? 0.6 : 1)) {
         const costo = Math.round(casoInt(300, 1200) * effetto.guasti());
-        stat(f, 'guasti', 1); stat(f, 'manutenzione', costo);
-        f.fermo = Math.max(1, casoInt(1, 2) - (livello('officina') ? 1 : 0)); f.motivo = 'guasto'; f.fermoDal = S.giorno; manut += costo;
-        notizia(`Guasto al ${m.nome}${f.usato ? ' usato' : ''}: ${costo} € di officina, fermo ${f.fermo} gg.`, 'male', 'gua-' + f.id);
+        stat(f, 'guasti', 1);
+        // resta fermo finché il giocatore non paga la riparazione
+        f.daRiparare = costo; f.fermo = 1; f.motivo = 'guasto'; f.fermoDal = S.giorno;
+        notizia(`Guasto al ${m.nome}${f.usato ? ' usato' : ''}: resta fermo finché non lo ripari (${costo} €).`, 'male', 'gua-' + f.id);
       }
     });
   });
 
   S.furgoni.filter(f => f.zona && !f.autistaId).forEach(f => notizia(`${modello(f.modello).nome} assegnato senza autista: resta fermo.`, 'male', 'noaut-' + f.id));
   // i giorni di fermo si scalano a fine giornata, ma non il giorno stesso dell'incidente/guasto
-  S.furgoni.forEach(f => { if (f.fermo > 0 && f.fermoDal !== S.giorno) { f.fermo -= 1; if (f.fermo === 0) f.motivo = null; } });
+  S.furgoni.forEach(f => { if (f.fermo > 0 && !f.daRiparare && f.fermoDal !== S.giorno) { f.fermo -= 1; if (f.fermo === 0) f.motivo = null; } });
 
   chiusi.push(...contrattiNonServiti());
   const incasso = Math.round(incassoZone);

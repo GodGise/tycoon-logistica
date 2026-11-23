@@ -87,6 +87,28 @@ function vistaObiettivoEContratti() {
 }
 
 // Scheda dell'offerta di contratto, in basso sopra la mappa
+// Riquadri fissi per i furgoni guasti: restano finché non premi Ripara
+function disegnaGuasti() {
+  const el = $('#guasti'), lista = furgoniDaRiparare();
+  const chiave = lista.map(f => f.id + ':' + f.daRiparare + ':' + (S.cassa >= f.daRiparare)).join('|');
+  if (el.dataset.chiave === chiave) return;
+  el.dataset.chiave = chiave;
+  el.innerHTML = lista.map(f => {
+    const m = modello(f.modello), dove = isJolly(f) ? 'jolly' : f.zona ? 'zona ' + nomeZona(zona(f.zona)) : 'in deposito', basta = S.cassa >= f.daRiparare;
+    return `<div class="guasto vetro" role="alert">
+      <div class="riga"><b>Guasto: ${esc(m.nome)}${f.usato ? ' usato' : ''}</b><span class="badge fermo">fermo</span></div>
+      <p class="nota">${esc(dove)} · resta fermo finché non lo ripari</p>
+      <button class="btn primario" data-ripara="${f.id}" ${basta ? '' : 'disabled'}>${basta ? 'Ripara · ' + eur.format(f.daRiparare) : 'Servono ' + eur.format(f.daRiparare)}</button>
+    </div>`;
+  }).join('');
+}
+$('#guasti').addEventListener('click', e => {
+  const b = e.target.closest('[data-ripara]'); if (!b) return;
+  const err = ripara(b.dataset.ripara);
+  if (err) toast(err); else { toast('Furgone riparato: dalla prossima giornata torna a lavorare.'); salva(); }
+  $('#guasti').dataset.chiave = '-'; disegnaGuasti(); ridisegnaSePossibile();
+});
+
 function disegnaOfferta() {
   const el = $('#offerta'), o = S && S.offertaContratto;
   if (!o) { el.hidden = true; el.dataset.id = ''; return; }
@@ -264,7 +286,7 @@ function vistaGiri() {
     const fuori = d && d.fuori ? d.fuori : assegnati.filter(f => !furgoneOperativo(f)).map(f => f.fermo > 0 ? 'fermo per ' + f.motivo : 'senza autista');
     if (fuori.length) {
       const conta = {}; fuori.forEach(m => conta[m] = (conta[m] || 0) + 1);
-      cause.push(`<b>Furgoni</b>: ${Object.entries(conta).map(([m, n]) => `${n} furgon${n > 1 ? 'i' : 'e'} ${m}`).join(', ')}, quindi ne ${partiti === 1 ? 'è partito' : 'sono partiti'} ${partiti} su ${assegnati.length}.${fuori.some(m => m === 'senza autista') ? ' Assegna un autista nella scheda Flotta.' : ' Un jolly può coprirlo.'}`);
+      cause.push(`<b>Furgoni</b>: ${Object.entries(conta).map(([m, n]) => `${n} furgon${n > 1 ? 'i' : 'e'} ${m}`).join(', ')}, quindi ne ${partiti === 1 ? 'è partito' : 'sono partiti'} ${partiti} su ${assegnati.length}.${fuori.some(m => m === 'senza autista') ? ' Assegna un autista nella scheda Flotta.' : fuori.some(m => m.includes('guasto')) ? ' Riparalo con il riquadro in alto a destra.' : ' Un jolly può coprirlo.'}`);
     }
     if (cap && liberi < 0 && jollyN < -liberi) cause.push(`<b>Posti</b>: i furgoni partiti sono pieni, mancano ${intero.format(-liberi - jollyN)} posti. Aggiungi un furgone a questa zona o metti un jolly.`);
     const spiegazione = attesa > 0 && cause.length
@@ -320,7 +342,7 @@ function dettaglioFurgone(f) {
     <div><b>${capacitaFurgone(f)}</b><span>pacchi per giro</span></div>
     <div><b>${eurCent.format(c.energia + c.manutenzione)}</b><span>costo al km</span></div>
     <div><b>${eur.format(assicurazioneFurgone(f))}</b><span>assicurazione/mese</span></div></div>`;
-  const stato = f.fermo > 0 ? `fermo ${f.fermo} gg (${f.motivo})` : furgoneOperativo(f) ? (isJolly(f) ? 'jolly' : 'in zona ' + nomeZona(zona(f.zona))) : 'non operativo';
+  const stato = f.daRiparare ? `guasto, da riparare (${eur.format(f.daRiparare)})` : f.fermo > 0 ? `fermo ${f.fermo} gg (${f.motivo})` : furgoneOperativo(f) ? (isJolly(f) ? 'jolly' : 'in zona ' + nomeZona(zona(f.zona))) : 'non operativo';
   const pot = Object.entries(POTENZIAMENTI_FURGONE).map(([k, p]) => `<div class="miglioramento"><div><b>${p.nome}</b><div class="nota">${p.descr}</div></div>
     ${ha(f, k) ? '<span class="badge">Montato</span>' : `<button class="btn piccolo" data-azione="potenzia" data-id="${f.id}" data-p="${k}" ${S.cassa < p.costo ? 'disabled' : ''}>${eur.format(p.costo)}</button>`}</div>`).join('');
   return `${testaDettaglio(esc(m.nome) + (f.usato ? ' <small class="nota">usato</small>' : ''), `${m.tipo} · ${intero.format(f.km)} km · ${stato}${a ? ' · autista ' + esc(a.nome) : ''}`, 'Flotta')}
@@ -501,7 +523,7 @@ function vistaFlotta() {
   const autisti = S.dipendenti.filter(d => d.ruolo === 'autista');
   const carte = S.furgoni.map(f => {
     const m = modello(f.modello);
-    const stato = f.fermo > 0 ? `<span class="badge fermo">fermo ${f.fermo} gg · ${f.motivo}</span>` : furgoneOperativo(f) ? '<span class="badge">operativo</span>' : '<span class="badge fermo">non operativo</span>';
+    const stato = f.daRiparare ? `<button class="btn piccolo primario" data-azione="ripara" data-id="${f.id}">Ripara · ${eur.format(f.daRiparare)}</button>` : f.fermo > 0 ? `<span class="badge fermo">fermo ${f.fermo} gg · ${f.motivo}</span>` : furgoneOperativo(f) ? '<span class="badge">operativo</span>' : '<span class="badge fermo">non operativo</span>';
     const optA = ['<option value="">Nessun autista</option>', ...autisti.map(a => {
       const altro = S.furgoni.find(x => x.autistaId === a.id && x.id !== f.id);
       return `<option value="${a.id}" ${f.autistaId === a.id ? 'selected' : ''}>${esc(a.nome)}${altro ? ' (su altro furgone)' : ''}</option>`;
@@ -625,6 +647,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'ripara': { const err = ripara(id); esito(err, 'Furgone riparato: dalla prossima giornata torna a lavorare.'); $('#guasti').dataset.chiave = '-'; disegnaGuasti(); break; }
     case 'apri-filiale': Object.assign(inizio, { modo: 'filiale', fase: 'citta', risultati: null, citta: null, errore: '' }); $('#contenuto').scrollTop = 0; ridisegna(); break;
     case 'annulla-filiale': annullaPuntoSullaMappa(); Object.assign(inizio, { modo: null, fase: 'citta', citta: null, errore: '' }); anteprimaZone = null; aggiornaZoneMappa(); inquadraZone(cittaVista); ridisegna(); break;
     case 'vedi-citta': cittaVista = b.dataset.id; inquadraZone(cittaVista); ridisegna(); break;
@@ -717,6 +740,7 @@ function ciclo(t) {
   if (S.traguardiNuovi && S.traguardiNuovi.length) { const t = TRAGUARDI.find(x => x.id === S.traguardiNuovi.shift()); if (t) toast(`★ Traguardo: ${t.nome.replace(/!$/, '')}! +${eur.format(t.premio)}`); daRidisegnare = true; }
   if (aggiornaOfferte(dt)) daRidisegnare = true;
   disegnaOfferta();
+  disegnaGuasti();
   if (aggiornaEvento(dt)) daRidisegnare = true;
   disegnaEvento();
   soldiSullaMappa(t, S.tempoGiorno / durata);

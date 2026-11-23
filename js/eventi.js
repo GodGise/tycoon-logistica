@@ -6,7 +6,7 @@ const MIGLIORAMENTI = {
   software:  { nome: 'Software per i percorsi', descr: 'Giri più corti: −10% di km per ogni livello.', livelli: [25000, 60000] },
   pubblicita:{ nome: 'Pubblicità', descr: '+10% di pacchi in tutte le zone per ogni livello.', livelli: [15000, 35000, 70000] },
   formazione:{ nome: 'Corso di guida sicura', descr: 'Gli autisti fanno il 40% di incidenti in meno.', livelli: [20000] },
-  officina:  { nome: 'Officina interna', descr: 'Guasti a metà prezzo e un giorno di fermo in meno.', livelli: [50000] },
+  officina:  { nome: 'Officina interna', descr: 'Riparazioni dei guasti a metà prezzo.', livelli: [50000] },
 };
 function livello(id) { return (S.miglioramenti && S.miglioramenti[id]) || 0; }
 function prezzoMiglioramento(id) { const l = MIGLIORAMENTI[id].livelli; return livello(id) < l.length ? l[livello(id)] : null; }
