@@ -53,6 +53,7 @@ function vistaAzienda() {
     <div class="riga"><span>Assicurazione flotta</span><span class="num">${eur.format(S.furgoni.reduce((t, f) => t + assicurazioneFurgone(f), 0))}/mese</span></div>
   </div>
   ${vistaMagazzini()}
+  ${vistaMiglioramenti()}
   <div><h2>Zone di consegna <small>${esc(S.citta.nome)} · ${S.zone.length} zone</small></h2><div style="display:grid;gap:8px">${zone}</div>
   <p class="nota" style="margin-top:8px">Un corriere fa al massimo ${COSTANTI.maxConsegneCorriere} consegne al giorno; un magazziniere smista ${COSTANTI.pacchiMagazziniere} pacchi.</p></div>
   <div class="scheda">
@@ -101,6 +102,45 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-offerta]'); if (!b || !S) return;
   if (b.dataset.offerta === 'si') esito(accettaOfferta(), 'Contratto firmato!'); else { rifiutaOfferta(); salva(); }
   disegnaOfferta(); ridisegna();
+});
+
+function vistaMiglioramenti() {
+  return `<div class="scheda"><h2 style="margin:0">Miglioramenti</h2>${Object.entries(MIGLIORAMENTI).map(([id, m]) => {
+    const l = livello(id), prezzo = prezzoMiglioramento(id), multi = m.livelli.length > 1;
+    return `<div class="miglioramento"><div><b>${m.nome}${multi ? ` <small class="nota">livello ${l}/${m.livelli.length}</small>` : ''}</b><div class="nota">${m.descr}</div></div>
+      ${prezzo === null ? '<span class="badge">Fatto</span>' : `<button class="btn piccolo" data-azione="migliora" data-id="${id}" ${S.cassa < prezzo ? 'disabled' : ''}>${eur.format(prezzo)}</button>`}</div>`;
+  }).join('')}</div>`;
+}
+
+// Finestra al centro per gli eventi rari (con decisione) e per il riepilogo a gioco chiuso
+function disegnaEvento() {
+  const el = $('#finestra'), ev = S && S.evento;
+  if (el.dataset.tipo === 'offline') return;
+  if (!ev) { if (el.dataset.tipo === 'evento') { el.hidden = true; el.dataset.tipo = ''; el.dataset.id = ''; } return; }
+  if (el.dataset.id !== ev.id) {
+    el.dataset.id = ev.id; el.dataset.tipo = 'evento'; el.hidden = false;
+    el.innerHTML = `<div class="finestra-corpo"><span class="badge speciale">Imprevisto</span><h2>${esc(ev.titolo)}</h2><p>${esc(ev.testo)}</p>
+      <div class="metro"><i id="evento-tempo"></i></div><p class="nota">Se non decidi, si applica l'ultima scelta.</p>
+      <div class="scelte">${ev.scelte.map((s, i) => `<button class="btn ${i === 0 ? 'primario' : ''}" data-scelta="${i}">${esc(s)}</button>`).join('')}</div></div>`;
+  }
+  $('#evento-tempo').style.width = Math.max(0, ev.restano / EVENTO.durata * 100) + '%';
+}
+function mostraRiepilogoOffline(r) {
+  const el = $('#finestra'); el.dataset.tipo = 'offline'; el.hidden = false;
+  const ore = Math.floor(r.secondi / 3600), min = Math.round(r.secondi % 3600 / 60);
+  el.innerHTML = `<div class="finestra-corpo"><span class="badge">Bentornato</span><h2>Mentre eri via</h2>
+    <p>Sono passat${ore ? 'e ' + ore + ' or' + (ore > 1 ? 'e' : 'a') + ' e ' : 'i '}${min} minuti${r.ridotto ? ' (si recuperano al massimo 2 ore)' : ''}: <b>${r.giorni} giorni</b> di lavoro per la tua azienda.</p>
+    <div class="riga"><span>Consegne</span><span class="num">${intero.format(r.consegne)}</span></div>
+    <div class="riga"><span>Cassa</span>${segnato(r.differenza)}</div>
+    <div class="scelte"><button class="btn primario" data-scelta="ok">Continua</button></div></div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-scelta]'); if (!b || !S) return;
+  const el = $('#finestra');
+  if (b.dataset.scelta === 'ok') { el.hidden = true; el.dataset.tipo = ''; return; }
+  const testo = decidiEvento(+b.dataset.scelta);
+  el.hidden = true; el.dataset.tipo = ''; el.dataset.id = '';
+  esito(null, testo);
 });
 
 function vistaMagazzini() {
@@ -297,6 +337,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'apri-negozio': negozioAperto = true; $('#contenuto').scrollTop = 0; ridisegna(); break;
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
+    case 'migliora': esito(compraMiglioramento(id), 'Miglioramento comprato!'); break;
     case 'allestimento': negozioAllestimento = b.dataset.v; ridisegna(); break;
     case 'compra': { const err = compraFurgone(id, negozioUsato, negozioAllestimento); if (!err) negozioAperto = false; esito(err, 'Furgone comprato: ora assegnagli un autista e una zona.'); break; }
     case 'vendi': if (b.dataset.conferma) { vendiFurgone(id); esito(null, 'Furgone venduto.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi la vendita?'; } break;
@@ -368,6 +409,8 @@ function ciclo(t) {
   avanzaIncasso(S.tempoGiorno / durata);
   if (aggiornaOfferte(dt)) daRidisegnare = true;
   disegnaOfferta();
+  if (aggiornaEvento(dt)) daRidisegnare = true;
+  disegnaEvento();
   soldiSullaMappa(t, S.tempoGiorno / durata);
   if (t - ultimaTestata > 250) {
     ultimaTestata = t; testata();
@@ -394,6 +437,8 @@ async function avvio() {
   const prezzi = await leggiPrezzi();
   prezziCaricati = prezzi;
   if (carica() && prezzi) S.prezzi = prezzi;
+  const riepilogo = S ? recuperaOffline() : null;
+  if (riepilogo) { salva(); mostraRiepilogoOffline(riepilogo); }
   ridisegna();
   avviaMappa('mappa', msg => { const a = $('#avviso-mappa'); a.hidden = false; a.textContent = msg + ' Il gioco funziona lo stesso dal pannello.'; });
   requestAnimationFrame(ciclo);

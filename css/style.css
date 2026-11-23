@@ -119,6 +119,22 @@ select { background: var(--campo); border: 1px solid var(--bordo); border-radius
 @media (prefers-reduced-motion: reduce) { .soldi { animation-duration: 1.4s; animation-name: svanisce; } .offerta { animation: none; } }
 @keyframes svanisce { from { opacity: 1; } to { opacity: 0; } }
 
+/* eventi e riepilogo */
+.finestra { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.35); }
+.finestra[hidden] { display: none; }
+.finestra-corpo { width: min(460px, 100%); display: grid; gap: 12px; padding: 22px; border-radius: 22px; background: var(--vetro);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8); border: 1px solid var(--bordo);
+  box-shadow: 0 30px 80px rgba(0,0,0,.6); animation: compare .3s ease-out; }
+.finestra-corpo h2 { font-size: 22px; margin: 0; }
+.finestra-corpo > .badge, .offerta-testa .badge { justify-self: start; }
+.finestra-corpo p { margin: 0; }
+.finestra-corpo .metro i { background: var(--avviso); transition: width .25s linear; }
+.scelte { display: grid; gap: 8px; }
+.miglioramento { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--bordo); }
+.miglioramento:first-of-type { border-top: 0; }
+@keyframes compare { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .finestra-corpo { animation: none; } }
+
 /* feed */
 .giorno-feed h3 { margin: 0 0 6px; font-size: 13px; color: var(--testo-2); font-weight: 600; }
 .voce-feed { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--bordo); }
