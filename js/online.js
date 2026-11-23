@@ -16,7 +16,8 @@ function onlineAttivo() { return !!(ONLINE.url && ONLINE.chiave); }
 async function rpc(funzione, argomenti) {
   const r = await fetch(`${ONLINE.url}/rest/v1/rpc/${funzione}`, {
     method: 'POST',
-    headers: { apikey: ONLINE.chiave, Authorization: 'Bearer ' + ONLINE.chiave, 'Content-Type': 'application/json' },
+    // chiave "anon" vecchia (JWT, inizia con eyJ) anche come Bearer; la nuova "publishable" (sb_publishable_…) solo come apikey
+    headers: Object.assign({ apikey: ONLINE.chiave, 'Content-Type': 'application/json' }, ONLINE.chiave.startsWith('eyJ') ? { Authorization: 'Bearer ' + ONLINE.chiave } : {}),
     body: JSON.stringify(argomenti),
   });
   const testo = await r.text();
