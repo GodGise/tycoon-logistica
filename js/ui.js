@@ -60,6 +60,7 @@ function vistaAzienda() {
   ${vistaMiglioramenti()}
   ${vistaTraguardi()}
   ${vistaFiliali()}
+  ${vistaAccount()}
   <div><h2>Zone di consegna <small>${esc(cittaDi(cittaVista).nome)} · ${S.zone.filter(z => idCitta(z) === cittaVista).length} zone</small></h2>
   ${multi ? `<div class="interruttore a-capo" style="margin-bottom:8px">${tutteCitta().map(c => `<button data-azione="vedi-citta" data-id="${c.id}" aria-pressed="${c.id === cittaVista}">${esc(c.nome)}</button>`).join('')}</div>` : ''}
   <div style="display:grid;gap:8px">${zone}</div>
@@ -179,6 +180,70 @@ document.addEventListener('click', e => {
   esito(null, testo);
 });
 
+/* ---------- account online ---------- */
+let accountAttesa = false;
+function vistaAccount() {
+  if (!onlineAttivo()) return '';
+  if (account.token) {
+    const quando = account.ultimo ? new Date(account.ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : null;
+    return `<div class="scheda"><div class="riga"><h2 style="margin:0">Account</h2><span class="badge">${esc(account.nome)}</span></div>
+      <p class="nota">La partita si salva online ogni 30 secondi${quando ? ' · ultimo salvataggio alle ' + quando : ''}. Accedi con lo stesso nome su un altro dispositivo per ritrovarla.</p>
+      ${account.errore ? `<p class="nota meno">${esc(account.errore)}</p>` : ''}
+      <div class="riga"><button class="btn piccolo" data-azione="salva-online" ${accountAttesa ? 'disabled' : ''}>Salva ora</button><button class="btn piccolo" data-azione="esci-account" ${accountAttesa ? 'disabled' : ''}>Esci</button></div></div>`;
+  }
+  return `<div class="scheda"><h2 style="margin:0">Account</h2>
+    <p class="nota">${S ? 'Registrati per salvare questa partita online e giocarla anche dal telefono.' : 'Hai già un account? Accedi per riprendere la tua partita.'}</p>
+    <form class="modulo-account" data-azione="account" autocomplete="on">
+      <input id="acc-nome" class="campo-testo" name="username" autocomplete="username" placeholder="Nome utente" maxlength="20" autocapitalize="none" spellcheck="false">
+      <input id="acc-pw" class="campo-testo" name="password" type="password" autocomplete="current-password" placeholder="Password (almeno 6 caratteri)">
+      <div class="riga"><button class="btn primario" type="submit" data-modo="accedi" ${accountAttesa ? 'disabled' : ''}>${accountAttesa ? 'Attendi…' : 'Accedi'}</button>
+        <button class="btn" type="submit" data-modo="registra" ${accountAttesa ? 'disabled' : ''}>Registrati</button></div>
+    </form>
+    ${account.errore ? `<p class="nota meno">${esc(account.errore)}</p>` : ''}</div>`;
+}
+// dopo che la partita è cambiata (accesso, altro dispositivo): ridisegna pannello e mappa
+function dopoCambioPartita(msg) {
+  ridisegna();
+  if (S && typeof aggiornaDepositiMappa === 'function') { try { aggiornaDepositiMappa(); aggiornaZoneMappa(); inquadraZone('c1'); } catch (e) { /* mappa non pronta */ } }
+  if (msg) toast(msg);
+}
+function chiediQualePartita(riga, token, nome) {
+  const el = $('#finestra'), on = riga.dati, qui = S;
+  const desc = p => `${esc(p.nomeAzienda || 'Partita')} · ${esc(p.citta.nome)} · giorno ${p.giorno} · ${eur.format(p.cassa)}`;
+  el.dataset.tipo = 'offline'; el.hidden = false;
+  el.innerHTML = `<div class="finestra-corpo vetro"><h2 style="margin:0">Quale partita tieni?</h2>
+    <p class="nota">Sul tuo account c'è già una partita, diversa da quella su questo dispositivo.</p>
+    <div class="scelte"><button class="btn primario" data-partita="online">Quella online: ${desc(on)}</button>
+    <button class="btn" data-partita="qui">Questa: ${desc(qui)}</button></div>
+    <p class="nota">Quella che non scegli viene sostituita.</p></div>`;
+  chiediQualePartita.attesa = { riga, token, nome };
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-partita]'); if (!b) return;
+  const el = $('#finestra'); el.hidden = true; el.dataset.tipo = '';
+  const { riga, token, nome } = chiediQualePartita.attesa;
+  Object.assign(account, { token, nome, nuvolaIl: 0 }); ricordaAccount();
+  if (b.dataset.partita === 'online') { usaPartitaNuvola(riga); dopoCambioPartita('Partita online caricata.'); }
+  else { await salvaOnline(true); dopoCambioPartita('Questa partita ora è salvata sul tuo account.'); }
+});
+document.addEventListener('submit', async e => {
+  const f = e.target.closest('form[data-azione=account]'); if (!f) return;
+  e.preventDefault();
+  const modo = (e.submitter && e.submitter.dataset.modo) || 'accedi';
+  const nome = $('#acc-nome').value, pw = $('#acc-pw').value;
+  accountAttesa = true; account.errore = ''; ridisegna();
+  if (modo === 'registra') {
+    const err = await registraAccount(nome, pw);
+    accountAttesa = false; account.errore = err || '';
+    dopoCambioPartita(err ? null : `Account ${account.nome} creato${S ? ': la partita è salvata online' : ''}.`);
+  } else {
+    const r = await accediAccount(nome, pw);
+    accountAttesa = false; account.errore = r.errore || '';
+    if (r.scegli) { ridisegna(); chiediQualePartita(r.scegli, r.token, r.nome); }
+    else dopoCambioPartita(r.ok ? `Bentornato, ${account.nome}!` : null);
+  }
+});
+
 function vistaFiliali() {
   const manca = requisitiFiliale();
   const lista = tutteCitta().map(c => {
@@ -246,7 +311,7 @@ function vistaInizio() {
   }
   const voce = (c, i, gruppo) => `<button class="voce-citta" data-azione="scegli-citta" data-gruppo="${gruppo}" data-i="${i}"><b>${esc(c.nome)}</b><span>${esc(c.dettaglio || '')}</span></button>`;
   const risultati = inizio.risultati;
-  return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : ''}<div style="display:grid;gap:10px">
+  return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : vistaAccount()}<div style="display:grid;gap:10px">
       <h2 style="margin:0;font-size:22px">${filiale ? 'In quale città apri la filiale?' : 'Dove apri la tua azienda?'}</h2>
       <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : 'Scegli una città qualsiasi: le zone di consegna si creano da sole, a cerchi intorno al centro.'}</p>
       <form class="cerca" data-azione="cerca"><input id="cerca-citta" type="search" placeholder="Cerca una città…" autocomplete="off" value="${esc(inizio.testo || '')}"><button class="btn primario" type="submit" ${inizio.cercando ? 'disabled' : ''}>${inizio.cercando ? 'Cerco…' : 'Cerca'}</button></form>
@@ -647,6 +712,8 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'salva-online': accountAttesa = true; ridisegna(); salvaOnline(false).then(r => { accountAttesa = false; dopoCambioPartita(r === 'ok' ? 'Partita salvata online.' : r === 'altro' ? 'Ho caricato la partita più recente dall\'altro dispositivo.' : null); }); break;
+    case 'esci-account': accountAttesa = true; ridisegna(); esciAccount().then(() => { accountAttesa = false; dopoCambioPartita('Sei uscito. La partita resta anche su questo dispositivo.'); }); break;
     case 'ripara': { const err = ripara(id); esito(err, 'Furgone riparato: dalla prossima giornata torna a lavorare.'); $('#guasti').dataset.chiave = '-'; disegnaGuasti(); break; }
     case 'apri-filiale': Object.assign(inizio, { modo: 'filiale', fase: 'citta', risultati: null, citta: null, errore: '' }); $('#contenuto').scrollTop = 0; ridisegna(); break;
     case 'annulla-filiale': annullaPuntoSullaMappa(); Object.assign(inizio, { modo: null, fase: 'citta', citta: null, errore: '' }); anteprimaZone = null; aggiornaZoneMappa(); inquadraZone(cittaVista); ridisegna(); break;
@@ -672,6 +739,7 @@ $('#contenuto').addEventListener('click', e => {
 });
 $('#contenuto').addEventListener('submit', async e => {
   e.preventDefault();
+  if (e.target.dataset.azione === 'account') return;   // gestito dal modulo account
   if (e.target.dataset.azione === 'rinomina') { esito(rinominaAzienda($('#input-nome').value), 'Nome aggiornato.'); $('#input-nome').blur(); return; }
   const testo = $('#cerca-citta').value.trim(); if (testo.length < 2) return;
   Object.assign(inizio, { testo, cercando: true, errore: '' }); ridisegna();
@@ -750,6 +818,8 @@ function ciclo(t) {
     if (oggi && S.ieri && !S.ieri.festivo && S.inCorso) oggi.textContent = `${intero.format(S.ieri.consegne)} consegne · ${eur.format(S.inCorso.accreditato)} di ${eur.format(S.ieri.incasso)}`;
   }
   if (t - ultimoSalvataggio > 5000) { ultimoSalvataggio = t; salva(); }
+  const sync = sincronizzaOgniTanto();
+  if (sync) sync.then(r => { if (r === 'altro') dopoCambioPartita('Ho caricato la partita più recente dall\'altro dispositivo.'); else if (scheda === 'azienda' && !dettaglio) daRidisegnare = true; });
   const p = S.tempoGiorno / durata, resto = Math.ceil(durata - S.tempoGiorno);
   $('#barra-giorno').style.width = (p * 100) + '%';
   $('#countdown').textContent = `${Math.floor(resto / 60)}:${String(resto % 60).padStart(2, '0')}`;
@@ -772,6 +842,7 @@ async function avvio() {
   const riepilogo = S ? recuperaOffline() : null;
   if (riepilogo) { salva(); mostraRiepilogoOffline(riepilogo); }
   ridisegna();
+  avviaOnline().then(() => { if (account.token || account.errore) dopoCambioPartita(null); });
   avviaMappa('mappa', msg => { const a = $('#avviso-mappa'); a.hidden = false; a.textContent = msg + ' Il gioco funziona lo stesso dal pannello.'; });
   requestAnimationFrame(ciclo);
 }
