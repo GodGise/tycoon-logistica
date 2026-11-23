@@ -6,11 +6,11 @@ const COSTANTI = {
   euroPerConsegna: 2,
   maxConsegneCorriere: 125,       // oltre restano pacchi in giacenza
   pacchiMagazziniere: 300,        // pacchi smistati al giorno da un magazziniere
-  secondiPerGiorno: 180,          // ogni giornata dura 3 minuti reali, senza possibilità di accelerare
+  secondiPerGiorno: 150,          // ogni giornata dura 2 minuti e mezzo reali, senza possibilità di accelerare
   // il fine settimana (sabato + domenica) passa in un unico blocco da 3 minuti
   assicurazioneMensile: 150,      // per furgone, premio base
-  aumentoPremioIncidente: 0.15,   // +15% al premio flotta per incidente
-  rientroPremioSettimanale: 0.01, // il premio torna verso la base piano piano
+  aumentoPremioIncidente: 0.25,   // +25% al premio di QUEL furgone per ogni incidente. Non scende più:
+                                  // se sale troppo conviene vendere il furgone e comprarne un altro
   costoAnnuncio: 50,              // pubblicare un annuncio di lavoro
   // prezzo della ricarica = PUN all'ingrosso (dato reale) + una quota fissa per reti, oneri e tasse
   oneriDeposito: 0.10,            // €/kWh in più sul PUN: ricarica lenta in deposito

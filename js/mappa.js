@@ -36,7 +36,7 @@ function geoZone() {
 }
 function geoEtichette() {
   return { type: 'FeatureCollection', features: zoneAttuali().map(z => ({ type: 'Feature',
-    properties: { nome: z.nome, info: S && S.ieri && S.ieri.perZona && S.ieri.perZona[z.id] ? `${S.ieri.perZona[z.id].consegne} consegne ieri` : `${z.pacchi} pacchi/giorno` },
+    properties: { nome: z.nome, info: S && S.ieri && S.ieri.perZona && S.ieri.perZona[z.id] ? `${S.ieri.perZona[z.id].consegne} consegne oggi` : `${z.pacchi} pacchi/giorno` },
     geometry: { type: 'Point', coordinates: z.centro || centroide(z.poligono) } })) };
 }
 
