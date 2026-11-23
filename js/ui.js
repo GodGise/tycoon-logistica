@@ -55,6 +55,7 @@ function vistaAzienda() {
   </div>
   ${vistaMagazzini()}
   ${vistaMiglioramenti()}
+  ${vistaTraguardi()}
   <div><h2>Zone di consegna <small>${esc(S.citta.nome)} · ${S.zone.length} zone</small></h2><div style="display:grid;gap:8px">${zone}</div>
   <p class="nota" style="margin-top:8px">Un corriere fa al massimo ${COSTANTI.maxConsegneCorriere} consegne al giorno; un magazziniere smista ${COSTANTI.pacchiMagazziniere} pacchi.</p></div>
   <div class="scheda">
@@ -104,6 +105,14 @@ document.addEventListener('click', e => {
   if (b.dataset.offerta === 'si') esito(accettaOfferta(), 'Contratto firmato!'); else { rifiutaOfferta(); salva(); }
   disegnaOfferta(); ridisegna();
 });
+
+function vistaTraguardi() {
+  const fatti = TRAGUARDI.filter(t => S.traguardi && S.traguardi[t.id] !== undefined).length;
+  return `<div class="scheda"><div class="riga"><h2 style="margin:0">Traguardi</h2><span class="num">${fatti}/${TRAGUARDI.length}</span></div>
+    <div class="metro"><i style="width:${fatti / TRAGUARDI.length * 100}%"></i></div>
+    <div class="medaglie">${TRAGUARDI.map(t => { const ok = S.traguardi && S.traguardi[t.id] !== undefined;
+      return `<div class="medaglia ${ok ? 'presa' : ''}" title="${esc(t.descr)}"><span class="disco" aria-hidden="true">${ok ? '★' : '☆'}</span><b>${esc(t.nome)}</b><span>${esc(t.descr)}</span><em>${ok ? 'preso' : '+' + eur.format(t.premio)}</em></div>`; }).join('')}</div></div>`;
+}
 
 function vistaMiglioramenti() {
   return `<div class="scheda"><h2 style="margin:0">Miglioramenti</h2>${Object.entries(MIGLIORAMENTI).map(([id, m]) => {
@@ -632,6 +641,7 @@ function ciclo(t) {
   }
   // gli autisti consegnano: la cassa sale durante la giornata
   avanzaIncasso(S.tempoGiorno / durata);
+  if (S.traguardiNuovi && S.traguardiNuovi.length) { const t = TRAGUARDI.find(x => x.id === S.traguardiNuovi.shift()); if (t) toast(`★ Traguardo: ${t.nome.replace(/!$/, '')}! +${eur.format(t.premio)}`); daRidisegnare = true; }
   if (aggiornaOfferte(dt)) daRidisegnare = true;
   disegnaOfferta();
   if (aggiornaEvento(dt)) daRidisegnare = true;

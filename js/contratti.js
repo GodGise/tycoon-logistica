@@ -97,6 +97,7 @@ function contrattiNonServiti() {
 }
 
 function notiziaContratto(c) {
+  if (c.fatti === c.pacchi) { S.contrattiCompletati = (S.contrattiCompletati || 0) + 1; S.speciali = S.speciali || {}; S.speciali[c.tipo] = true; }
   if (c.fatti === c.pacchi) notizia(`Contratto ${c.cliente} completato: +${c.ricavo.toLocaleString('it-IT')} €.`, 'buono', 'ctr-' + c.id);
   else if (!c.adatto) notizia(`Contratto ${c.cliente} fallito: ${c.tipo === 'standard' ? 'nessun furgone in zona' : 'serviva un furgone ' + ALLESTIMENTI[c.tipo].nome.toLowerCase()}. Penale ${c.penale.toLocaleString('it-IT')} €.`, 'male', 'ctr-' + c.id);
   else notizia(`Contratto ${c.cliente} consegnato a metà (${c.fatti}/${c.pacchi}): +${c.ricavo.toLocaleString('it-IT')} €, penale ${c.penale.toLocaleString('it-IT')} €.`, 'male', 'ctr-' + c.id);
