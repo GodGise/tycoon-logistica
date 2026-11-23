@@ -209,8 +209,8 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 /* riflesso che segue il puntatore */
 .vetro::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
-  background: radial-gradient(420px circle at var(--mx, 30%) var(--my, 0%), rgba(255,255,255,0.14), transparent 45%);
-  transition: background .2s;
+  background: radial-gradient(260px circle at var(--mx, 30%) var(--my, 0%), rgba(255,255,255,0.05), transparent 60%);
+  opacity: var(--luce, 0); transition: opacity .5s ease;   /* appare solo col mouse sopra, sparisce quando esci */
 }
 /* bordo che brilla di più in alto a sinistra, come una lastra curva */
 .vetro::after {
