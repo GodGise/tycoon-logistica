@@ -9,7 +9,7 @@ const TRAGUARDI = [
   { id: 'flotta-15',      nome: 'Grande flotta',         descr: 'Abbi 15 furgoni',                             premio: 20000, ok: () => S.furgoni.length >= 15 },
   { id: 'elettrico',      nome: 'Aria pulita',           descr: 'Compra il primo furgone elettrico',           premio: 3000,  ok: () => S.furgoni.some(f => modello(f.modello).tipo === 'elettrico') },
   { id: 'speciale',       nome: 'Attrezzati',            descr: 'Compra un furgone con allestimento speciale', premio: 2000,  ok: () => S.furgoni.some(f => f.allestimento && f.allestimento !== 'standard') },
-  { id: 'jolly',          nome: 'Jolly in campo',        descr: 'Metti un furgone come jolly',                 premio: 1500,  ok: () => S.furgoni.some(f => f.zona === ZONA_JOLLY) },
+  { id: 'jolly',          nome: 'Jolly in campo',        descr: 'Metti un furgone come jolly',                 premio: 1500,  ok: () => S.furgoni.some(f => isJolly(f)) },
   { id: 'magazzini-2',    nome: 'Due basi',              descr: 'Abbi 2 magazzini',                            premio: 15000, ok: () => S.depositi.length >= 2 },
   { id: 'magazzini-3',    nome: 'Rete di magazzini',     descr: 'Abbi 3 magazzini',                            premio: 30000, ok: () => S.depositi.length >= 3 },
   { id: 'zone-tutte',     nome: 'Tutta la città',        descr: 'Servi tutte le zone della città',             premio: 25000, ok: () => S.zone.every(z => S.furgoni.some(f => f.zona === z.id)) },
