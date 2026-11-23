@@ -245,26 +245,50 @@ function vistaGiri() {
     .sort((a, b) => b.attesa - a.attesa);
   const totAttesa = servite.reduce((t, x) => t + x.attesa, 0);
   const righe = servite.map(({ z, d, attesa }) => {
-    const furgoni = S.furgoni.filter(f => f.zona === z.id).length;
-    const cap = d ? d.capacita : furgoni * COSTANTI.maxConsegneCorriere;
+    const assegnati = S.furgoni.filter(f => f.zona === z.id);
+    const partiti = d ? d.giri : assegnati.filter(f => furgoneOperativo(f)).length;
+    const cap = d ? d.capacita : assegnati.filter(f => furgoneOperativo(f)).reduce((t, f) => t + capacitaFurgone(f), 0);
     const arrivo = d ? d.arrivo : z.pacchi;
-    const pieno = cap ? Math.min(100, Math.round(arrivo / cap * 100)) : 100;
+    const pronti = d ? d.smistati : arrivo;          // i furgoni possono portare solo i pacchi smistati
+    const jollyN = d ? d.jolly : 0;
+    // barra: quanto sono pieni i furgoni della zona (pacchi pronti / posti sui furgoni partiti)
+    const pieno = cap ? Math.round(pronti / cap * 100) : (pronti ? 999 : 0);
+    const liberi = cap - pronti;
+    const testoBarra = !cap ? (pronti ? 'Nessun furgone partito: i pacchi restano tutti in deposito' : 'Nessun pacco')
+      : liberi >= 0 ? `${intero.format(pronti)} pacchi su ${intero.format(cap)} posti · ${intero.format(liberi)} posti liberi`
+      : `${intero.format(pronti)} pacchi su ${intero.format(cap)} posti · mancano ${intero.format(-liberi)} posti`;
+    // perché restano pacchi: le cause, in ordine
+    const cause = [];
+    if (d && d.sciopero) cause.push('Sciopero: oggi nessun furgone è partito.');
+    if (d && d.smistati < d.arrivo) cause.push(`<b>Magazzinieri</b>: ${intero.format(d.arrivo - d.smistati)} pacchi non smistati. Ogni magazziniere smista circa ${COSTANTI.pacchiMagazziniere} pacchi al giorno per tutta la città: assumine un altro.`);
+    const fuori = d && d.fuori ? d.fuori : assegnati.filter(f => !furgoneOperativo(f)).map(f => f.fermo > 0 ? 'fermo per ' + f.motivo : 'senza autista');
+    if (fuori.length) {
+      const conta = {}; fuori.forEach(m => conta[m] = (conta[m] || 0) + 1);
+      cause.push(`<b>Furgoni</b>: ${Object.entries(conta).map(([m, n]) => `${n} furgon${n > 1 ? 'i' : 'e'} ${m}`).join(', ')}, quindi ne ${partiti === 1 ? 'è partito' : 'sono partiti'} ${partiti} su ${assegnati.length}.${fuori.some(m => m === 'senza autista') ? ' Assegna un autista nella scheda Flotta.' : ' Un jolly può coprirlo.'}`);
+    }
+    if (cap && liberi < 0 && jollyN < -liberi) cause.push(`<b>Posti</b>: i furgoni partiti sono pieni, mancano ${intero.format(-liberi - jollyN)} posti. Aggiungi un furgone a questa zona o metti un jolly.`);
+    const spiegazione = attesa > 0 && cause.length
+      ? `<div class="perche"><b>Perché restano pacchi</b><ul>${cause.map(c => `<li>${c}</li>`).join('')}</ul></div>`
+      : attesa > 0 ? '<p class="nota">I pacchi in attesa sono di ieri: oggi verranno consegnati per primi.</p>'
+      : cap && partiti > 1 && liberi >= cap / partiti ? `<p class="nota">C'è spazio: anche con un furgone in meno ce la faresti. Potresti spostarne uno in un'altra zona.</p>` : '';
     return `<div class="scheda giro ${attesa > 0 ? 'in-ritardo' : ''}">
       <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(nomeZona(z))}</span>
         <span class="num ${attesa > 0 ? 'meno' : 'piu'}"><b>${intero.format(attesa)}</b> in attesa</span></div>
-      <div class="metro ${pieno > 100 || attesa > 0 ? 'basso' : pieno > 85 ? 'medio' : ''}"><i style="width:${Math.min(100, pieno)}%"></i></div>
+      <div class="metro ${pieno > 100 ? 'basso' : pieno > 85 ? 'medio' : ''}" title="Quanto sono pieni i furgoni"><i style="width:${Math.min(100, pieno)}%"></i></div>
+      <p class="nota testo-barra">Furgoni pieni${cap ? ' al ' + Math.min(pieno, 999) + '%' : ''}: ${testoBarra}</p>
       <div class="griglia-giro">
         <div><b>${intero.format(arrivo)}</b><span>pacchi oggi</span></div>
         <div><b>${d ? intero.format(d.consegne) : '–'}</b><span>consegnati</span></div>
-        <div><b>${furgoni}</b><span>furgon${furgoni === 1 ? 'e' : 'i'} · ${intero.format(cap)} posti</span></div>
-        <div><b>${d && d.jolly ? '+' + intero.format(d.jolly) : '–'}</b><span>dal jolly</span></div>
+        <div><b>${partiti === assegnati.length ? partiti : partiti + '/' + assegnati.length}</b><span>furgoni partiti</span></div>
+        <div><b>${jollyN ? '+' + intero.format(jollyN) : '–'}</b><span>dal jolly</span></div>
       </div>
-      ${d && d.smistati < d.arrivo ? `<p class="nota meno">${intero.format(d.arrivo - d.smistati)} pacchi non smistati: servono più magazzinieri.</p>` : ''}
+      ${spiegazione}
     </div>`;
   }).join('');
   return `<div class="scheda">
       <div class="riga"><h2 style="margin:0">Pacchi in attesa in deposito</h2><span class="num ${totAttesa ? 'meno' : 'piu'}"><b>${intero.format(totAttesa)}</b></span></div>
       <p class="nota">Sono i pacchi rimasti in magazzino che domani si aggiungono a quelli nuovi. Oltre un giorno di ritardo i clienti annullano gli ordini e la reputazione scende.</p>
+      <p class="nota">In ogni zona la barra mostra quanto sono pieni i furgoni partiti: verde c'è spazio, arancione quasi pieni, rossa non bastano. Sotto trovi il motivo quando restano pacchi.</p>
     </div>
     <div class="scheda jolly-box">
       <div class="riga"><h2 style="margin:0">Jolly</h2><span class="badge">${jolly.length} furgon${jolly.length === 1 ? 'e' : 'i'}</span></div>

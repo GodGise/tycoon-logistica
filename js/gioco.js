@@ -289,7 +289,10 @@ function giornoLavorativo() {
     chiusi.push(...ec.chiusi);
     const consegneCtr = ec.chiusi.reduce((t, c) => t + c.fatti, 0);
     const consegne = Math.min(smistati, ec.capacita);
-    ris[z.id] = { z, smistati, giri, consegneCtr, consegne, jolly: [] };
+    // furgoni della zona che oggi non partono, con il motivo (per spiegarlo nella scheda Giri)
+    const fuori = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && !furgoneOperativo(f))
+      .map(f => f.fermo > 0 ? (f.motivo === 'incidente' ? 'fermo per incidente' : 'fermo per guasto') : 'senza autista');
+    ris[z.id] = { z, smistati, giri, consegneCtr, consegne, jolly: [], fuori };
   });
 
   // 2) i jolly vanno da soli nella zona con più pacchi pronti in deposito che nessuno porta
@@ -316,7 +319,7 @@ function giornoLavorativo() {
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0);
     stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
     perZona[z.id] = { arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
-      giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly };
+      giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly, fuori: r.fuori, sciopero: !!sciopero };
     consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
 
     if (restano > 0 && (giri.length || daJolly)) notizia(`Zona ${z.nome}: pacchi in giacenza, la reputazione scende.`, 'male', 'giac-' + z.id);

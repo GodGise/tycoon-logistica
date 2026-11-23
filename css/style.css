@@ -349,3 +349,9 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .medaglia.presa { opacity: 1; background: linear-gradient(180deg, rgba(255,214,10,0.18), rgba(255,214,10,0.06)); }
 .medaglia.presa .disco { background: linear-gradient(160deg, #ffe066, #ffb340); color: #3a2a00; box-shadow: 0 2px 8px rgba(255,179,64,.4); }
 .medaglia.presa em { color: var(--testo-2); }
+
+/* scheda Giri: testo sotto la barra e motivi dei ritardi */
+.testo-barra { margin-top: 6px; font-size: 12.5px; }
+.perche { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,69,58,.10); border: 1px solid rgba(255,69,58,.25); font-size: 13px; }
+.perche ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; color: var(--testo-2); }
+.perche li b { color: var(--testo); }
