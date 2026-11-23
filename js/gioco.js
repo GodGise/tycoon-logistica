@@ -245,6 +245,8 @@ function giornoLavorativo() {
   servite.forEach(z => { arrivo[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + S.giacenze[z.id]; totale += arrivo[z.id]; });
   S.zone.forEach(z => { if (!arrivo[z.id]) S.giacenze[z.id] = 0; });
   const quota = totale > 0 ? Math.min(1, capSmistamento / totale) : 0;
+  const smistatiOggi = Math.floor(totale * quota);
+  S.dipendenti.filter(x => x.ruolo === 'magazziniere').forEach(x => { stat(x, 'giorni', 1); stat(x, 'pacchi', smistatiOggi / magazzinieri); });
   if (servite.length && magazzinieri === 0) notizia('Nessun magazziniere: i pacchi restano nel magazzino e i furgoni non partono.', 'male', 'no-mag');
   else if (quota < 1) notizia('Magazzino intasato: i magazzinieri non riescono a smistare tutti i pacchi.', 'male', 'intasato');
 
@@ -257,7 +259,7 @@ function giornoLavorativo() {
   servite.forEach(z => {
     const smistati = Math.floor(arrivo[z.id] * quota);
     const giri = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f));
-    const ec = eseguiContratti(z, giri, giri.length * capFurgone);
+    const ec = eseguiContratti(z, giri, giri.reduce((t, f) => t + capacitaFurgone(f), 0));
     chiusi.push(...ec.chiusi);
     const consegneCtr = ec.chiusi.reduce((t, c) => t + c.fatti, 0);
     const consegne = Math.min(smistati, ec.capacita);
@@ -270,7 +272,7 @@ function giornoLavorativo() {
     let meglio = null, attesa = 0;
     Object.values(ris).forEach(r => { const pronti = r.smistati - r.consegne; if (pronti > attesa) { attesa = pronti; meglio = r; } });
     if (!meglio) { jollyOggi[f.id] = null; return; }
-    const extra = Math.min(attesa, capFurgone);
+    const extra = Math.min(attesa, capacitaFurgone(f));
     meglio.consegne += extra; meglio.jolly.push({ f, n: extra });
     jollyOggi[f.id] = meglio.z.id;
   });
@@ -287,7 +289,7 @@ function giornoLavorativo() {
     S.giacenze[z.id] = restano - persi;
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0);
     perZona[z.id] = { arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
-      giri: giri.length, capacita: giri.length * capFurgone, jolly: daJolly };
+      giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly };
     consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
 
     if (restano > 0 && (giri.length || daJolly)) notizia(`Zona ${z.nome}: pacchi in giacenza, la reputazione scende.`, 'male', 'giac-' + z.id);
@@ -301,23 +303,31 @@ function giornoLavorativo() {
     const totZona = consegne - daJolly + consegneCtr;
     const lavori = giri.map((f, i) => ({ f, mie: Math.floor(totZona / giri.length) + (i < totZona % giri.length ? 1 : 0) }))
       .concat(r.jolly.map(j => ({ f: j.f, mie: j.n })));
+    stat(magazzinoVicino(z.centro).magazzino, 'pacchi', r.smistati);
     lavori.forEach(({ f, mie }) => {
       perFurgone[f.id] = mie;
-      const km = Math.round(kmGiro(z) * effetto.km(z.id) * (0.7 + 0.3 * Math.min(1, mie / 100)));
+      const km = Math.round(kmGiro(z) * effetto.km(z.id) * (ha(f, 'navigatore') ? 0.92 : 1) * (0.7 + 0.3 * Math.min(1, mie / 100)));
       const m = modello(f.modello), c = costoKm(m, f.usato);
       if (m.tipo === 'diesel') carburante += km * c.energia; else ricarica += km * c.energia;
       manut += km * c.manutenzione;
       f.km += km;
       const a = dipendente(f.autistaId);
       a.esperienza = Math.min(100, a.esperienza + 0.15);
+      // statistiche del furgone e dell'autista
+      stat(f, 'giorni', 1); stat(f, 'consegne', mie); stat(f, 'km', km);
+      stat(f, m.tipo === 'diesel' ? 'carburante' : 'ricarica', km * c.energia); stat(f, 'manutenzione', km * c.manutenzione);
+      stat(f, 'incasso', mie * tariffa() * effetto.tariffaZona(z.id));
+      stat(a, 'giorni', 1); stat(a, 'consegne', mie); stat(a, 'km', km);
       // incidente: dipende dall'esperienza
-      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti();
+      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1);
       if (Math.random() < pKm * km) {
+        stat(f, 'incidenti', 1); stat(a, 'incidenti', 1);
         f.fermo = casoInt(1, 3); f.motivo = 'incidente'; f.fermoDal = S.giorno;
         f.premio = (f.premio || 1) + COSTANTI.aumentoPremioIncidente; f.incidenti = (f.incidenti || 0) + 1;
         notizia(`Incidente: ${a.nome} con il ${m.nome}. Furgone fermo ${f.fermo} gg, assicurazione di questo furgone a ${assicurazioneFurgone(f)} €/mese. La riparazione è trattenuta dallo stipendio.`, 'male', 'inc-' + f.id);
-      } else if (Math.random() < GUASTO_GIORNO[f.usato ? 'usato' : 'nuovo'] * (1 + f.km / 300000)) {
+      } else if (Math.random() < GUASTO_GIORNO[f.usato ? 'usato' : 'nuovo'] * (1 + f.km / 300000) * (ha(f, 'tagliandi') ? 0.6 : 1)) {
         const costo = Math.round(casoInt(300, 1200) * effetto.guasti());
+        stat(f, 'guasti', 1); stat(f, 'manutenzione', costo);
         f.fermo = Math.max(1, casoInt(1, 2) - (livello('officina') ? 1 : 0)); f.motivo = 'guasto'; f.fermoDal = S.giorno; manut += costo;
         notizia(`Guasto al ${m.nome}${f.usato ? ' usato' : ''}: ${costo} € di officina, fermo ${f.fermo} gg.`, 'male', 'gua-' + f.id);
       }
@@ -363,6 +373,9 @@ function fineMese(d) {
   const nomeMese = d.toLocaleDateString('it-IT', { month: 'long' });
   if (personale) notizia(`Busta paga di ${nomeMese}: ${Math.round(personale)} € al personale.`, 'info', 'paga');
   if (assic) notizia(`Assicurazione flotta di ${nomeMese}: ${assic} €.`, 'info', 'assic');
+  S.furgoni.forEach(f => stat(f, 'assicurazione', assicurazioneFurgone(f)));
+  S.dipendenti.forEach(x => stat(x, 'stipendio', x.stipendio * (S.giorno - Math.max(x.assuntoGiorno, primo) + 1) / gg));
+  [...S.furgoni, ...S.dipendenti, ...S.depositi].forEach(chiudiMeseStat);
   S.storico.unshift({ mese: S.conti.mese, voci: S.conti.voci });
   S.storico.length = Math.min(S.storico.length, 12);
   S.conti = { mese: chiaveMese(dataDelGiorno(S.giorno + 1)), voci: vociVuote() };

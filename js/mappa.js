@@ -70,6 +70,10 @@ function avviaMappa(contenitore, quandoFallisce) {
       paint: { 'circle-radius': 6, 'circle-color': ['get', 'colore'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } });
 
     aggiornaDepositiMappa();
+    // clic su un furgone: apre la sua scheda di dettaglio
+    mappa.on('click', 'furgoni', e => { if (!attesaClick && e.features[0] && window.apriDettaglio) window.apriDettaglio('furgone', e.features[0].properties.id); });
+    mappa.on('mouseenter', 'furgoni', () => { if (!attesaClick) mappa.getCanvas().style.cursor = 'pointer'; });
+    mappa.on('mouseleave', 'furgoni', () => { if (!attesaClick) mappa.getCanvas().style.cursor = ''; });
     mappa.on('click', e => {
       if (!attesaClick) return;
       const cb = attesaClick; annullaPuntoSullaMappa(); cb([e.lngLat.lng, e.lngLat.lat]);
@@ -107,6 +111,7 @@ function aggiornaDepositiMappa() {
   markerDepositi.forEach(m => m.remove()); markerDepositi = [];
   (S ? S.depositi : []).forEach((d, i) => {
     const el = document.createElement('div'); el.className = 'marker-deposito'; el.title = d.nome; el.textContent = i + 1;
+    el.addEventListener('click', ev => { ev.stopPropagation(); if (!attesaClick && window.apriDettaglio) window.apriDettaglio('magazzino', d.id); });
     markerDepositi.push(new maplibregl.Marker({ element: el }).setLngLat([d.lng, d.lat]).addTo(mappa));
   });
 }
@@ -167,7 +172,7 @@ function aggiornaFurgoniMappa(progresso) {
       pos = [p[k][0] + (p[k + 1][0] - p[k][0]) * r, p[k][1] + (p[k + 1][1] - p[k][1]) * r];
     } else if (f.fermo > 0) colore = '#ff5c5c';
     posizioniFurgoni[f.id] = pos;
-    return { type: 'Feature', properties: { colore }, geometry: { type: 'Point', coordinates: pos } };
+    return { type: 'Feature', properties: { colore, id: f.id }, geometry: { type: 'Point', coordinates: pos } };
   });
   mappa.getSource('furgoni').setData({ type: 'FeatureCollection', features });
 }

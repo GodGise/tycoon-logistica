@@ -291,3 +291,19 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 /* leggibilità: schede interne leggermente più scure del pannello, pulsanti disattivati in grigio */
 .scheda, .kpi div { background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025)), rgba(0,0,0,0.12); }
 .btn:disabled { color: var(--testo-2); opacity: .55; }
+
+/* schede di dettaglio */
+.titolo-link { border: 0; background: none; padding: 0; color: var(--testo); font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.titolo-link:hover { color: var(--accento); }
+.titolo-link.piccolo { font-weight: 600; color: var(--testo-2); }
+.indietro { justify-self: start; color: var(--accento) !important; font-weight: 600; }
+.titolo-dettaglio { font-size: 24px; margin: 0 0 2px; }
+.tab-stat th { font-size: 12px; }
+.tab-stat td:first-child { color: var(--testo-2); white-space: normal; }
+.tab-stat tr.totale td { font-weight: 700; color: var(--testo); }
+.kpi b { font-size: 19px; }
+.tab-stat { font-size: 13px; table-layout: fixed; }
+.tab-stat th:first-child, .tab-stat td:first-child { width: 31%; }
+.tab-stat td + td, .tab-stat th + th { padding-left: 6px; }
+.tab-stat tr.totale td { font-size: 13px; }
+.badge { white-space: nowrap; }

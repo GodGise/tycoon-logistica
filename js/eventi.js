@@ -60,8 +60,8 @@ const EVENTI = [
   { id: 'smarrito', puo: () => S.furgoni.length >= 1, crea: () => ({ titolo: 'Pacco smarrito', testo: 'Un cliente denuncia la perdita di un pacco da 600 €. Non è chiaro di chi sia la colpa. Rimborsarlo costa, ma rifiutare può fare brutta pubblicità.',
       scelte: [{ testo: 'Rimborsa 600 €', fai: () => { movimento('eventi', -600); S.reputazione = limita(S.reputazione + 1, 0, 100); return 'Cliente rimborsato e soddisfatto.'; } },
                { testo: 'Rifiuta il rimborso', fai: () => { S.reputazione = limita(S.reputazione - 6, 0, 100); return 'Il cliente scrive recensioni negative: reputazione in calo.'; } }] }) },
-  { id: 'aumento', puo: () => S.dipendenti.some(d => d.ruolo === 'autista'), crea: () => {
-      const d = scegli(S.dipendenti.filter(x => x.ruolo === 'autista'));
+  { id: 'aumento', puo: () => S.dipendenti.some(d => d.ruolo === 'autista' && !(S.giorno - (d.ultimoAumento ?? -999) < 60)), crea: () => {
+      const d = scegli(S.dipendenti.filter(x => x.ruolo === 'autista' && !(S.giorno - (x.ultimoAumento ?? -999) < 60)));
       return { titolo: 'Richiesta di aumento', testo: `${d.nome} chiede un aumento di 150 € al mese. Dice che altrove pagano di più. Se rifiuti, potrebbe andarsene.`,
         scelte: [{ testo: 'Concedi +150 €/mese', fai: () => { d.stipendio += 150; return `${d.nome} resta volentieri.`; } },
                  { testo: 'Rifiuta', fai: () => { if (Math.random() < 0.35) { licenzia(d.id); return `${d.nome} si è dimesso.`; } return `${d.nome} resta, ma non è contento.`; } }] };
