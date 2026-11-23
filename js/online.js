@@ -3,8 +3,8 @@
    le funzioni di online/supabase.sql. Se ONLINE.url è vuoto il gioco resta solo locale. */
 
 const ONLINE = {
-  url: '',      // es. https://xxxx.supabase.co
-  chiave: '',   // chiave pubblica "anon" (è fatta per stare nel browser)
+  url: 'https://kiefpncgfgttlwmqtafk.supabase.co',
+  chiave: 'sb_publishable_vsd9PzLEHjpurTW8ecLCoQ_slZH5ukn',   // chiave pubblica: è fatta per stare nel browser
 };
 const CHIAVE_ACCOUNT = 'tycoon-logistica-account';
 const SYNC_OGNI = 30000;   // ms tra un salvataggio online e l'altro
