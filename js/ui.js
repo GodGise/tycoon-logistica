@@ -13,6 +13,7 @@ const fmtData = g => dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'sh
 let scheda = 'azienda', ultimoT = null, daRidisegnare = true;
 let negozioUsato = false, negozioAperto = false, negozioAllestimento = 'standard';
 let prezziCaricati = null, posizionando = false;
+let dettaglio = null; // { tipo: 'furgone' | 'dipendente' | 'magazzino', id }
 const inizio = { fase: 'citta', risultati: null, citta: null, cercando: false, errore: '' };
 
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('vis'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('vis'), 2600); }
@@ -146,7 +147,7 @@ document.addEventListener('click', e => {
 function vistaMagazzini() {
   const lista = S.depositi.map((m, i) => {
     const zoneServite = S.zone.filter(z => magazzinoVicino(z.centro).magazzino.id === m.id && S.furgoni.some(f => f.zona === z.id)).length;
-    return `<div class="riga"><span><b style="color:var(--testo)">${i + 1}</b> · ${esc(m.nome)} · ${zoneServite} zon${zoneServite === 1 ? 'a' : 'e'} servit${zoneServite === 1 ? 'a' : 'e'}</span>
+    return `<div class="riga"><span><b style="color:var(--testo)">${i + 1}</b> · <button class="titolo-link piccolo" data-azione="dettaglio" data-tipo="magazzino" data-id="${m.id}">${esc(m.nome)} ›</button> · ${zoneServite} zon${zoneServite === 1 ? 'a' : 'e'} servit${zoneServite === 1 ? 'a' : 'e'}</span>
       ${S.depositi.length > 1 ? `<button class="btn piccolo" data-azione="vendi-magazzino" data-id="${m.id}">Vendi per ${eur.format(valoreMagazzino(m) * COSTANTI.rivenditaMagazzino)}</button>` : `<span class="num">${eur.format(valoreMagazzino(m))}</span>`}</div>`;
   }).join('');
   return `<div class="scheda">
@@ -232,6 +233,94 @@ function vistaGiri() {
     ${righe || '<p class="nota">Nessuna zona servita: assegna un furgone a una zona nella scheda Flotta.</p>'}`;
 }
 
+/* ---------- schede di dettaglio ---------- */
+function tabellaStat(o, righe) {
+  // righe: [etichetta, campo | funzione(periodo), tipo: 'eur' | 'num' | 'eur-' ]
+  const val = (r, per) => typeof r[1] === 'function' ? r[1](per) : leggiStat(o, per, r[1]);
+  const fmt = (r, v) => r[2] === 'num' ? intero.format(v) : r[2] === 'eur-' ? (v ? '−' + eur.format(v) : '–') : r[2] === 'segno' ? segnato(v) : eur.format(v);
+  return `<table class="tab-stat"><thead><tr><th></th><th>Questo mese</th><th>Mese scorso</th><th>Totale</th></tr></thead><tbody>
+    ${righe.map(r => `<tr class="${r[3] || ''}"><td>${r[0]}</td>${['mese', 'prec', 'tot'].map(per => `<td>${fmt(r, Math.round(val(r, per)))}</td>`).join('')}</tr>`).join('')}
+  </tbody></table>`;
+}
+function testaDettaglio(titolo, sotto, indietro) {
+  return `<button class="btn link indietro" data-azione="chiudi-dettaglio">‹ ${indietro}</button>
+    <div><h2 class="titolo-dettaglio">${titolo}</h2><div class="nota">${sotto}</div></div>`;
+}
+function dettaglioFurgone(f) {
+  const m = modello(f.modello), a = dipendente(f.autistaId), c = costoKm(m, f.usato);
+  const energia = m.tipo === 'diesel' ? 'carburante' : 'ricarica';
+  const costi = per => leggiStat(f, per, energia) + leggiStat(f, per, 'manutenzione') + leggiStat(f, per, 'assicurazione');
+  const kpi = `<div class="kpi">
+    <div><b>${capacitaFurgone(f)}</b><span>pacchi per giro</span></div>
+    <div><b>${eurCent.format(c.energia + c.manutenzione)}</b><span>costo al km</span></div>
+    <div><b>${eur.format(assicurazioneFurgone(f))}</b><span>assicurazione/mese</span></div></div>`;
+  const stato = f.fermo > 0 ? `fermo ${f.fermo} gg (${f.motivo})` : furgoneOperativo(f) ? (f.zona === ZONA_JOLLY ? 'jolly' : 'in zona ' + zona(f.zona).nome) : 'non operativo';
+  const pot = Object.entries(POTENZIAMENTI_FURGONE).map(([k, p]) => `<div class="miglioramento"><div><b>${p.nome}</b><div class="nota">${p.descr}</div></div>
+    ${ha(f, k) ? '<span class="badge">Montato</span>' : `<button class="btn piccolo" data-azione="potenzia" data-id="${f.id}" data-p="${k}" ${S.cassa < p.costo ? 'disabled' : ''}>${eur.format(p.costo)}</button>`}</div>`).join('');
+  return `${testaDettaglio(esc(m.nome) + (f.usato ? ' <small class="nota">usato</small>' : ''), `${m.tipo} · ${ALLESTIMENTI[f.allestimento || 'standard'].nome.toLowerCase()} · ${intero.format(f.km)} km · ${stato}${a ? ' · autista ' + esc(a.nome) : ''}`, 'Flotta')}
+    ${kpi}
+    <div class="scheda">${tabellaStat(f, [
+      ['Giorni di lavoro', 'giorni', 'num'], ['Consegne', 'consegne', 'num'], ['Km', 'km', 'num'],
+      ['Incasso consegne', 'incasso', 'eur'],
+      [m.tipo === 'diesel' ? 'Gasolio' : 'Ricarica', energia, 'eur-'], ['Manutenzione', 'manutenzione', 'eur-'], ['Assicurazione', 'assicurazione', 'eur-'],
+      ['Utile del furgone', per => leggiStat(f, per, 'incasso') - costi(per), 'segno', 'totale'],
+      ['Incidenti', 'incidenti', 'num'], ['Guasti', 'guasti', 'num']])}
+      <p class="nota">L'utile del furgone non comprende lo stipendio dell'autista. L'assicurazione si conta a fine mese.</p></div>
+    <div class="scheda"><h2 style="margin:0">Potenziamenti</h2>${pot}<p class="nota">Restano sul furgone; se lo vendi ne recuperi metà del costo.</p></div>
+    <div class="scheda"><div class="riga"><span>Valore di rivendita</span><button class="btn piccolo" data-azione="vendi" data-id="${f.id}">Vendi per ${eur.format(f.valore * COSTANTI.valoreRivendita)}</button></div></div>`;
+}
+function dettaglioDipendente(d) {
+  const autista = d.ruolo === 'autista', f = S.furgoni.find(x => x.autistaId === d.id);
+  const giorniAz = S.giorno - d.assuntoGiorno;
+  const costoUnita = per => { const n = leggiStat(d, per, autista ? 'consegne' : 'pacchi'); return n ? leggiStat(d, per, 'stipendio') / n : 0; };
+  const corsoTra = d.ultimoCorso !== undefined ? CORSO_AUTISTA.pausaGiorni - (S.giorno - d.ultimoCorso) : 0;
+  return `${testaDettaglio(esc(d.nome), `${RUOLI[d.ruolo].nome} · in azienda da ${giorniAz} giorn${giorniAz === 1 ? 'o' : 'i'}${f ? ' · ' + esc(modello(f.modello).nome) + (f.zona === ZONA_JOLLY ? ' (jolly)' : f.zona ? ' in ' + esc(zona(f.zona).nome) : '') : ''}`, 'Personale')}
+    <div class="kpi">
+      <div><b>${eur.format(d.stipendio)}</b><span>stipendio/mese</span></div>
+      ${autista ? `<div><b>${Math.round(d.esperienza)}</b><span>esperienza /100</span></div>` : `<div><b>${intero.format(Math.round(COSTANTI.pacchiMagazziniere * effetto.smistamento()))}</b><span>pacchi al giorno</span></div>`}
+      <div><b>${eurCent.format(costoUnita('prec') || costoUnita('mese'))}</b><span>costo per ${autista ? 'consegna' : 'pacco'}</span></div></div>
+    ${autista ? `<div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
+    <div class="scheda">${tabellaStat(d, autista
+      ? [['Giorni di lavoro', 'giorni', 'num'], ['Consegne', 'consegne', 'num'], ['Km guidati', 'km', 'num'], ['Incidenti', 'incidenti', 'num'], ['Stipendio pagato', 'stipendio', 'eur-']]
+      : [['Giorni di lavoro', 'giorni', 'num'], ['Pacchi smistati', 'pacchi', 'num'], ['Stipendio pagato', 'stipendio', 'eur-']])}
+      <p class="nota">Lo stipendio si conta a fine mese.${autista ? ' Più esperienza vuol dire meno incidenti, e quindi assicurazione più bassa.' : ''}</p></div>
+    <div class="scheda"><h2 style="margin:0">Azioni</h2>
+      ${autista ? `<div class="miglioramento"><div><b>Corso di guida</b><div class="nota">+${CORSO_AUTISTA.esperienza} di esperienza. Al massimo uno ogni ${CORSO_AUTISTA.pausaGiorni} giorni.</div></div>
+        ${corsoTra > 0 ? `<span class="badge">tra ${corsoTra} gg</span>` : `<button class="btn piccolo" data-azione="corso" data-id="${d.id}" ${S.cassa < CORSO_AUTISTA.costo ? 'disabled' : ''}>${eur.format(CORSO_AUTISTA.costo)}</button>`}</div>` : ''}
+      <div class="miglioramento"><div><b>Aumento di 100 €/mese</b><div class="nota">Per 60 giorni non chiederà aumenti e non rischi che si dimetta.</div></div>
+        <button class="btn piccolo" data-azione="aumento" data-id="${d.id}">+100 €</button></div>
+      <div class="miglioramento"><div><b>Licenzia</b><div class="nota">Paghi i giorni lavorati questo mese.</div></div>
+        <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia</button></div>
+    </div>`;
+}
+function dettaglioMagazzino(mz) {
+  const zone = S.zone.filter(z => magazzinoVicino(z.centro).magazzino.id === mz.id);
+  const servite = zone.filter(z => S.furgoni.some(f => f.zona === z.id));
+  const furgoni = S.furgoni.filter(f => f.zona && f.zona !== ZONA_JOLLY && servite.some(z => z.id === f.zona)).length;
+  return `${testaDettaglio(esc(mz.nome), `${zone.length} zone vicine · ${servite.length} servite · ${furgoni} furgon${furgoni === 1 ? 'e' : 'i'} partono da qui`, 'Azienda')}
+    <div class="kpi">
+      <div><b>${eur.format(valoreMagazzino(mz))}</b><span>pagato</span></div>
+      <div><b>${intero.format(leggiStat(mz, 'prec', 'pacchi') || leggiStat(mz, 'mese', 'pacchi'))}</b><span>pacchi al mese</span></div>
+      <div><b>${zone.length ? Math.round(zone.reduce((t, z) => t + kmGiro(z), 0) / zone.length) : 0} km</b><span>giro medio</span></div></div>
+    <div class="scheda">${tabellaStat(mz, [['Pacchi smistati per le sue zone', 'pacchi', 'num']])}</div>
+    <div class="scheda"><h2 style="margin:0">Zone che partono da qui</h2>
+      ${zone.map(z => `<div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span><span class="num">${z.pacchi} pacchi · giro ${kmGiro(z)} km${S.furgoni.some(f => f.zona === z.id) ? '' : ' · <span class="nota">non servita</span>'}</span></div>`).join('') || '<p class="nota">Nessuna: le zone partono da un altro magazzino più vicino.</p>'}
+    </div>
+    ${S.depositi.length > 1 ? `<div class="scheda"><div class="riga"><span>Vendita (70% del prezzo)</span><button class="btn piccolo" data-azione="vendi-magazzino" data-id="${mz.id}">Vendi per ${eur.format(valoreMagazzino(mz) * COSTANTI.rivenditaMagazzino)}</button></div></div>` : ''}`;
+}
+function vistaDettaglio() {
+  const d = dettaglio;
+  const o = d.tipo === 'furgone' ? S.furgoni.find(x => x.id === d.id) : d.tipo === 'dipendente' ? dipendente(d.id) : S.depositi.find(x => x.id === d.id);
+  if (!o) { dettaglio = null; return VISTE[scheda](); }
+  return d.tipo === 'furgone' ? dettaglioFurgone(o) : d.tipo === 'dipendente' ? dettaglioDipendente(o) : dettaglioMagazzino(o);
+}
+function apriDettaglio(tipo, id) {
+  dettaglio = { tipo, id };
+  scheda = tipo === 'furgone' ? 'flotta' : tipo === 'dipendente' ? 'personale' : 'azienda';
+  negozioAperto = false; $('#contenuto').scrollTop = 0; ridisegna();
+}
+window.apriDettaglio = apriDettaglio;
+
 function vistaAttivita() {
   if (!S.feed.length) return '<p class="nota">Ancora nessuna attività.</p>';
   const gruppi = [];
@@ -289,7 +378,7 @@ function vistaFlotta() {
     })].join('');
     const optZ = ['<option value="">In deposito</option>', `<option value="${ZONA_JOLLY}" ${f.zona === ZONA_JOLLY ? 'selected' : ''}>Jolly: va dove ci sono più pacchi</option>`, ...S.zone.map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}</option>`)].join('');
     return `<div class="scheda">
-      <div class="riga"><strong>${esc(m.nome)}${f.usato ? ' <small class="nota">usato</small>' : ''}</strong><span class="badge ${m.tipo}">${m.tipo}</span></div>
+      <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="furgone" data-id="${f.id}">${esc(m.nome)}${f.usato ? ' <small class="nota">usato</small>' : ''} ›</button><span class="badge ${m.tipo}">${m.tipo}</span></div>
       ${f.allestimento && f.allestimento !== 'standard' ? `<div class="riga"><span>Allestimento</span><span class="badge speciale">${ALLESTIMENTI[f.allestimento].nome}</span></div>` : ''}
       <div class="riga"><span>${intero.format(f.km)} km</span>${stato}</div>
       <div class="riga"><span>Assicurazione</span><span class="num ${f.premio > 1 ? 'meno' : ''}">${eur.format(assicurazioneFurgone(f))}/mese${f.premio > 1 ? ` · +${Math.round((f.premio - 1) * 100)}% (${f.incidenti} incident${f.incidenti === 1 ? 'e' : 'i'})` : ''}</span></div>
@@ -310,7 +399,7 @@ function vistaPersonale() {
   return ['autista', 'magazziniere'].map(ruolo => {
     const r = RUOLI[ruolo], staff = S.dipendenti.filter(d => d.ruolo === ruolo);
     const lista = staff.map(d => `<div class="scheda">
-      <div class="riga"><strong>${esc(d.nome)}</strong><span class="num">${eur.format(d.stipendio)}/mese</span></div>
+      <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="dipendente" data-id="${d.id}">${esc(d.nome)} ›</button><span class="num">${eur.format(d.stipendio)}/mese</span></div>
       ${ruolo === 'autista' ? `<div class="riga"><span>Esperienza</span><span class="num">${Math.round(d.esperienza)}/100</span></div><div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
       <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id && f.zona === ZONA_JOLLY) ? '<b style="color:#ffd60a">Jolly</b>' : S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
       <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia</button></div>
@@ -352,8 +441,9 @@ function ridisegna() {
   testata();
   const c = $('#contenuto'), scroll = c.scrollTop;
   document.querySelector('.pannello').classList.toggle('in-avvio', !S);
-  c.innerHTML = S ? VISTE[scheda]() : vistaInizio();
-  if (c.dataset.scheda !== scheda) { c.dataset.scheda = scheda; c.classList.remove('entra'); void c.offsetWidth; c.classList.add('entra'); }
+  c.innerHTML = S ? (dettaglio ? vistaDettaglio() : VISTE[scheda]()) : vistaInizio();
+  const chiave = scheda + (dettaglio ? ':' + dettaglio.id : '');
+  if (c.dataset.scheda !== chiave) { c.dataset.scheda = chiave; c.classList.remove('entra'); void c.offsetWidth; c.classList.add('entra'); }
   c.scrollTop = scroll;
   document.querySelectorAll('.schede button').forEach(b => b.setAttribute('aria-selected', b.dataset.scheda === scheda));
   muoviIndicatore();
@@ -391,7 +481,7 @@ function ridisegnaSePossibile() {
 /* ---------- eventi ---------- */
 document.querySelector('.schede').addEventListener('click', e => {
   const b = e.target.closest('button[data-scheda]'); if (!b) return;
-  scheda = b.dataset.scheda; negozioAperto = false; $('#contenuto').scrollTop = 0; ridisegna();
+  scheda = b.dataset.scheda; negozioAperto = false; dettaglio = null; $('#contenuto').scrollTop = 0; ridisegna();
 });
 $('#contenuto').addEventListener('click', e => {
   const b = e.target.closest('[data-azione]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
@@ -400,6 +490,11 @@ $('#contenuto').addEventListener('click', e => {
     case 'apri-negozio': negozioAperto = true; $('#contenuto').scrollTop = 0; ridisegna(); break;
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
+    case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'chiudi-dettaglio': dettaglio = null; $('#contenuto').scrollTop = 0; ridisegna(); break;
+    case 'potenzia': esito(compraPotenziamento(id, b.dataset.p), 'Potenziamento montato!'); break;
+    case 'corso': esito(corsoAutista(id), 'Corso fatto: esperienza aumentata.'); break;
+    case 'aumento': if (b.dataset.conferma) esito(aumentoDipendente(id), 'Aumento concesso.'); else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'migliora': esito(compraMiglioramento(id), 'Miglioramento comprato!'); break;
     case 'allestimento': negozioAllestimento = b.dataset.v; ridisegna(); break;
     case 'compra': { const err = compraFurgone(id, negozioUsato, negozioAllestimento); if (!err) negozioAperto = false; esito(err, 'Furgone comprato: ora assegnagli un autista e una zona.'); break; }
