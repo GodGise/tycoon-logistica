@@ -417,3 +417,15 @@ tr.totale td { font-weight: 700; font-size: 16px; }
   .pannello.in-avvio .cassa-box { display: none; }
 }
 .voce-citta:disabled { opacity: .5; cursor: not-allowed; }
+
+/* tabella dei conti: la voce va a capo, le cifre no; colonne delle cifre a larghezza fissa */
+.tabella-conti { table-layout: fixed; }
+.tabella-conti th:not(:first-child), .tabella-conti td:not(:first-child) { width: 30%; padding-left: 10px; }
+.tabella-conti td:first-child { white-space: normal; line-height: 1.25; padding-right: 6px; }
+.tabella-conti th { white-space: nowrap; }
+@media (max-width: 760px) {
+  .tabella-conti { font-size: 13px; }
+  .tabella-conti th { font-size: 12px; }
+  .tabella-conti th:not(:first-child), .tabella-conti td:not(:first-child) { width: 31%; padding-left: 6px; }
+}
+@media (max-width: 760px) { .tabella-conti tr.totale td { font-size: 15px; } }
