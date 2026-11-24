@@ -99,7 +99,7 @@ function reportMensile(d) {
       oggetto: `Report di ${d.toLocaleDateString('it-IT', { month: 'long' })}`,
       righe: [`Utile del magazzino: ${utile.toLocaleString('it-IT')} €`, `Mio compenso: ${costo.toLocaleString('it-IT')} € (${RESPONSABILE.stipendio.toLocaleString('it-IT')} € + 8% dell'utile)`,
         `Contratti accettati: ${mese.contratti || 0} · Email dei clienti gestite: ${mese.email || 0} (${mese.giuste || 0} come avresti fatto tu)`,
-        `Assunti: ${mese.assunti || 0} · Guasti fatti riparare: ${mese.riparati || 0}`],
+        `Assunti: ${mese.assunti || 0} · Licenziati perché in più: ${mese.tagliati || 0} · Guasti fatti riparare: ${mese.riparati || 0}`],
       consigli, letta: false, risposta: null, esito: '' });
     S.posta[0].testo = S.posta[0].righe[0] + (consigli.length ? ` · ${consigli.length} consigli` : '');
     r.mese = { contratti: 0, email: 0, giuste: 0, assunti: 0, riparati: 0 };

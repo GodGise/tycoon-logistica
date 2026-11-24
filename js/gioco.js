@@ -287,6 +287,7 @@ function giornoLavorativo() {
   forseEvento();
   controllaPosta();
   lavoroResponsabili(); contrattiResponsabili();
+  if (dataDelGiorno(S.giorno).getDay() === 1) S.depositi.forEach(m => { if (m.responsabile || (S.gestionale && S.capoturno && S.taglia !== false && sbloccato('capoturno'))) tagliaPersonaleInPiu(m); });
   if (S.capoturno && S.gestionale && sbloccato('capoturno')) { let n = 0; S.depositi.filter(m => !m.responsabile).forEach(m => { n += applicaPiano(pianoOrganizza(m.id)); }); if (n) notizia(`Il capoturno ha riorganizzato la flotta (${n} cambi).`, 'info', 'capoturno'); }
   effettiDipendenti();
   const sciopero = effetto.sciopero();
@@ -381,6 +382,12 @@ function giornoLavorativo() {
       meglio.consegne += extra; meglio.jolly.push({ f, n: extra }); posto -= extra;
       if (!jollyOggi[f.id]) jollyOggi[f.id] = meglio.z.id;
     }
+  });
+  // quanti jolly sono serviti davvero oggi, per magazzino (servono a capire se ce ne sono troppi)
+  if (!sciopero) S.depositi.forEach(m => {
+    const portati = f => Object.values(ris).reduce((t, r) => t + r.jolly.filter(j => j.f === f).reduce((a, j) => a + j.n, 0), 0);
+    const usati = jolly.filter(f => magDi(f) === m.id && portati(f) >= 30).length;   // jolly che oggi hanno lavorato davvero
+    m.jollyUsati = (m.jollyUsati || []).concat(usati).slice(-10);
   });
   if (jolly.length) {
     const usati = Object.values(jollyOggi).filter(Boolean).length;
@@ -503,6 +510,27 @@ function fineMese(d) {
   if (S.cassa < 0) notizia('Cassa in rosso! Vendi un mezzo o riduci i costi.', 'male', 'rosso');
 }
 
+// il lunedì il gestionale (o il responsabile) licenzia chi è in più: autisti senza furgone oltre uno di riserva,
+// e i jolly che negli ultimi 10 giorni non sono mai serviti tutti insieme (vende anche il loro furgone).
+function tagliaPersonaleInPiu(m) {
+  let licenziati = 0, venduti = 0;
+  const peggiori = (a, b) => (stelleDi(a) ?? 3) - (stelleDi(b) ?? 3) || costoLicenziamento(a) - costoLicenziamento(b);
+  const senzaFurgone = S.dipendenti.filter(d => d.ruolo === 'autista' && magDi(d) === m.id && !S.furgoni.some(f => f.autistaId === d.id) && !(d.sospesoFino >= S.giorno))
+    .sort(peggiori);
+  senzaFurgone.slice(0, Math.max(0, senzaFurgone.length - 1)).forEach(d => { licenzia(d.id); licenziati++; });
+  const storia = m.jollyUsati || [];
+  if (storia.length >= 5) {
+    const servono = Math.max(...storia) + 1;   // uno di margine per i picchi più grossi
+    const euroKm = f => { const k = costoKm(modello(f.modello), f.usato); return k.energia + k.manutenzione; };
+    const jolly = S.furgoni.filter(f => magDi(f) === m.id && isJolly(f) && f.autistaId && furgoneOperativo(f)).sort((a, b) => euroKm(b) - euroKm(a));
+    jolly.slice(0, Math.max(0, jolly.length - servono)).forEach(f => { const d = f.autistaId; vendiFurgone(f.id); licenzia(d); venduti++; licenziati++; });
+  }
+  if (licenziati || venduti) {
+    const chi = m.responsabile ? `${m.responsabile.nome} (${m.nome})` : 'Il gestionale';
+    notizia(`${chi}: personale in più tagliato, ${licenziati} autist${licenziati === 1 ? 'a' : 'i'} licenziat${licenziati === 1 ? 'o' : 'i'}${venduti ? ` e ${venduti} jolly vendut${venduti === 1 ? 'o' : 'i'}` : ''}.`, 'info', 'taglia-' + m.id);
+    if (m.responsabile) { const r = m.responsabile; r.mese = r.mese || {}; r.mese.tagliati = (r.mese.tagliati || 0) + licenziati; }
+  }
+}
 const COSTO_GESTIONALE = 30000;   // una volta sola, poi è tuo per sempre
 function compraGestionale() {
   if (S.gestionale) return null;
