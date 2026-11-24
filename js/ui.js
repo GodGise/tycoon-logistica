@@ -916,7 +916,7 @@ function vistaPosta() {
       <p class="testo-email">${esc(m.testo)}</p>
       ${m.risposta === -1 ? `<div class="esito-email male"><b>Scaduta senza risposta</b><div class="riga"><span>Reputazione</span><span class="num meno">−1</span></div></div>`
       : m.risposta === null ? `<p class="nota">${mancano > 0 ? `Hai ${mancano} giorn${mancano === 1 ? 'o' : 'i'} per rispondere.` : 'Ultimo giorno per rispondere!'} Dopo scade e perdi 1 punto di reputazione.</p>
-        <div class="scelte">${e.scelte.map((s, i) => `<button class="btn" data-azione="rispondi" data-i="${i}">${esc(s.testo)}</button>`).join('')}</div>`
+        <div class="scelte">${(m.ordine || e.scelte.map((_, i) => i)).map(i => `<button class="btn" data-azione="rispondi" data-i="${i}">${esc(e.scelte[i].testo)}</button>`).join('')}</div>`
       : `<div class="esito-email ${m.rep > 0 ? 'buono' : m.rep < 0 ? 'male' : ''}"><b>Hai scelto:</b> ${esc(e.scelte[m.risposta].testo)}<p>${esc(m.esito)}</p>
           <div class="riga"><span>Reputazione</span><span class="num ${m.rep > 0 ? 'piu' : m.rep < 0 ? 'meno' : ''}">${m.rep > 0 ? '+' : ''}${m.rep}</span></div>
           ${m.soldi ? `<div class="riga"><span>Soldi</span><span class="num ${m.soldi > 0 ? 'piu' : 'meno'}">${m.soldi > 0 ? '+' : '−'}${eur.format(Math.abs(m.soldi))}</span></div>` : ''}</div>`}
