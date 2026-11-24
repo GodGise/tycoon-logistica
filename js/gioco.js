@@ -185,6 +185,7 @@ function puoiMettereMagazzino(lngLat) {
   return km <= citta.raggio * COSTANTI.distanzaMaxMagazzino ? null : `Troppo lontano dalle tue città (${Math.round(km)} km dal centro di ${citta.nome}).`;
 }
 function apriMagazzino(lngLat) {
+  if (miglioramentiMancanti().length) return 'Prima completa tutti i miglioramenti del magazzino.';
   const err = puoiMettereMagazzino(lngLat); if (err) return err;
   const cittaM = cittaVicina(lngLat).citta, prezzo = prezzoMagazzino(cittaM, lngLat);
   if (S.cassa < prezzo) return `Qui un magazzino costa ${prezzo.toLocaleString('it-IT')} €: non hai abbastanza soldi.`;
@@ -561,6 +562,7 @@ const FILIALE = { costo: 50000, furgoni: 5, reputazione: 60 };
 function requisitiFiliale() {
   const mancano = [];
   if (!sbloccato('filiali')) mancano.push(`il livello ${livelloPer('filiali')} dell'azienda`);
+  if (miglioramentiMancanti().length) mancano.push('tutti i miglioramenti del magazzino completati');
   if (S.furgoni.length < FILIALE.furgoni) mancano.push(`almeno ${FILIALE.furgoni} furgoni (ne hai ${S.furgoni.length})`);
   if (S.reputazione < FILIALE.reputazione) mancano.push(`reputazione almeno ${FILIALE.reputazione} (ora ${Math.round(S.reputazione)})`);
   if (S.cassa < FILIALE.costo + prezzoMagazzinoMin()) mancano.push(`almeno ${(FILIALE.costo + prezzoMagazzinoMin()).toLocaleString('it-IT')} € in cassa`);
