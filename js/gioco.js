@@ -363,7 +363,7 @@ function giornoLavorativo() {
     if (!(gestito(m) || (S.gestionale && S.capoturno)) || !r.giri.length) return;
     let libero = r.giri.reduce((t, f) => t + capacitaFurgone(f), 0) - r.consegne;
     const vicine = Object.values(ris).filter(x => x !== r && magDi(x.z) === m && x.smistati > x.consegne)
-      .sort((a, b) => distanzaKm(r.z.centro, a.z.centro) - distanzaKm(r.z.centro, b.z.centro)).slice(0, 2);
+      .sort((a, b) => distanzaKm(r.z.centro, a.z.centro) - distanzaKm(r.z.centro, b.z.centro));
     vicine.forEach(x => { if (libero < 10) return; const n = Math.min(libero, x.smistati - x.consegne); x.consegne += n; x.aiuto += n; libero -= n; aiutati += n; });
   });
   if (aiutati) notizia(`Il gestionale ha mandato i furgoni con posto libero nelle zone vicine: ${aiutati} pacchi in più consegnati.`, 'info', 'aiuto');
