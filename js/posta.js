@@ -295,6 +295,7 @@ function controllaPosta() {
     notizia(`Email scaduta senza risposta: "${m.oggetto}". Reputazione −1.`, 'male');
   });
   if (!S.furgoni.length) return;
+  forseEmailGrave();
   // la prima email arriva subito (il primo giorno con un furgone), poi una il lunedì e una il giovedì
   if (S.posta.length && !POSTA.giorniSettimana.includes(dataDelGiorno(S.giorno).getDay())) return;
   if (S.posta.some(m => m.giorno === S.giorno)) return;
@@ -308,7 +309,8 @@ function controllaPosta() {
 }
 
 function applicaRisposta(m, i, scaduta) {
-  const e = EMAIL.find(x => x.id === m.id), s = e.scelte[i];
+  const e = trovaEmail(m.id), s = e.scelte[i];
+  if (s.fai) s.fai(m.ctx || {});
   m.risposta = i; m.letta = true;
   cambiaFama(s.rep);
   if (s.soldi) movimento(s.soldi > 0 ? 'contratti' : 'eventi', s.soldi);
@@ -323,3 +325,116 @@ function rispondiEmail(indice, scelta) {
   return null;
 }
 function emailNonLette() { return (S && S.posta || []).filter(m => m.risposta === null).length; }
+
+/* ---------- email gravi: una al mese, con conseguenze vere su un dipendente o un furgone ---------- */
+// ctx: chi è coinvolto. Le scelte hanno rep/soldi/esito come le altre, più fai(ctx) con l'effetto sul gioco.
+const autistaConFurgone = () => { const a = S.dipendenti.filter(d => d.ruolo === 'autista' && S.furgoni.some(f => f.autistaId === d.id && f.zona)); return a.length ? scegli(a) : null; };
+const unMagazziniere = () => { const a = S.dipendenti.filter(d => d.ruolo === 'magazziniere'); return a.length ? scegli(a) : null; };
+const sospendi = (id, giorni) => { const d = dipendente(id); if (d) d.sospesoFino = S.giorno + giorni; };
+const licenziaPer = id => { if (dipendente(id)) licenzia(id); };
+const zonaDi = id => { const f = S.furgoni.find(x => x.autistaId === id); return f && f.zona ? (isJolly(f) ? 'il giro jolly' : 'la zona ' + nomeZona(zona(f.zona))) : 'il suo giro'; };
+const BUCO = ' Il suo furgone resta senza autista finché non ne assumi un altro: se hai un jolly copre lui, altrimenti la zona resta scoperta e la reputazione scende.';
+
+const EMAIL_GRAVI = [
+  { id: 'g-droga', grave: true, puo: () => !!autistaConFurgone(), prepara: () => { const a = autistaConFurgone(); return { id: a.id, nome: a.nome }; },
+    mittente: () => 'Caposquadra autisti', oggetto: c => `${c.nome} si droga durante il lavoro`,
+    testo: c => `Ho trovato ${c.nome} a fare uso di droghe nel furgone durante la pausa. Non è la prima volta: altri colleghi l'hanno visto. Guida ogni giorno ${zonaDi(c.id)}. Devi decidere tu.`,
+    scelte: [
+      { testo: 'Lo licenzio subito', rep: 2, soldi: 0, fai: c => licenziaPer(c.id), esito: 'Licenziato. Hai protetto i colleghi e i clienti.' + BUCO },
+      { testo: 'Lo sospendo e gli pago un percorso di recupero', rep: 4, soldi: -2500, fai: c => sospendi(c.id, 10), esito: 'Resta a casa 10 giorni per il percorso. Il furgone è fermo intanto: un jolly può coprire. Poi torna e lavora bene.' },
+      { testo: 'Faccio finta di niente', rep: -3, soldi: 0, fai: c => { const d = dipendente(c.id); if (d) d.rischio = 1.5; }, esito: 'Resta al suo posto, ma da ora fa il 50% di incidenti in più. E i colleghi lo sanno.' },
+    ] },
+  { id: 'g-alcol', grave: true, puo: () => !!autistaConFurgone(), prepara: () => { const a = autistaConFurgone(); return { id: a.id, nome: a.nome }; },
+    mittente: () => 'Polizia Locale', oggetto: c => `${c.nome} fermato con tasso alcolico alto`,
+    testo: c => `Il vostro autista ${c.nome} è stato fermato alla guida del furgone aziendale con un tasso alcolico oltre il limite. Patente sospesa per 15 giorni, furgone affidato a un collega.`,
+    scelte: [
+      { testo: 'Lo licenzio', rep: 2, soldi: -300, fai: c => licenziaPer(c.id), esito: 'Licenziato per giusta causa.' + BUCO },
+      { testo: 'Lo tengo in magazzino finché non riavrà la patente', rep: 3, soldi: 0, fai: c => sospendi(c.id, 15), esito: 'Per 15 giorni non guida: il suo furgone è fermo e serve un jolly. Poi torna al volante, molto più attento.' },
+      { testo: 'Lo faccio guidare lo stesso', rep: -6, soldi: -3000, fai: c => { const d = dipendente(c.id); if (d) d.rischio = 1.5; }, esito: 'Guida senza patente: secondo fermo, multa salata all\'azienda e da ora il 50% di incidenti in più.' },
+    ] },
+  { id: 'g-furto', grave: true, puo: () => !!unMagazziniere(), prepara: () => { const a = unMagazziniere(); return { id: a.id, nome: a.nome }; },
+    mittente: () => 'Ufficio sicurezza', oggetto: c => `Le telecamere riprendono ${c.nome} mentre ruba`,
+    testo: c => `Dalle telecamere del magazzino si vede ${c.nome} aprire pacchi e portare via cellulari e cuffie. Negli ultimi mesi i reclami per pacchi vuoti erano aumentati.`,
+    scelte: [
+      { testo: 'Lo licenzio e lo denuncio', rep: 4, soldi: -1200, fai: c => licenziaPer(c.id), esito: 'Licenziato e denunciato; avvocato pagato. Lo smistamento ha un magazziniere in meno finché non ne assumi un altro.' },
+      { testo: 'Lo licenzio senza denuncia', rep: 2, soldi: 0, fai: c => licenziaPer(c.id), esito: 'Licenziato. Lo smistamento ha un magazziniere in meno finché non ne assumi un altro.' },
+      { testo: 'Gli do un\'altra possibilità', rep: -3, soldi: 0, fai: c => { const d = dipendente(c.id); if (d) d.ruba = true; }, esito: 'Ha promesso di smettere. Non ha smesso: ogni tanto spariscono pacchi e paghi i rimborsi.' },
+    ] },
+  { id: 'g-patente', grave: true, puo: () => !!autistaConFurgone(), prepara: () => { const a = autistaConFurgone(); return { id: a.id, nome: a.nome }; },
+    mittente: () => 'Ufficio personale', oggetto: c => `La patente di ${c.nome} è scaduta da 3 mesi`,
+    testo: c => `Controllando i documenti abbiamo scoperto che la patente C di ${c.nome} è scaduta da tre mesi. Ha guidato tutto questo tempo senza saperlo (dice). Il rinnovo richiede una settimana.`,
+    scelte: [
+      { testo: 'Lo fermo una settimana finché rinnova', rep: 3, soldi: -200, fai: c => sospendi(c.id, 7), esito: 'Una settimana a terra: il suo furgone è fermo, un jolly può coprirlo. Poi tutto in regola.' },
+      { testo: 'Lo faccio guidare intanto', rep: -4, soldi: -2500, fai: () => {}, esito: 'Controllo stradale: multa all\'azienda e furgone sequestrato per un giorno.' },
+      { testo: 'Lo licenzio: doveva saperlo', rep: -1, soldi: 0, fai: c => licenziaPer(c.id), esito: 'Licenziato per una svista: gli altri non l\'hanno presa bene.' + BUCO },
+    ] },
+  { id: 'g-rissa', grave: true, puo: () => !!autistaConFurgone(), prepara: () => { const a = autistaConFurgone(); return { id: a.id, nome: a.nome }; },
+    mittente: () => 'Ufficio reclami', oggetto: c => `${c.nome} ha spintonato un cliente`,
+    testo: c => `Un cliente ha denunciato che ${c.nome}, durante una consegna, lo ha insultato e spintonato dopo una discussione sul pacco. C'è un video del citofono.`,
+    scelte: [
+      { testo: 'Lo licenzio', rep: 3, soldi: 0, fai: c => licenziaPer(c.id), esito: 'Licenziato. Il cliente ha ritirato la denuncia contro l\'azienda.' + BUCO },
+      { testo: 'Lo sospendo 5 giorni e mi scuso col cliente', rep: 1, soldi: -300, fai: c => sospendi(c.id, 5), esito: 'Cinque giorni a casa senza stipendio, scuse e un buono al cliente. Il suo furgone è fermo intanto.' },
+      { testo: 'Difendo il mio autista', rep: -5, soldi: -1500, fai: () => {}, esito: 'Il video è finito online. Causa persa e titolo sul giornale locale.' },
+    ] },
+  { id: 'g-infortunio', grave: true, puo: () => !!unMagazziniere(), prepara: () => { const a = unMagazziniere(); return { id: a.id, nome: a.nome }; },
+    mittente: () => 'Responsabile magazzino', oggetto: c => `${c.nome} si è fatto male al lavoro`,
+    testo: c => `${c.nome} si è schiacciato una mano con un bancale. Non aveva i guanti: quelli in magazzino sono finiti da settimane. Starà a casa 10 giorni. Ci chiede di dichiararlo come infortunio sul lavoro.`,
+    scelte: [
+      { testo: 'Lo dichiaro e compro le protezioni per tutti', rep: 4, soldi: -1800, fai: c => sospendi(c.id, 10), esito: 'Infortunio dichiarato, guanti e scarpe nuove per tutti. 10 giorni senza di lui: lo smistamento rallenta.' },
+      { testo: 'Gli chiedo di dire che si è fatto male a casa', rep: -6, soldi: -4000, fai: c => sospendi(c.id, 10), esito: 'Ha detto la verità all\'Ispettorato del lavoro: multa pesante e brutta figura.' },
+    ] },
+  { id: 'g-freni', grave: true, puo: () => S.furgoni.some(f => f.zona && f.autistaId), prepara: () => { const f = scegli(S.furgoni.filter(x => x.zona && x.autistaId)); return { furgone: f.id, nome: modello(f.modello).nome, autista: (dipendente(f.autistaId) || {}).nome || 'L\'autista' }; },
+    mittente: c => `${c.autista} · autista`, oggetto: c => `I freni del ${c.nome} non vanno`,
+    testo: c => `Capo, i freni del ${c.nome} fanno un rumore strano e a volte il pedale va giù troppo. Oggi ho rischiato. Il meccanico dice che servono 3 giorni e 1.400 €.`,
+    scelte: [
+      { testo: 'Lo fermo e lo riparo', rep: 3, soldi: -1400, fai: c => { const f = S.furgoni.find(x => x.id === c.furgone); if (f) { f.fermo = 3; f.motivo = 'riparazione freni'; f.fermoDal = S.giorno; } }, esito: 'Tre giorni fermo: un jolly può coprire la zona. Poi furgone sicuro.' },
+      { testo: 'Continua a girare, lo sistemo il mese prossimo', rep: -4, soldi: 0, fai: c => { const f = S.furgoni.find(x => x.id === c.furgone); if (f) f.difettoFino = S.giorno + 30; }, esito: 'Per un mese quel furgone ha il doppio dei rischi di incidente. E l\'autista lo racconta a tutti.' },
+    ] },
+  { id: 'g-concorrente', grave: true, puo: () => !!autistaConFurgone(), prepara: () => { const a = autistaConFurgone(); return { id: a.id, nome: a.nome, stip: a.stipendio }; },
+    mittente: c => `${c.nome} · autista`, oggetto: () => 'Un concorrente mi offre di più',
+    testo: c => `Ciao, sono il tuo autista con più esperienza su ${zonaDi(c.id)}. Un concorrente mi offre 350 € in più al mese. Mi trovo bene da te, ma ho una famiglia. Se non puoi, mi licenzio a fine settimana.`,
+    scelte: [
+      { testo: 'Gli aumento lo stipendio di 350 €', rep: 2, soldi: 0, fai: c => { const d = dipendente(c.id); if (d) d.stipendio += 350; }, esito: 'Resta, contento. Lo stipendio sale di 350 € al mese.' },
+      { testo: 'Gli offro 150 € e un giorno libero in più al mese', rep: 1, soldi: 0, fai: c => { const d = dipendente(c.id); if (d) d.stipendio += 150; }, esito: 'Ha accettato il compromesso.' },
+      { testo: 'Lo lascio andare', rep: -1, soldi: 0, fai: c => licenziaPer(c.id), esito: 'Se n\'è andato dal concorrente, con i suoi clienti affezionati.' + BUCO },
+    ] },
+  { id: 'g-ransomware', grave: true, puo: () => true, prepara: () => ({}),
+    mittente: () => 'Ufficio IT', oggetto: () => 'Attacco informatico: server bloccati',
+    testo: () => `Un virus ha cifrato i server: gestionale, tracking e indirizzi di consegna sono bloccati. Gli hacker chiedono 15.000 € in criptovalute. Il backup è di 3 giorni fa.`,
+    scelte: [
+      { testo: 'Ripristino dal backup e denuncio alla Polizia Postale', rep: 3, soldi: -2500, fai: () => {}, esito: 'Due giorni di lavoro manuale e qualche pacco rifatto, ma tutto recuperato. Hai anche messo un backup ogni notte.' },
+      { testo: 'Pago il riscatto', rep: -4, soldi: -15000, fai: () => {}, esito: 'Hanno sbloccato solo metà dei dati e un mese dopo ci hanno riprovato.' },
+    ] },
+  { id: 'g-caporalato', grave: true, puo: () => S.dipendenti.length >= 3, prepara: () => ({}),
+    mittente: () => 'Agenzia LavoroSubito', oggetto: () => 'Autisti a 5 € l\'ora, senza contratto',
+    testo: () => `Possiamo fornirvi autisti a 5 € l'ora, pagati in contanti, senza contratti né contributi. Risparmio garantito del 60% sul personale. Ne mandiamo quanti volete da lunedì.`,
+    scelte: [
+      { testo: 'Rifiuto e segnalo all\'Ispettorato del lavoro', rep: 5, soldi: 0, fai: () => {}, esito: 'L\'agenzia è stata chiusa. Il sindacato ti ha ringraziato pubblicamente.' },
+      { testo: 'Rifiuto e basta', rep: 1, soldi: 0, fai: () => {}, esito: 'Non ti sei sporcato le mani.' },
+      { testo: 'Ne prendo un paio per i picchi', rep: -8, soldi: -6000, fai: () => {}, esito: 'Controllo dei Carabinieri: lavoro nero e sfruttamento. Multa enorme e notizia ovunque.' },
+    ] },
+];
+function trovaEmail(id) { return EMAIL.find(x => x.id === id) || EMAIL_GRAVI.find(x => x.id === id); }
+
+// al massimo una email grave al mese, in un giorno a caso dopo il 5 del mese
+function forseEmailGrave() {
+  if (S.furgoni.length < 2) return;
+  const d = dataDelGiorno(S.giorno), mese = d.getFullYear() + '-' + d.getMonth();
+  if (S.meseGrave === mese || d.getDate() < 5) return;
+  if (d.getDate() < 25 && Math.random() > 0.15) return;
+  const usate = (S.posta || []).map(m => m.id).slice(0, 12);
+  const possibili = EMAIL_GRAVI.filter(e => e.puo() && !usate.includes(e.id));
+  if (!possibili.length) return;
+  const e = scegli(possibili), ctx = e.prepara();
+  S.meseGrave = mese;
+  S.posta.unshift({ id: e.id, grave: true, ctx, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
+    mittente: e.mittente(ctx), oggetto: e.oggetto(ctx), testo: e.testo(ctx), letta: false, risposta: null, esito: '' });
+  notizia(`Email urgente: "${S.posta[0].oggetto}". Decidi nella scheda Posta.`, 'male', 'posta-grave');
+}
+
+// effetti che durano: rimborsi per chi ruba
+function effettiDipendenti() {
+  S.dipendenti.filter(d => d.ruba).forEach(d => {
+    if (Math.random() < 0.25) { const n = casoInt(150, 450); movimento('eventi', -n); cambiaFama(-0.5); notizia(`Pacchi aperti in magazzino di nuovo: ${n} € di rimborsi. Sospetti su ${d.nome}.`, 'male', 'ruba-' + d.id); }
+  });
+}

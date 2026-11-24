@@ -384,7 +384,7 @@ function vistaGiri() {
     const cause = [];
     if (d && d.sciopero) cause.push('Sciopero: oggi nessun furgone è partito.');
     if (d && d.smistati < d.arrivo) cause.push(`<b>Magazzinieri</b>: ${intero.format(d.arrivo - d.smistati)} pacchi non smistati. Ogni magazziniere smista circa ${COSTANTI.pacchiMagazziniere} pacchi al giorno per tutta la città: assumine un altro.`);
-    const fuori = d && d.fuori ? d.fuori : assegnati.filter(f => !furgoneOperativo(f)).map(f => f.fermo > 0 ? 'fermo per ' + f.motivo : 'senza autista');
+    const fuori = d && d.fuori ? d.fuori : assegnati.filter(f => !furgoneOperativo(f)).map(f => f.fermo > 0 ? 'fermo per ' + f.motivo : !f.autistaId ? 'senza autista' : 'con l\'autista sospeso');
     if (fuori.length) {
       const conta = {}; fuori.forEach(m => conta[m] = (conta[m] || 0) + 1);
       cause.push(`<b>Furgoni</b>: ${Object.entries(conta).map(([m, n]) => `${n} furgon${n > 1 ? 'i' : 'e'} ${m}`).join(', ')}, quindi ne ${partiti === 1 ? 'è partito' : 'sono partiti'} ${partiti} su ${assegnati.length}.${fuori.some(m => m === 'senza autista') ? ' Assegna un autista nella scheda Flotta.' : fuori.some(m => m.includes('guasto')) ? ' Riparalo con il riquadro in alto a destra.' : ' Un jolly può coprirlo.'}`);
@@ -470,6 +470,9 @@ function dettaglioDipendente(d) {
       ${autista ? `<div><b>${Math.round(d.esperienza)}</b><span>esperienza /100</span></div>` : `<div><b>${intero.format(Math.round(COSTANTI.pacchiMagazziniere * effetto.smistamento()))}</b><span>pacchi al giorno</span></div>`}
       <div><b>${eurCent.format(costoUnita('prec') || costoUnita('mese'))}</b><span>costo per ${autista ? 'consegna' : 'pacco'}</span></div></div>
     ${autista ? `<div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
+    ${d.sospesoFino >= S.giorno ? `<div class="riga"><span>Sospeso</span><span class="num meno">ancora ${d.sospesoFino - S.giorno + 1} giorn${d.sospesoFino - S.giorno ? 'i' : 'o'}</span></div>` : ''}
+    ${d.rischio > 1 ? '<div class="riga"><span>Rischio incidenti</span><span class="num meno">+50%</span></div>' : ''}
+    ${d.ruba ? '<div class="riga"><span>Sotto sospetto</span><span class="num meno">pacchi che spariscono</span></div>' : ''}
     <div class="scheda">${tabellaStat(d, autista
       ? [['Giorni di lavoro', 'giorni', 'num'], ['Consegne', 'consegne', 'num'], ['Km guidati', 'km', 'num'], ['Incidenti', 'incidenti', 'num'], ['Stipendio pagato', 'stipendio', 'eur-']]
       : [['Giorni di lavoro', 'giorni', 'num'], ['Pacchi smistati', 'pacchi', 'num'], ['Stipendio pagato', 'stipendio', 'eur-']])}
@@ -697,11 +700,11 @@ function apriEmail(i) {
 function vistaPosta() {
   const posta = S.posta || [];
   if (emailAperta !== null && posta[emailAperta]) {
-    const m = posta[emailAperta], e = EMAIL.find(x => x.id === m.id), mancano = m.scadenza - S.giorno;
+    const m = posta[emailAperta], e = trovaEmail(m.id), mancano = m.scadenza - S.giorno;
     return `<button class="btn link indietro" data-azione="chiudi-email">‹ Posta</button>
     <div class="scheda email">
       <div class="nota">Da: <b style="color:var(--testo)">${esc(m.mittente)}</b> · ${nomeGiorno(m.giorno)}</div>
-      <h2 style="margin:4px 0 0">${esc(m.oggetto)}</h2>
+      ${m.grave ? '<span class="badge grave">Decisione grave</span>' : ''}<h2 style="margin:4px 0 0">${esc(m.oggetto)}</h2>
       <p class="testo-email">${esc(m.testo)}</p>
       ${m.risposta === -1 ? `<div class="esito-email male"><b>Scaduta senza risposta</b><div class="riga"><span>Reputazione</span><span class="num meno">−1</span></div></div>`
       : m.risposta === null ? `<p class="nota">${mancano > 0 ? `Hai ${mancano} giorn${mancano === 1 ? 'o' : 'i'} per rispondere.` : 'Ultimo giorno per rispondere!'} Dopo scade e perdi 1 punto di reputazione.</p>
@@ -712,7 +715,7 @@ function vistaPosta() {
     </div>`;
   }
   const lista = posta.map((m, i) => `<button class="voce-email ${m.risposta === null ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
-      <span class="mittente">${m.risposta === null ? '<i class="punto-blu"></i>' : ''}${esc(m.mittente)}</span>
+      <span class="mittente">${m.risposta === null ? `<i class="punto-blu ${m.grave ? 'rosso' : ''}"></i>` : ''}${m.grave ? '<span class="badge grave">Grave</span>' : ''}${esc(m.mittente)}</span>
       <span class="quando">${nomeGiorno(m.giorno)}</span>
       <b>${esc(m.oggetto)}</b>
       <span class="anteprima">${m.risposta === null ? esc(m.testo) : m.risposta === -1 ? 'Scaduta senza risposta · reputazione −1' : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>

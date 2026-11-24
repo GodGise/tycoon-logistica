@@ -208,7 +208,8 @@ function assegna(idFurgone, campo, valore) {
     f.autistaId = valore || null;
   } else f.zona = valore || null;
 }
-function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0 && !f.daRiparare; }
+function autistaSospeso(f) { const d = f.autistaId && dipendente(f.autistaId); return !!(d && d.sospesoFino >= S.giorno); }
+function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0 && !f.daRiparare && !autistaSospeso(f); }
 
 /* ---------- guasti: il furgone resta fermo finché non lo fai riparare ---------- */
 function furgoniDaRiparare() { return S ? S.furgoni.filter(f => f.daRiparare > 0) : []; }
@@ -270,6 +271,7 @@ function giornoLavorativo() {
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));  // i jolly non aprono zone nuove
   forseEvento();
   controllaPosta();
+  effettiDipendenti();
   const sciopero = effetto.sciopero();
   if (sciopero) notizia('Sciopero: oggi i furgoni restano in deposito.', 'male', 'sciopero');
   if (effetto.capacita() < 1) notizia('Neve: oggi i furgoni vanno piano e fanno meno consegne.', 'male', 'neve');
@@ -305,7 +307,7 @@ function giornoLavorativo() {
   // smistamento: ogni città ha i suoi magazzinieri
   const quota = {}, multi = S.filiali && S.filiali.length;
   tutteCitta().forEach(c => {
-    const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && idCitta(x) === c.id);
+    const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && idCitta(x) === c.id && !(x.sospesoFino >= S.giorno));
     const cap = Math.round(mags.length * COSTANTI.pacchiMagazziniere * effetto.smistamento());
     const tot = servite.filter(z => idCitta(z) === c.id).reduce((t, z) => t + arrivo[z.id], 0);
     quota[c.id] = tot > 0 ? Math.min(1, cap / tot) : 0;
@@ -330,7 +332,7 @@ function giornoLavorativo() {
     const consegne = Math.min(smistati, ec.capacita);
     // furgoni della zona che oggi non partono, con il motivo (per spiegarlo nella scheda Giri)
     const fuori = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && !furgoneOperativo(f))
-      .map(f => f.fermo > 0 ? (f.motivo === 'incidente' ? 'fermo per incidente' : 'fermo per guasto') : 'senza autista');
+      .map(f => f.fermo > 0 ? (f.motivo === 'incidente' ? 'fermo per incidente' : f.motivo === 'guasto' ? 'fermo per guasto' : 'fermo per ' + f.motivo) : !f.autistaId ? 'senza autista' : 'con l\'autista sospeso');
     ris[z.id] = { z, smistati, giri, consegneCtr, consegne, jolly: [], fuori };
   });
 
@@ -389,7 +391,7 @@ function giornoLavorativo() {
       stat(f, 'incasso', mie * tariffa() * effetto.tariffaZona(z.id));
       stat(a, 'giorni', 1); stat(a, 'consegne', mie); stat(a, 'km', km);
       // incidente: dipende dall'esperienza
-      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1);
+      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1) * (a.rischio || 1) * (f.difettoFino >= S.giorno ? 2 : 1);
       if (Math.random() < pKm * km) {
         stat(f, 'incidenti', 1); stat(a, 'incidenti', 1);
         f.fermo = casoInt(1, 3); f.motivo = 'incidente'; f.fermoDal = S.giorno;
