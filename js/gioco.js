@@ -46,9 +46,14 @@ function magazzinoVicino(punto, cittaId) {
   return { magazzino: m, km: d };
 }
 // prezzo di un magazzino: 300.000 € in centro, scende fino a 200.000 € al bordo della città
-function prezzoMagazzino(citta, lngLat) {
+// ogni magazzino in più costa il 20% più del precedente (2° ×1,2 · 3° ×1,44 · 4° ×1,73 · 5° ×2,07)
+const RINCARO_MAGAZZINO = 1.2;
+function rincaroMagazzini() { return S ? Math.pow(RINCARO_MAGAZZINO, S.depositi.length) : 1; }
+function prezzoMagazzinoMin() { return Math.round(COSTANTI.prezzoMagazzinoMin * rincaroMagazzini() / 5000) * 5000; }
+function prezzoMagazzinoMax() { return Math.round(COSTANTI.prezzoMagazzinoMax * rincaroMagazzini() / 5000) * 5000; }
+function prezzoMagazzino(citta, lngLat, primo) {
   const t = limita(distanzaKm([citta.lng, citta.lat], lngLat) / (citta.raggio * 1.15), 0, 1);
-  const p = COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t;
+  const p = (COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t) * (primo ? 1 : rincaroMagazzini());
   return Math.round(p / 5000) * 5000;
 }
 function kmGiro(z) { return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * magazzinoVicino(z.centro, idCitta(z)).km); }
@@ -60,7 +65,7 @@ function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); r
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   S = {
     citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
-    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
+    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino, true) }],
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
     cassa: COSTANTI.cassaIniziale, reputazione: 70, servizio: 0.94, fama: 0,
@@ -203,7 +208,8 @@ function assegna(idFurgone, campo, valore) {
     f.autistaId = valore || null;
   } else f.zona = valore || null;
 }
-function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0 && !f.daRiparare; }
+function autistaSospeso(f) { const d = f.autistaId && dipendente(f.autistaId); return !!(d && d.sospesoFino >= S.giorno); }
+function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0 && !f.daRiparare && !autistaSospeso(f); }
 
 /* ---------- guasti: il furgone resta fermo finché non lo fai riparare ---------- */
 function furgoniDaRiparare() { return S ? S.furgoni.filter(f => f.daRiparare > 0) : []; }
@@ -265,6 +271,7 @@ function giornoLavorativo() {
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));  // i jolly non aprono zone nuove
   forseEvento();
   controllaPosta();
+  effettiDipendenti();
   const sciopero = effetto.sciopero();
   if (sciopero) notizia('Sciopero: oggi i furgoni restano in deposito.', 'male', 'sciopero');
   if (effetto.capacita() < 1) notizia('Neve: oggi i furgoni vanno piano e fanno meno consegne.', 'male', 'neve');
@@ -276,16 +283,17 @@ function giornoLavorativo() {
   // picchi di ordini: ogni giorno in qualche zona di ogni città arrivano più pacchi del solito.
   // Sono il lavoro del jolly: abbastanza da tenerlo occupato, non tanto da intasare tutto.
   const picco = {};
-  // Con almeno 4 zone servite: 2 zone in picco al giorno, in tutto ~1,5–2 furgoni di pacchi in più = lavoro per 2 jolly.
   // Le zone cambiano ogni giorno (oggi il Centro, domani il Nord...).
   const ieri = S.picchiIeri || [];
   tutteCitta().forEach(c => {
     const zc = servite.filter(z => idCitta(z) === c.id); if (zc.length < 2) return;
-    const quante = zc.length >= 4 ? 2 : 1;
-    const totale = Math.round(COSTANTI.maxConsegneCorriere * (quante === 2 ? caso(1.5, 2) : caso(0.3, 0.5)));
+    // più zone servi, più picchi: con 13 zone circa 5 furgoni di pacchi in più al giorno = lavoro per 5 jolly
+    const quante = Math.min(5, Math.max(1, Math.floor(zc.length / 2.6)));
+    const furgoniExtra = Math.min(5.4, Math.max(0.4, (zc.length - 2) * 0.5)) * caso(0.85, 1.05);
+    const totale = Math.round(COSTANTI.maxConsegneCorriere * furgoniExtra);
     const scelte = [...zc].sort(() => Math.random() - 0.5).sort((a, b) => ieri.includes(a.id) - ieri.includes(b.id)).slice(0, quante);
-    const quota = quante === 2 ? [0.6, 0.4] : [1];
-    scelte.forEach((z, i) => { picco[z.id] = Math.round(totale * quota[i]); });
+    const pesi = scelte.map(() => caso(0.7, 1.3)), somma = pesi.reduce((a, b) => a + b, 0);
+    scelte.forEach((z, i) => { picco[z.id] = Math.round(totale * pesi[i] / somma); });
   });
   S.picchiIeri = Object.keys(picco); S.piccoOggi = picco;
   const nuovi = {};
@@ -299,7 +307,7 @@ function giornoLavorativo() {
   // smistamento: ogni città ha i suoi magazzinieri
   const quota = {}, multi = S.filiali && S.filiali.length;
   tutteCitta().forEach(c => {
-    const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && idCitta(x) === c.id);
+    const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && idCitta(x) === c.id && !(x.sospesoFino >= S.giorno));
     const cap = Math.round(mags.length * COSTANTI.pacchiMagazziniere * effetto.smistamento());
     const tot = servite.filter(z => idCitta(z) === c.id).reduce((t, z) => t + arrivo[z.id], 0);
     quota[c.id] = tot > 0 ? Math.min(1, cap / tot) : 0;
@@ -324,7 +332,7 @@ function giornoLavorativo() {
     const consegne = Math.min(smistati, ec.capacita);
     // furgoni della zona che oggi non partono, con il motivo (per spiegarlo nella scheda Giri)
     const fuori = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && !furgoneOperativo(f))
-      .map(f => f.fermo > 0 ? (f.motivo === 'incidente' ? 'fermo per incidente' : 'fermo per guasto') : 'senza autista');
+      .map(f => f.fermo > 0 ? (f.motivo === 'incidente' ? 'fermo per incidente' : f.motivo === 'guasto' ? 'fermo per guasto' : 'fermo per ' + f.motivo) : !f.autistaId ? 'senza autista' : 'con l\'autista sospeso');
     ris[z.id] = { z, smistati, giri, consegneCtr, consegne, jolly: [], fuori };
   });
 
@@ -383,7 +391,7 @@ function giornoLavorativo() {
       stat(f, 'incasso', mie * tariffa() * effetto.tariffaZona(z.id));
       stat(a, 'giorni', 1); stat(a, 'consegne', mie); stat(a, 'km', km);
       // incidente: dipende dall'esperienza
-      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1);
+      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1) * (a.rischio || 1) * (f.difettoFino >= S.giorno ? 2 : 1);
       if (Math.random() < pKm * km) {
         stat(f, 'incidenti', 1); stat(a, 'incidenti', 1);
         f.fermo = casoInt(1, 3); f.motivo = 'incidente'; f.fermoDal = S.giorno;
@@ -536,7 +544,7 @@ function requisitiFiliale() {
   const mancano = [];
   if (S.furgoni.length < FILIALE.furgoni) mancano.push(`almeno ${FILIALE.furgoni} furgoni (ne hai ${S.furgoni.length})`);
   if (S.reputazione < FILIALE.reputazione) mancano.push(`reputazione almeno ${FILIALE.reputazione} (ora ${Math.round(S.reputazione)})`);
-  if (S.cassa < FILIALE.costo + COSTANTI.prezzoMagazzinoMin) mancano.push(`almeno ${(FILIALE.costo + COSTANTI.prezzoMagazzinoMin).toLocaleString('it-IT')} € in cassa`);
+  if (S.cassa < FILIALE.costo + prezzoMagazzinoMin()) mancano.push(`almeno ${(FILIALE.costo + prezzoMagazzinoMin()).toLocaleString('it-IT')} € in cassa`);
   return mancano;
 }
 function apriFiliale(citta, lngLat, zonePronte) {

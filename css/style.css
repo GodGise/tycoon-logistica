@@ -473,3 +473,10 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .prima-dopo .freccia { color: #0a84ff; }
 .prima-dopo .dopo { color: #30d158; font-size: 16px; }
 .attivo-ok { color: #30d158; font-weight: 600; text-align: center; padding: 6px 0; }
+.avviso-posta { border-color: rgba(10,132,255,.6); }
+/* pallino della posta come badge di iOS: sopra l'angolo del pulsante, non lo allarga */
+.schede button[data-scheda="posta"] { position: relative; }
+.pallino-posta { position: absolute; top: 1px; right: 0; margin: 0; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; line-height: 16px; box-shadow: 0 0 0 2px rgba(28,28,30,.9); }
+.pallino-posta { top: 3px; right: 1px; min-width: 0; width: 8px; height: 8px; padding: 0; font-size: 0; color: transparent; box-shadow: none; }
+.badge.grave { background: rgba(255,69,58,.2); color: #ff6961; margin-right: 6px; }
+.punto-blu.rosso { background: #ff453a; }

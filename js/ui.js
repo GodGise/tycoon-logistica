@@ -91,13 +91,17 @@ function vistaObiettivoEContratti() {
 }
 
 // Scheda dell'offerta di contratto, in basso sopra la mappa
-// Riquadri fissi per i furgoni guasti: restano finché non premi Ripara
+// Riquadri fissi per i furgoni guasti (finché non premi Ripara) e per la posta non letta (finché non la apri)
 function disegnaGuasti() {
   const el = $('#guasti'), lista = furgoniDaRiparare();
-  const chiave = lista.map(f => f.id + ':' + f.daRiparare + ':' + (S.cassa >= f.daRiparare)).join('|');
+  const nuove = S ? (S.posta || []).map((m, i) => ({ m, i })).filter(x => !x.m.letta && x.m.risposta === null) : [];
+  const chiave = nuove.map(x => 'm' + x.i).join('|') + '#' + lista.map(f => f.id + ':' + f.daRiparare + ':' + (S.cassa >= f.daRiparare)).join('|');
   if (el.dataset.chiave === chiave) return;
   el.dataset.chiave = chiave;
-  el.innerHTML = lista.map(f => {
+  el.innerHTML = nuove.map(({ m, i }) => `<div class="guasto avviso-posta vetro" role="alert">
+      <div class="riga"><b>✉︎ Nuova email</b><span class="badge">${m.scadenza - S.giorno > 0 ? (m.scadenza - S.giorno) + ' giorni per rispondere' : 'ultimo giorno'}</span></div>
+      <p class="nota"><b style="color:var(--testo)">${esc(m.mittente)}</b><br>${esc(m.oggetto)}</p>
+      <button class="btn primario" data-leggi="${i}">Leggi e decidi</button></div>`).join('') + lista.map(f => {
     const m = modello(f.modello), dove = isJolly(f) ? 'jolly' : f.zona ? 'zona ' + nomeZona(zona(f.zona)) : 'in deposito', basta = S.cassa >= f.daRiparare;
     return `<div class="guasto vetro" role="alert">
       <div class="riga"><b>Guasto: ${esc(m.nome)}${f.usato ? ' usato' : ''}</b><span class="badge fermo">fermo</span></div>
@@ -107,6 +111,8 @@ function disegnaGuasti() {
   }).join('');
 }
 $('#guasti').addEventListener('click', e => {
+  const l = e.target.closest('[data-leggi]');
+  if (l) { apriEmail(+l.dataset.leggi); return; }
   const b = e.target.closest('[data-ripara]'); if (!b) return;
   const err = ripara(b.dataset.ripara);
   if (err) toast(err); else { toast('Furgone riparato: dalla prossima giornata torna a lavorare.'); salva(); }
@@ -298,7 +304,7 @@ function vistaMagazzini() {
     <h2 style="margin:0">Magazzini <small>di tua proprietà</small></h2>
     ${lista}
     ${posizionando ? `<p class="nota" style="color:var(--accento)">Clicca sulla mappa dove vuoi il nuovo magazzino.</p><button class="btn" data-azione="annulla-magazzino">Annulla</button>`
-      : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < COSTANTI.prezzoMagazzinoMin ? 'disabled' : ''}>Compra un magazzino (${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)})</button>`}
+      : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < prezzoMagazzinoMin() ? 'disabled' : ''}>Compra il ${S.depositi.length + 1}° magazzino (${eur.format(prezzoMagazzinoMin())}–${eur.format(prezzoMagazzinoMax())})</button>`}
     <p class="nota">Costa di più in centro e meno verso la periferia. Una volta comprato è tuo: niente affitto.</p>
     <p class="nota">Ogni zona parte dal magazzino più vicino: più è lontano, più km fanno i furgoni ogni giorno.</p>
   </div>`;
@@ -315,7 +321,7 @@ function vistaInizio() {
     <div class="scheda"><h2 style="margin:0">Metti il magazzino della filiale</h2>
       <p style="margin:0">Clicca sulla mappa dove vuoi il magazzino di ${esc(c.nome)}.</p>
       <div class="riga"><span>Apertura della filiale</span><span class="num">${eur.format(FILIALE.costo)}</span></div>
-      <div class="riga"><span>Magazzino</span><span class="num">${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)}</span></div>
+      <div class="riga"><span>Magazzino (${S.depositi.length + 1}°, +20% a magazzino)</span><span class="num">${eur.format(prezzoMagazzinoMin())}–${eur.format(prezzoMagazzinoMax())}</span></div>
       <div class="riga"><span>In cassa</span><span class="num">${eur.format(S.cassa)}</span></div>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}</div>
     <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
@@ -378,7 +384,7 @@ function vistaGiri() {
     const cause = [];
     if (d && d.sciopero) cause.push('Sciopero: oggi nessun furgone è partito.');
     if (d && d.smistati < d.arrivo) cause.push(`<b>Magazzinieri</b>: ${intero.format(d.arrivo - d.smistati)} pacchi non smistati. Ogni magazziniere smista circa ${COSTANTI.pacchiMagazziniere} pacchi al giorno per tutta la città: assumine un altro.`);
-    const fuori = d && d.fuori ? d.fuori : assegnati.filter(f => !furgoneOperativo(f)).map(f => f.fermo > 0 ? 'fermo per ' + f.motivo : 'senza autista');
+    const fuori = d && d.fuori ? d.fuori : assegnati.filter(f => !furgoneOperativo(f)).map(f => f.fermo > 0 ? 'fermo per ' + f.motivo : !f.autistaId ? 'senza autista' : 'con l\'autista sospeso');
     if (fuori.length) {
       const conta = {}; fuori.forEach(m => conta[m] = (conta[m] || 0) + 1);
       cause.push(`<b>Furgoni</b>: ${Object.entries(conta).map(([m, n]) => `${n} furgon${n > 1 ? 'i' : 'e'} ${m}`).join(', ')}, quindi ne ${partiti === 1 ? 'è partito' : 'sono partiti'} ${partiti} su ${assegnati.length}.${fuori.some(m => m === 'senza autista') ? ' Assegna un autista nella scheda Flotta.' : fuori.some(m => m.includes('guasto')) ? ' Riparalo con il riquadro in alto a destra.' : ' Un jolly può coprirlo.'}`);
@@ -464,6 +470,9 @@ function dettaglioDipendente(d) {
       ${autista ? `<div><b>${Math.round(d.esperienza)}</b><span>esperienza /100</span></div>` : `<div><b>${intero.format(Math.round(COSTANTI.pacchiMagazziniere * effetto.smistamento()))}</b><span>pacchi al giorno</span></div>`}
       <div><b>${eurCent.format(costoUnita('prec') || costoUnita('mese'))}</b><span>costo per ${autista ? 'consegna' : 'pacco'}</span></div></div>
     ${autista ? `<div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
+    ${d.sospesoFino >= S.giorno ? `<div class="riga"><span>Sospeso</span><span class="num meno">ancora ${d.sospesoFino - S.giorno + 1} giorn${d.sospesoFino - S.giorno ? 'i' : 'o'}</span></div>` : ''}
+    ${d.rischio > 1 ? '<div class="riga"><span>Rischio incidenti</span><span class="num meno">+50%</span></div>' : ''}
+    ${d.ruba ? '<div class="riga"><span>Sotto sospetto</span><span class="num meno">pacchi che spariscono</span></div>' : ''}
     <div class="scheda">${tabellaStat(d, autista
       ? [['Giorni di lavoro', 'giorni', 'num'], ['Consegne', 'consegne', 'num'], ['Km guidati', 'km', 'num'], ['Incidenti', 'incidenti', 'num'], ['Stipendio pagato', 'stipendio', 'eur-']]
       : [['Giorni di lavoro', 'giorni', 'num'], ['Pacchi smistati', 'pacchi', 'num'], ['Stipendio pagato', 'stipendio', 'eur-']])}
@@ -681,16 +690,24 @@ const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita,
 
 /* ---------- posta: una email decisionale a settimana ---------- */
 let emailAperta = null;
+function apriEmail(i) {
+  emailAperta = i; if (S.posta[i]) S.posta[i].letta = true;
+  dettaglio = null; scheda = 'posta';
+  document.querySelectorAll('.schede button').forEach(x => x.setAttribute('aria-selected', x.dataset.scheda === 'posta'));
+  const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
+  $('#guasti').dataset.chiave = '-'; disegnaGuasti(); ridisegna(); muoviIndicatore();
+}
 function vistaPosta() {
   const posta = S.posta || [];
   if (emailAperta !== null && posta[emailAperta]) {
-    const m = posta[emailAperta], e = EMAIL.find(x => x.id === m.id), mancano = m.scadenza - S.giorno;
+    const m = posta[emailAperta], e = trovaEmail(m.id), mancano = m.scadenza - S.giorno;
     return `<button class="btn link indietro" data-azione="chiudi-email">‹ Posta</button>
     <div class="scheda email">
       <div class="nota">Da: <b style="color:var(--testo)">${esc(m.mittente)}</b> · ${nomeGiorno(m.giorno)}</div>
-      <h2 style="margin:4px 0 0">${esc(m.oggetto)}</h2>
+      ${m.grave ? '<span class="badge grave">Decisione grave</span>' : ''}<h2 style="margin:4px 0 0">${esc(m.oggetto)}</h2>
       <p class="testo-email">${esc(m.testo)}</p>
-      ${m.risposta === null ? `<p class="nota">${mancano > 0 ? `Hai ${mancano} giorn${mancano === 1 ? 'o' : 'i'} per rispondere.` : 'Ultimo giorno per rispondere!'} Se non rispondi vale la scelta peggiore.</p>
+      ${m.risposta === -1 ? `<div class="esito-email male"><b>Scaduta senza risposta</b><div class="riga"><span>Reputazione</span><span class="num meno">−1</span></div></div>`
+      : m.risposta === null ? `<p class="nota">${mancano > 0 ? `Hai ${mancano} giorn${mancano === 1 ? 'o' : 'i'} per rispondere.` : 'Ultimo giorno per rispondere!'} Dopo scade e perdi 1 punto di reputazione.</p>
         <div class="scelte">${e.scelte.map((s, i) => `<button class="btn" data-azione="rispondi" data-i="${i}">${esc(s.testo)}</button>`).join('')}</div>`
       : `<div class="esito-email ${m.rep > 0 ? 'buono' : m.rep < 0 ? 'male' : ''}"><b>Hai scelto:</b> ${esc(e.scelte[m.risposta].testo)}<p>${esc(m.esito)}</p>
           <div class="riga"><span>Reputazione</span><span class="num ${m.rep > 0 ? 'piu' : m.rep < 0 ? 'meno' : ''}">${m.rep > 0 ? '+' : ''}${m.rep}</span></div>
@@ -698,14 +715,14 @@ function vistaPosta() {
     </div>`;
   }
   const lista = posta.map((m, i) => `<button class="voce-email ${m.risposta === null ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
-      <span class="mittente">${m.risposta === null ? '<i class="punto-blu"></i>' : ''}${esc(m.mittente)}</span>
+      <span class="mittente">${m.risposta === null ? `<i class="punto-blu ${m.grave ? 'rosso' : ''}"></i>` : ''}${m.grave ? '<span class="badge grave">Grave</span>' : ''}${esc(m.mittente)}</span>
       <span class="quando">${nomeGiorno(m.giorno)}</span>
       <b>${esc(m.oggetto)}</b>
-      <span class="anteprima">${m.risposta === null ? esc(m.testo) : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
+      <span class="anteprima">${m.risposta === null ? esc(m.testo) : m.risposta === -1 ? 'Scaduta senza risposta · reputazione −1' : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
     </button>`).join('');
   return `<div class="scheda"><div class="riga"><h2 style="margin:0">Posta</h2><span class="badge">Reputazione ${Math.round(S.reputazione)}</span></div>
-    <p class="nota">Ogni lunedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai ${POSTA.giorniPerRispondere} giorni per rispondere.</p></div>
-    ${lista ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per ora. La prima arriva lunedì, quando hai almeno un furgone.</p>'}`;
+    <p class="nota">Ogni lunedì e giovedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai una settimana per rispondere, poi l'email scade (−1 di reputazione).</p></div>
+    ${lista ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per ora. La prima arriva appena hai un furgone.</p>'}`;
 }
 
 function testata() {
@@ -797,8 +814,8 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
-    case 'apri-email': emailAperta = +b.dataset.i; $('#contenuto').scrollTop = 0; break;
-    case 'chiudi-email': emailAperta = null; break;
+    case 'apri-email': apriEmail(+b.dataset.i); $('#contenuto').scrollTop = 0; break;
+    case 'chiudi-email': emailAperta = null; ridisegna(); $('#contenuto').scrollTop = 0; break;
     case 'rispondi': { const err = rispondiEmail(emailAperta, +b.dataset.i); esito(err); break; }
     case 'salva-online': accountAttesa = true; ridisegna(); salvaOnline(false).then(r => { accountAttesa = false; dopoCambioPartita(r === 'ok' ? 'Partita salvata online.' : r === 'altro' ? 'Ho caricato la partita più recente dall\'altro dispositivo.' : null); }); break;
     case 'esci-account': accountAttesa = true; ridisegna(); esciAccount().then(() => { accountAttesa = false; dopoCambioPartita('Sei uscito. La partita resta anche su questo dispositivo.'); }); break;
