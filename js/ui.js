@@ -777,7 +777,7 @@ function vistaFlotta() {
   return `${barraMagazzini()}<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
     ${capo}
     ${piano}
-    <div class="filtri-flotta interruttore a-capo">${[['tutti', 'Tutti'], ['assegnati', 'Assegnati'], ['jolly', 'Jolly'], ['senza', 'Senza autista'], ['deposito', 'In deposito'], ['problemi', 'Problemi']].map(([k, t]) =>
+    <div class="filtri-chip">${[['tutti', 'Tutti'], ['assegnati', 'Assegnati'], ['jolly', 'Jolly'], ['senza', 'Senza autista'], ['deposito', 'In deposito'], ['problemi', 'Problemi']].map(([k, t]) =>
       `<button data-azione="filtro-flotta" data-v="${k}" aria-pressed="${flottaFiltro === k}">${t} <span>${conta(k)}</span></button>`).join('')}</div>
     ${html || '<p class="nota">Nessun furgone in questo filtro.</p>'}
     <p class="nota">Tocca un gruppo per aprirlo, tocca un furgone per cambiare autista o zona.</p>`;
@@ -809,7 +809,7 @@ function vistaPersonale() {
   const daControllare = d => { const s = stelleDi(d); return (s !== null && s < 3) || inProva(d); };
   const passa = d => personaleFiltro === 'tutti' || (personaleFiltro === 'controllare' ? daControllare(d) : d.ruolo === 'autista' && statoAut(d) === personaleFiltro);
   const aut = mieiDip.filter(d => d.ruolo === 'autista');
-  const filtro = `<div class="interruttore filtri-flotta a-capo">${[['tutti', 'Tutti', mieiDip.length], ['assegnati', 'Assegnati', aut.filter(d => statoAut(d) === 'assegnati').length],
+  const filtro = `<div class="filtri-chip">${[['tutti', 'Tutti', mieiDip.length], ['assegnati', 'Assegnati', aut.filter(d => statoAut(d) === 'assegnati').length],
     ['jolly', 'Jolly', aut.filter(d => statoAut(d) === 'jolly').length], ['liberi', 'Liberi', aut.filter(d => statoAut(d) === 'liberi').length],
     ['controllare', 'Da controllare', mieiDip.filter(daControllare).length]].map(([k, t, n]) => `<button data-azione="filtro-personale" data-v="${k}" aria-pressed="${personaleFiltro === k}">${t} <span>${n}</span></button>`).join('')}</div>
     ${personaleFiltro === 'controllare' ? '<p class="nota">Sotto le 3 stelle o ancora in prova: controlla le loro stelle prima che finisca il periodo di prova.</p>' : ''}`;
