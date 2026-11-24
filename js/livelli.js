@@ -8,7 +8,7 @@ const LIVELLI = [
   { n: 3,  nome: 'Rete locale',           xp: 6000,   sblocca: ['Ivecco Daylì', 'Pubblicità in città'] },
   { n: 4,  nome: 'Logistica urbana',      xp: 15000,  sblocca: ['Mercedez Sprinta', 'Officina nel magazzino', 'Corso di guida sicura'] },
   { n: 5,  nome: 'Operatore regionale',   xp: 30000,  sblocca: ['Furgone elettrico grande e-Daylì', 'Nastro trasportatore'] },
-  { n: 6,  nome: 'Gruppo logistico',      xp: 55000,  sblocca: ['Filiali in altre città', 'Gestionale automatizzato (30.000 €, per sempre): fa "Organizza" da solo ogni mattina'] },
+  { n: 6,  nome: 'Gruppo logistico',      xp: 55000,  sblocca: ['Filiali in altre città', 'Gestionale automatizzato (100.000 €, per sempre): fa "Organizza" da solo ogni mattina'] },
   { n: 7,  nome: 'Rete interregionale',   xp: 90000,  sblocca: ['Contratti dei clienti pagati il 20% in più'] },
   { n: 8,  nome: 'Big della logistica',   xp: 140000, sblocca: ['Accordo flotta: −10% sui furgoni nuovi'] },
   { n: 9,  nome: 'Network nazionale',     xp: 210000, sblocca: ['Licenze di zona a metà prezzo'] },

@@ -520,7 +520,7 @@ function tagliaPersonaleInPiu(m) {
   senzaFurgone.slice(0, Math.max(0, senzaFurgone.length - 1)).forEach(d => { licenzia(d.id); licenziati++; });
   const storia = m.jollyUsati || [];
   if (storia.length >= 5) {
-    const servono = Math.max(...storia) + 1;   // uno di margine per i picchi più grossi
+    const servono = Math.max(JOLLY_MINIMI, Math.max(...storia) + 1);   // mai sotto i 5 jolly di riserva
     const euroKm = f => { const k = costoKm(modello(f.modello), f.usato); return k.energia + k.manutenzione; };
     const jolly = S.furgoni.filter(f => magDi(f) === m.id && isJolly(f) && f.autistaId && furgoneOperativo(f)).sort((a, b) => euroKm(b) - euroKm(a));
     jolly.slice(0, Math.max(0, jolly.length - servono)).forEach(f => { const d = f.autistaId; vendiFurgone(f.id); licenzia(d); venduti++; licenziati++; });
@@ -531,7 +531,8 @@ function tagliaPersonaleInPiu(m) {
     if (m.responsabile) { const r = m.responsabile; r.mese = r.mese || {}; r.mese.tagliati = (r.mese.tagliati || 0) + licenziati; }
   }
 }
-const COSTO_GESTIONALE = 30000;   // una volta sola, poi è tuo per sempre
+const JOLLY_MINIMI = 5;   // riserva fissa: i picchi e i guasti li coprono loro
+const COSTO_GESTIONALE = 100000;   // una volta sola, poi è tuo per sempre
 function compraGestionale() {
   if (S.gestionale) return null;
   if (!sbloccato('capoturno')) return 'Non ancora sbloccato.';
@@ -707,9 +708,14 @@ function pianoOrganizza(soloMag) {
     const jolly = (miei.find(p => p.zona && p.zona.startsWith(ZONA_JOLLY)) || {}).zona || ZONA_JOLLY;
     const pool = miei.filter(pronto), assegnati = new Map(), manca = new Map(servite.map(z => [z.id, serve(z)]));
     const soglia = COSTANTI.maxConsegneCorriere * 0.5;   // sotto mezzo furgone di pacchi ci pensano i jolly
-    // a turno, la zona più scoperta prende un furgone: prima uno che era già lì, poi quello che la copre meglio
+    // a turno, la zona più scoperta prende un furgone: prima uno che era già lì, poi quello che la copre meglio.
+    // Ogni zona ha almeno un furgone; poi restano sempre 5 jolly di riserva (se ci sono abbastanza furgoni).
+    const riserva = Math.min(JOLLY_MINIMI, Math.max(0, pool.length - servite.length));
+    const coperta = id => [...assegnati.values()].includes(id);
     for (;;) {
-      let peggio = null; manca.forEach((m, id) => { if (m > soglia && (!peggio || m > manca.get(peggio))) peggio = id; });
+      const scoperte = servite.filter(z => !coperta(z.id)).length;
+      const soloScoperte = pool.length <= riserva + scoperte;   // i furgoni rimasti servono alle zone vuote o alla riserva
+      let peggio = null; manca.forEach((m, id) => { if (m > soglia && !(soloScoperte && coperta(id)) && (!peggio || m > manca.get(peggio))) peggio = id; });
       if (!peggio || !pool.length) break;
       const m = manca.get(peggio);
       let i = pool.findIndex(p => p.zona === peggio);
