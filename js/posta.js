@@ -1,8 +1,8 @@
-/* Tycoon Logistica – posta: ogni lunedì e giovedì arriva una email con una decisione da prendere.
+/* Tycoon Logistica – posta: ogni lunedì arriva una email con una decisione da prendere.
    Le scelte non sono banali: quella giusta alza la reputazione, a volte costa soldi subito.
    Se non rispondi entro una settimana l'email scade e perdi 1 punto di reputazione. */
 
-const POSTA = { giorniSettimana: [1, 4], giorniPerRispondere: 7, massimoInAttesa: 3 };
+const POSTA = { giorniSettimana: [1], giorniPerRispondere: 7, massimoInAttesa: 3 };   // una email ogni lunedì
 // al massimo 3 email da leggere alla volta, anche dopo tanto tempo offline
 function postaPiena() { return (S.posta || []).filter(m => m.risposta === null).length >= POSTA.massimoInAttesa; }
 function segnaUsata(id) { S.postaUsate = (S.postaUsate || []).concat(id).slice(-30); S.postaRicevute = (S.postaRicevute || 0) + 1; }
@@ -303,7 +303,7 @@ function controllaPosta() {
   if (!S.furgoni.length || postaPiena()) return;
   forseEmailGrave();
   if (postaPiena()) return;
-  // la prima email arriva subito (il primo giorno con un furgone), poi una il lunedì e una il giovedì
+  // la prima email arriva subito (il primo giorno con un furgone), poi una ogni lunedì
   if (S.postaRicevute && !POSTA.giorniSettimana.includes(dataDelGiorno(S.giorno).getDay())) return;
   if (S.posta.some(m => m.giorno === S.giorno)) return;
   const usate = S.postaUsate || [];
