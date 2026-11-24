@@ -92,7 +92,7 @@ function emailLamentela(a) {
   a.ultimaLamentela = S.giorno;
   S.posta = S.posta || [];
   S.posta.unshift({ id: 'lamentela', lamentela: true, ctx: { id: a.id }, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
-    mittente: 'Un cliente', oggetto: `Lamentela sul corriere ${a.nome}`, testo: scegli(TESTI_LAMENTELA)(a.nome), letta: false, risposta: null, esito: '' });
+    mittente: 'Un cliente', oggetto: `Lamentela sul corriere ${a.nome}`, testo: scegli(TESTI_LAMENTELA)(a.nome), letta: false, risposta: null, esito: '', ordine: mescola(EMAIL_LAMENTELE[0].scelte) });
 }
 
 // licenziamento: gratis durante la prova, dopo costa un mese di stipendio
