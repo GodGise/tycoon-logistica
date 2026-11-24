@@ -26,13 +26,13 @@ function esito(errore, ok) { if (errore) toast(errore); else if (ok) toast(ok); 
 /* ---------- schede ---------- */
 function vistaAzienda() {
   const utile = utileMese(S.conti.voci);
-  const autisti = S.dipendenti.filter(d => d.ruolo === 'autista').length, mag = S.dipendenti.filter(d => d.ruolo === 'magazziniere').length;
+  const autisti = S.dipendenti.filter(d => d.ruolo === 'autista' && magDi(d) === magAttivo()).length, mag = S.dipendenti.filter(d => d.ruolo === 'magazziniere' && magDi(d) === magAttivo()).length;
   const rep = Math.round(S.reputazione), cls = rep >= 60 ? '' : rep >= 35 ? 'medio' : 'basso';
   const inc = S.inCorso && S.inCorso.giorno === S.giorno ? S.inCorso : null;
   const ieri = S.ieri && !S.ieri.festivo ? `${intero.format(S.ieri.consegne)} consegne · ${eur.format(inc ? inc.accreditato : S.ieri.incasso)} di ${eur.format(S.ieri.incasso)}` : 'Oggi non si lavora';
   const multi = S.filiali && S.filiali.length;
-  if (!tutteCitta().some(c => c.id === cittaVista)) cittaVista = 'c1';
-  const zone = S.zone.filter(z => idCitta(z) === cittaVista).map(z => {
+  const zoneMag = S.zone.filter(z => magDi(z) === magAttivo());
+  const zone = zoneMag.map(z => {
     const giri = S.furgoni.filter(f => f.zona === z.id);
     const pz = S.ieri && S.ieri.perZona && S.ieri.perZona[z.id];
     const cap = giri.length * COSTANTI.maxConsegneCorriere, cop = cap ? Math.min(100, Math.round(cap / z.pacchi * 100)) : 0;
@@ -47,10 +47,10 @@ function vistaAzienda() {
     </div>`;
   }).join('');
   const p = S.prezzi;
-  return `
+  return `${barraMagazzini()}
   <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
   <div class="kpi">
-    <div><b>${S.furgoni.length}</b><span>Furgoni</span></div>
+    <div><b>${S.furgoni.filter(delMag(magAttivo())).length}</b><span>Furgoni</span></div>
     <div><b>${autisti}</b><span>Autisti</span></div>
     <div><b>${mag}</b><span>Magazzinieri</span></div>
   </div>
@@ -68,8 +68,7 @@ function vistaAzienda() {
   ${vistaTraguardi()}
   ${vistaFiliali()}
   ${vistaAccount()}
-  <div><h2>Zone di consegna <small>${esc(cittaDi(cittaVista).nome)} · ${S.zone.filter(z => idCitta(z) === cittaVista).length} zone</small></h2>
-  ${multi ? `<div class="interruttore a-capo" style="margin-bottom:8px">${tutteCitta().map(c => `<button data-azione="vedi-citta" data-id="${c.id}" aria-pressed="${c.id === cittaVista}">${esc(c.nome)}</button>`).join('')}</div>` : ''}
+  <div><h2>Zone di consegna <small>${esc(nomeMag(magAttivo()))} · ${zoneMag.length} zone</small></h2>
   <div style="display:grid;gap:8px">${zone}</div>
   <p class="nota" style="margin-top:8px">Un corriere fa al massimo ${COSTANTI.maxConsegneCorriere} consegne al giorno; un magazziniere smista ${COSTANTI.pacchiMagazziniere} pacchi.</p></div>
   <div class="scheda">
@@ -103,9 +102,9 @@ function disegnaGuasti() {
   if (el.dataset.chiave === chiave) return;
   el.dataset.chiave = chiave;
   el.innerHTML = nuove.map(({ m, i }) => `<div class="guasto avviso-posta vetro" role="alert">
-      <div class="riga"><b>✉︎ Nuova email</b><span class="badge">${m.scadenza - S.giorno > 0 ? (m.scadenza - S.giorno) + ' giorni per rispondere' : 'ultimo giorno'}</span></div>
+      <div class="riga"><b>✉︎ Nuova email</b><span class="badge">${m.report ? 'report del mese' : m.scadenza - S.giorno > 0 ? (m.scadenza - S.giorno) + ' giorni per rispondere' : 'ultimo giorno'}</span></div>
       <p class="nota"><b style="color:var(--testo)">${esc(m.mittente)}</b><br>${esc(m.oggetto)}</p>
-      <button class="btn primario" data-leggi="${i}">Leggi e decidi</button></div>`).join('') + lista.map(f => {
+      <button class="btn primario" data-leggi="${i}">${m.report ? 'Leggi' : 'Leggi e decidi'}</button></div>`).join('') + lista.map(f => {
     const m = modello(f.modello), dove = isJolly(f) ? 'jolly' : f.zona ? 'zona ' + nomeZona(zona(f.zona)) : 'in deposito', basta = S.cassa >= f.daRiparare;
     return `<div class="guasto vetro" role="alert">
       <div class="riga"><b>Guasto: ${esc(m.nome)}${f.usato ? ' usato' : ''}</b><span class="badge fermo">fermo</span></div>
@@ -324,20 +323,34 @@ function vistaFiliali() {
 
 function vistaMagazzini() {
   const lista = S.depositi.map((m, i) => {
-    const zoneServite = S.zone.filter(z => magazzinoVicino(z.centro, idCitta(z)).magazzino.id === m.id && S.furgoni.some(f => f.zona === z.id)).length;
-    return `<div class="riga"><span><b style="color:var(--testo)">${i + 1}</b> · <button class="titolo-link piccolo" data-azione="dettaglio" data-tipo="magazzino" data-id="${m.id}">${esc(m.nome)} ›</button> · ${zoneServite} zon${zoneServite === 1 ? 'a' : 'e'} servit${zoneServite === 1 ? 'a' : 'e'}</span>
-      ${S.depositi.length > 1 ? `<button class="btn piccolo" data-azione="vendi-magazzino" data-id="${m.id}">Vendi per ${eur.format(valoreMagazzino(m) * COSTANTI.rivenditaMagazzino)}</button>` : `<span class="num">${eur.format(valoreMagazzino(m))}</span>`}</div>`;
+    const zoneServite = S.zone.filter(z => magDi(z) === m.id && S.furgoni.some(f => f.zona === z.id)).length;
+    const attivo = m.id === magAttivo(), r = m.responsabile, manca = miglioramentiMancanti(m.id);
+    return `<div class="carta-mag ${attivo ? 'attivo' : ''}">
+      <div class="riga"><span><b style="color:var(--testo)">${i + 1}</b> · <button class="titolo-link piccolo" data-azione="dettaglio" data-tipo="magazzino" data-id="${m.id}">${esc(m.nome)} ›</button></span>
+        ${attivo ? '<span class="badge">stai gestendo questo</span>' : `<button class="btn piccolo" data-azione="vai-magazzino" data-id="${m.id}">Vai</button>`}</div>
+      <div class="nota">${zoneServite} zone servite · ${S.furgoni.filter(delMag(m.id)).length} furgoni · ${S.dipendenti.filter(delMag(m.id)).length} dipendenti · utile del mese ${eur.format(Math.round(utileMagazzino(m)))}</div>
+      ${r ? `<div class="riga responsabile"><span>👔 <b>${esc(r.nome)}</b> lo gestisce da solo</span><button class="btn piccolo" data-azione="licenzia-resp" data-id="${m.id}">Riprendilo tu</button></div>`
+        : manca.length ? `<div class="nota">Responsabile: completa prima i miglioramenti (mancano ${manca.length}, ${eur.format(costoMiglioramentiMancanti(m.id))}).</div>`
+        : `<button class="btn primario" data-azione="assumi-resp" data-id="${m.id}">Assumi un responsabile · ${eur.format(RESPONSABILE.stipendio)}/mese + 8% dell'utile</button>`}
+    </div>`;
   }).join('');
+  const senza = magazziniSenzaResponsabile();
   return `<div class="scheda">
     <h2 style="margin:0">Magazzini <small>di tua proprietà</small></h2>
     ${lista}
     ${posizionando ? `<p class="nota" style="color:var(--accento)">Clicca sulla mappa dove vuoi il nuovo magazzino.</p><button class="btn" data-azione="annulla-magazzino">Annulla</button>`
-      : miglioramentiMancanti().length ? `<div class="bloccato">🔒 Per comprare il ${S.depositi.length + 1}° magazzino completa prima tutti i miglioramenti del magazzino.<br>
-          Mancano: <b>${miglioramentiMancanti().map(id => MIGLIORAMENTI[id].nome + (MIGLIORAMENTI[id].livelli.length > 1 ? ` (liv. ${livello(id)}/${MIGLIORAMENTI[id].livelli.length})` : '')).join(', ')}</b> · ${eur.format(costoMiglioramentiMancanti())} in tutto</div>`
+      : senza.length ? `<div class="bloccato">🔒 Per comprare il ${S.depositi.length + 1}° magazzino ogni magazzino deve avere un responsabile, che si assume quando ha tutti i miglioramenti.<br>
+          Senza responsabile: <b>${senza.map(m => esc(m.nome)).join(', ')}</b></div>`
       : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < prezzoMagazzinoMin() ? 'disabled' : ''}>Compra il ${S.depositi.length + 1}° magazzino (${eur.format(prezzoMagazzinoMin())}–${eur.format(prezzoMagazzinoMax())})</button>`}
-    <p class="nota">Costa di più in centro e meno verso la periferia. Una volta comprato è tuo: niente affitto.</p>
-    <p class="nota">Ogni zona parte dal magazzino più vicino: più è lontano, più km fanno i furgoni ogni giorno.</p>
+    <p class="nota">Il responsabile gestisce il magazzino al posto tuo: accetta i contratti, risponde ai clienti, assume e organizza, e ogni mese ti manda un report. Tu passi al magazzino successivo.</p>
   </div>`;
+}
+
+/* ---------- selettore del magazzino che stai gestendo ---------- */
+function barraMagazzini() {
+  if (S.depositi.length < 2) return '';
+  return `<div class="barra-mag interruttore">${S.depositi.map(m => `<button data-azione="vai-magazzino" data-id="${m.id}" aria-pressed="${m.id === magAttivo()}">${m.responsabile ? '👔 ' : ''}${esc(m.nome)}</button>`).join('')}</div>
+    ${gestito(magAttivo()) ? `<p class="nota avviso-gestito">👔 ${esc(magazzino(magAttivo()).responsabile.nome)} gestisce questo magazzino: contratti, clienti, assunzioni e flotta li fa lui. Puoi comunque guardare e cambiare.</p>` : ''}`;
 }
 
 function vistaInizio() {
@@ -391,9 +404,9 @@ function vistaInizio() {
 // Scheda Giri: per ogni zona quanti pacchi ci sono e quanti aspettano in deposito
 function vistaGiri() {
   const pz = (S.ieri && S.ieri.perZona) || {};
-  const jolly = S.furgoni.filter(f => isJolly(f));
+  const jolly = S.furgoni.filter(f => isJolly(f) && magDi(f) === magAttivo());
   const dove = S.inCorso && S.inCorso.jolly || {};
-  const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id))
+  const servite = S.zone.filter(z => magDi(z) === magAttivo() && S.furgoni.some(f => f.zona === z.id))
     .map(z => ({ z, d: pz[z.id] || null, attesa: S.giacenze[z.id] || 0 }))
     .sort((a, b) => b.attesa - a.attesa);
   const totAttesa = servite.reduce((t, x) => t + x.attesa, 0);
@@ -439,7 +452,7 @@ function vistaGiri() {
       ${notaPicco}${spiegazione}
     </div>`;
   }).join('');
-  return `<div class="scheda">
+  return `${barraMagazzini()}<div class="scheda">
       <div class="riga"><h2 style="margin:0">Pacchi in attesa in deposito</h2><span class="num ${totAttesa ? 'meno' : 'piu'}"><b>${intero.format(totAttesa)}</b></span></div>
       <p class="nota">Sono i pacchi rimasti in magazzino che domani si aggiungono a quelli nuovi. Oltre un giorno di ritardo i clienti annullano gli ordini e la reputazione scende.</p>
       <p class="nota">In ogni zona la barra mostra quanto sono pieni i furgoni partiti: verde c'è spazio, arancione quasi pieni, rossa non bastano. Sotto trovi il motivo quando restano pacchi.</p>
@@ -674,10 +687,11 @@ function rigaFurgone(f, autisti) {
       return `<option value="${x.id}" ${f.autistaId === x.id ? 'selected' : ''}>${esc(x.nome)}${altro ? ' (su altro furgone)' : ''}</option>`;
     })].join('');
     const quanti = id => { const n = S.furgoni.filter(x => x.zona === id && x.autistaId).length; return ` (${n} autist${n === 1 ? 'a' : 'i'})`; };
-    const optZ = '<option value="">In deposito</option>' + tutteCitta().map(c => {
+    // solo le zone del magazzino di questo furgone
+    const optZ = '<option value="">In deposito</option>' + [cittaDi(idCitta(magazzino(magDi(f))))].map(c => {
       const j = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id;
-      const opts = `<option value="${j}" ${f.zona === j ? 'selected' : ''}>Jolly: va dove ci sono più pacchi${quanti(j)}</option>` + S.zone.filter(z => idCitta(z) === c.id).map(z => haLicenza(z) ? `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}${quanti(z.id)}</option>` : `<option value="${z.id}" disabled>🔒 ${esc(z.nome)} · licenza ${eur.format(prezzoLicenza(z))}</option>`).join('');
-      return tutteCitta().length > 1 ? `<optgroup label="${esc(c.nome)}">${opts}</optgroup>` : opts;
+      const opts = `<option value="${j}" ${isJolly(f) ? 'selected' : ''}>Jolly: va dove ci sono più pacchi${quanti(j)}</option>` + S.zone.filter(z => magDi(z) === magDi(f)).map(z => haLicenza(z) ? `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}${quanti(z.id)}</option>` : `<option value="${z.id}" disabled>🔒 ${esc(z.nome)} · licenza ${eur.format(prezzoLicenza(z))}</option>`).join('');
+      return opts;
     }).join('');
     const k = costoKm(m, f.usato);
     editor = `<div class="editor-furgone">
@@ -694,34 +708,40 @@ function rigaFurgone(f, autisti) {
   return `<div class="riga-furgone ${aperto ? 'aperta' : ''} ${prob ? 'con-problema' : ''}">
     <button class="testa-furgone" data-azione="espandi-furgone" data-id="${f.id}">
       <i class="tipo-pallino ${m.tipo}"></i>
-      <span class="nome-f">${esc(m.nome)}${f.usato ? ' <small>usato</small>' : ''}</span>
+      <span class="nome-f">${esc(m.nome)}${f.usato ? ' <small>usato</small>' : ''}${f.zona && !isJolly(f) && zona(f.zona) ? `<small class="zona-f"><i style="background:${zona(f.zona).colore}"></i>${esc(zona(f.zona).nome)}</small>` : ''}</span>
       <span class="autista-f ${a ? '' : 'meno'}">${a ? `<span class="n">${esc(a.nome)}</span>${htmlStelle(a, true)}` : 'senza autista'}</span>
       ${prob ? `<span class="badge fermo">${prob}</span>` : '<span class="ok-f">✓</span>'}
     </button>${editor}</div>`;
 }
 function vistaFlotta() {
   if (negozioAperto) return vistaNegozio();
-  const autisti = S.dipendenti.filter(d => d.ruolo === 'autista');
-  if (!S.furgoni.length) return `<button class="btn primario" data-azione="apri-negozio">Compra un furgone</button>
+  const mag = magAttivo(), furgoniMag = S.furgoni.filter(delMag(mag));
+  const autisti = S.dipendenti.filter(d => d.ruolo === 'autista' && magDi(d) === mag);
+  if (!furgoniMag.length) return barraMagazzini() + `<button class="btn primario" data-azione="apri-negozio">Compra un furgone</button>
     <p class="nota">Non hai ancora furgoni. Comincia da uno: un diesel usato costa poco, un elettrico nuovo consuma meno.</p>`;
-  const filtri = { tutti: () => true, problemi: f => !!problemaFurgone(f), jolly: f => isJolly(f), deposito: f => !f.zona };
-  const conta = k => S.furgoni.filter(filtri[k]).length;
-  const visibili = S.furgoni.filter(filtri[flottaFiltro]);
-  // gruppi: per ogni città le sue zone servite, il jolly, poi il deposito
-  const gruppi = [];
-  tutteCitta().forEach(c => {
-    const pref = tutteCitta().length > 1 ? c.nome + ' · ' : '';
-    S.zone.filter(z => idCitta(z) === c.id).forEach(z => {
-      const fs = visibili.filter(f => f.zona === z.id); if (!fs.length) return;
-      const posti = S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f)).reduce((t, f) => t + capacitaFurgone(f), 0);
-      const pacchi = Math.round(z.pacchi * (1 + 0.1 * livello('pubblicita')));
-      gruppi.push({ id: z.id, titolo: pref + z.nome, colore: z.colore, fs, info: `${intero.format(posti)} posti · ${intero.format(pacchi)} pacchi`, corto: posti < pacchi });
-    });
-    const j = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id, fj = visibili.filter(f => f.zona === j);
-    if (fj.length) gruppi.push({ id: j, titolo: pref + 'Jolly', colore: '#ffd60a', fs: fj, info: 'vanno dove servono' });
-  });
-  const dep = visibili.filter(f => !f.zona);
-  if (dep.length) gruppi.push({ id: 'deposito', titolo: 'In deposito', colore: '#8e8e93', fs: dep, info: 'non lavorano' });
+  // furgoni divisi per stato: assegnati a una zona, jolly, senza autista, in deposito
+  const statoF = f => !f.zona ? 'deposito' : !f.autistaId ? 'senza' : isJolly(f) ? 'jolly' : 'assegnati';
+  const STATI = [['assegnati', 'Assegnati a una zona', '#30d158', 'lavorano nella loro zona'], ['jolly', 'Jolly', '#ffd60a', 'vanno dove servono'],
+    ['senza', 'Senza autista', '#ff9f0a', 'fermi: manca chi guida'], ['deposito', 'In deposito', '#8e8e93', 'non lavorano']];
+  const filtri = { tutti: () => true, problemi: f => !!problemaFurgone(f) };
+  STATI.forEach(([k]) => { filtri[k] = f => statoF(f) === k; });
+  if (!filtri[flottaFiltro]) flottaFiltro = 'tutti';
+  const conta = k => furgoniMag.filter(filtri[k]).length;
+  const visibili = furgoniMag.filter(filtri[flottaFiltro]);
+  const ordineZona = f => { const z = zona(f.zona); return z ? z.nome : ''; };
+  const gruppi = STATI.map(([k, t, col, info]) => {
+    const fs = visibili.filter(f => statoF(f) === k).sort((x, y) => ordineZona(x).localeCompare(ordineZona(y)));
+    if (!fs.length) return null;
+    let inf = info;
+    if (k === 'assegnati') {
+      const zs = new Set(fs.map(f => f.zona));
+      const corte = [...zs].filter(id => { const z = zona(id); const posti = S.furgoni.filter(f => f.zona === id && furgoneOperativo(f)).reduce((t, f) => t + capacitaFurgone(f), 0);
+        return z && posti < Math.round(z.pacchi * (1 + 0.1 * livello('pubblicita'))); }).length;
+      inf = `${zs.size} zone${corte ? ` · ${corte} con pochi posti` : ''}`;
+      return { id: k, titolo: t, colore: col, fs, info: inf, corto: corte > 0 };
+    }
+    return { id: k, titolo: t, colore: col, fs, info: inf };
+  }).filter(Boolean);
   if (!flottaAperti) flottaAperti = new Set(gruppi.filter(g => g.fs.some(problemaFurgone)).map(g => g.id));
   const tuttoAperto = flottaFiltro !== 'tutti';
   const html = gruppi.map(g => {
@@ -749,16 +769,18 @@ function vistaFlotta() {
       <div class="riga"><button class="btn" data-azione="annulla-piano">Annulla</button><button class="btn primario" data-azione="applica-piano">Applica</button></div>`
       : '<p class="nota">È già tutto organizzato al meglio.</p><button class="btn" data-azione="annulla-piano">Chiudi</button>'}
     </div>` : '';
-  const capo = sbloccato('capoturno') ? `<div class="riga capoturno"><span><b>Capoturno</b><span class="nota"> · fa "Organizza" da solo ogni mattina</span></span>
-      <button class="btn piccolo ${S.capoturno ? 'primario' : ''}" data-azione="capoturno">${S.capoturno ? 'Acceso' : 'Spento'}</button></div>`
-    : `<p class="nota">🔒 Al livello ${livelloPer('capoturno')} sblocchi il capoturno, che organizza la flotta da solo ogni mattina.</p>`;
-  return `<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
+  const capo = !sbloccato('capoturno') ? `<p class="nota">🔒 Al livello ${livelloPer('capoturno')} sblocchi il gestionale automatizzato, che organizza la flotta da solo ogni mattina.</p>`
+    : !S.gestionale ? `<div class="riga capoturno"><span><b>Gestionale automatizzato</b><span class="nota"> · fa "Organizza" da solo ogni mattina · lo paghi una volta, è tuo per sempre</span></span>
+      <button class="btn piccolo primario" data-azione="compra-gestionale" ${S.cassa < COSTO_GESTIONALE ? 'disabled' : ''}>Compra ${eur.format(COSTO_GESTIONALE)}</button></div>`
+    : `<div class="riga capoturno"><span><b>Gestionale automatizzato</b><span class="nota"> · fa "Organizza" da solo ogni mattina</span></span>
+      <button class="btn piccolo ${S.capoturno ? 'primario' : ''}" data-azione="capoturno">${S.capoturno ? 'Acceso' : 'Spento'}</button></div>`;
+  return `${barraMagazzini()}<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
     ${capo}
     ${piano}
-    <div class="filtri-flotta interruttore">${[['tutti', 'Tutti'], ['problemi', 'Problemi'], ['jolly', 'Jolly'], ['deposito', 'In deposito']].map(([k, t]) =>
+    <div class="filtri-flotta interruttore a-capo">${[['tutti', 'Tutti'], ['assegnati', 'Assegnati'], ['jolly', 'Jolly'], ['senza', 'Senza autista'], ['deposito', 'In deposito'], ['problemi', 'Problemi']].map(([k, t]) =>
       `<button data-azione="filtro-flotta" data-v="${k}" aria-pressed="${flottaFiltro === k}">${t} <span>${conta(k)}</span></button>`).join('')}</div>
     ${html || '<p class="nota">Nessun furgone in questo filtro.</p>'}
-    <p class="nota">Tocca una zona per vedere i suoi furgoni, tocca un furgone per cambiare autista o zona.</p>`;
+    <p class="nota">Tocca un gruppo per aprirlo, tocca un furgone per cambiare autista o zona.</p>`;
 }
 
 /* ---------- stelle dei dipendenti ---------- */
@@ -781,20 +803,34 @@ function riepilogoTesto(d) {
 let personaleFiltro = 'tutti';
 
 function vistaPersonale() {
-  const basse = S.dipendenti.filter(d => { const s = stelleDi(d); return s !== null && s < 3; }).length;
-  const filtro = `<div class="interruttore filtri-flotta"><button data-azione="filtro-personale" data-v="tutti" aria-pressed="${personaleFiltro === 'tutti'}">Tutti <span>${S.dipendenti.length}</span></button>
-    <button data-azione="filtro-personale" data-v="basse" aria-pressed="${personaleFiltro === 'basse'}">Sotto le 3 stelle <span>${basse}</span></button>
-    <button data-azione="filtro-personale" data-v="prova" aria-pressed="${personaleFiltro === 'prova'}">In prova <span>${S.dipendenti.filter(inProva).length}</span></button></div>`;
-  return filtro + ['autista', 'magazziniere'].map(ruolo => {
-    const r = RUOLI[ruolo], staff = S.dipendenti.filter(d => d.ruolo === ruolo).filter(d => personaleFiltro === 'tutti' || (personaleFiltro === 'prova' ? inProva(d) : (stelleDi(d) !== null && stelleDi(d) < 3)));
-    const lista = staff.map(d => `<div class="scheda">
+  // autisti divisi per cosa fanno: su un furgone in zona, jolly, liberi (senza furgone)
+  const mieiDip = S.dipendenti.filter(d => magDi(d) === magAttivo());
+  const statoAut = d => { const f = S.furgoni.find(x => x.autistaId === d.id); return !f ? 'liberi' : isJolly(f) ? 'jolly' : f.zona ? 'assegnati' : 'liberi'; };
+  const daControllare = d => { const s = stelleDi(d); return (s !== null && s < 3) || inProva(d); };
+  const passa = d => personaleFiltro === 'tutti' || (personaleFiltro === 'controllare' ? daControllare(d) : d.ruolo === 'autista' && statoAut(d) === personaleFiltro);
+  const aut = mieiDip.filter(d => d.ruolo === 'autista');
+  const filtro = `<div class="interruttore filtri-flotta a-capo">${[['tutti', 'Tutti', mieiDip.length], ['assegnati', 'Assegnati', aut.filter(d => statoAut(d) === 'assegnati').length],
+    ['jolly', 'Jolly', aut.filter(d => statoAut(d) === 'jolly').length], ['liberi', 'Liberi', aut.filter(d => statoAut(d) === 'liberi').length],
+    ['controllare', 'Da controllare', mieiDip.filter(daControllare).length]].map(([k, t, n]) => `<button data-azione="filtro-personale" data-v="${k}" aria-pressed="${personaleFiltro === k}">${t} <span>${n}</span></button>`).join('')}</div>
+    ${personaleFiltro === 'controllare' ? '<p class="nota">Sotto le 3 stelle o ancora in prova: controlla le loro stelle prima che finisca il periodo di prova.</p>' : ''}`;
+  return barraMagazzini() + filtro + ['autista', 'magazziniere'].map(ruolo => {
+    const r = RUOLI[ruolo], staff = mieiDip.filter(d => d.ruolo === ruolo).filter(passa);
+    const card = d => `<div class="scheda">
       <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="dipendente" data-id="${d.id}">${esc(d.nome)} ›</button><span class="num">${eur.format(d.stipendio)}/mese</span></div>
       <div class="riga">${htmlStelle(d)}${inProva(d) ? `<span class="badge">in prova ancora ${STELLE.prova - (S.giorno - d.assuntoGiorno)} gg</span>` : ''}</div>
       ${ruolo === 'autista' ? `<div class="riga"><span>Esperienza</span><span class="num">${Math.round(d.esperienza)}/100</span></div><div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
       ${ruolo === 'magazziniere' && S.filiali && S.filiali.length ? `<label><span class="nota">Lavora a</span><select data-azione="citta-mag" data-id="${d.id}">${tutteCitta().map(c => `<option value="${c.id}" ${idCitta(d) === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>` : ''}
       <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id && isJolly(f)) ? '<b style="color:#ffd60a">Jolly</b>' : S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
       <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia</button></div>
-    </div>`).join('');
+    </div>`;
+    const sezioni = ruolo === 'autista' ? [['assegnati', 'Assegnati a una zona'], ['jolly', 'Jolly'], ['liberi', 'Liberi, senza furgone']] : [[null, null]];
+    const lista = sezioni.map(([k, t]) => { const gruppo = k ? staff.filter(d => statoAut(d) === k) : staff; if (!gruppo.length) return '';
+      return (t ? `<h3 class="sezione-dip">${t} <small>${gruppo.length}</small></h3>` : '') + gruppo.map(card).join(''); }).join('');
+    const daFormare = ruolo === 'autista' ? autistiDaFormare(magAttivo()) : [];
+    const corsi = ruolo !== 'autista' ? '' : daFormare.length
+      ? `<div class="scheda corsi-tutti"><div class="riga"><span><b>Corso di guida a tutti</b><span class="nota"> · ${daFormare.length} autist${daFormare.length === 1 ? 'a può' : 'i possono'} farlo ora (+${CORSO_AUTISTA.esperienza} esperienza)</span></span>
+          <button class="btn piccolo primario" data-azione="corso-tutti" ${S.cassa < daFormare.length * CORSO_AUTISTA.costo ? 'disabled' : ''}>${eur.format(daFormare.length * CORSO_AUTISTA.costo)}</button></div></div>`
+      : '<p class="nota">Corso di guida: nessun autista può farlo ora (tutti al massimo o già fatto negli ultimi 30 giorni).</p>';
     const cand = S.candidati[ruolo].map(c => `<div class="scheda">
       <div class="riga"><strong>${esc(c.nome)}</strong><span class="num">${eur.format(c.stipendio)}/mese</span></div>
       ${c.esperienza !== null ? `<div class="riga"><span>Esperienza</span><span class="num">${c.esperienza}/100</span></div><div class="metro ${c.esperienza >= 60 ? '' : c.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${c.esperienza}%"></i></div>` : ''}
@@ -803,6 +839,7 @@ function vistaPersonale() {
     return `<div style="display:grid;gap:8px">
       <h2>${r.nome === 'Autista' ? 'Autisti' : 'Magazzinieri'} <small>${staff.length} in squadra</small></h2>
       ${lista || '<p class="nota">Nessuno in squadra.</p>'}
+      ${corsi}
       <div class="scheda">
         <div class="riga"><span>Stipendio offerto</span><span class="num" id="val-${ruolo}">${eur.format(S.offerta[ruolo])}</span></div>
         <input type="range" min="${r.stipMin}" max="${r.stipMax}" step="50" value="${S.offerta[ruolo]}" data-azione="stipendio" data-ruolo="${ruolo}" aria-label="Stipendio offerto ${r.nome}">
@@ -831,6 +868,19 @@ function vistaPosta() {
   const posta = S.posta || [];
   if (emailAperta && !posta.includes(emailAperta)) emailAperta = null;
   if (emailAperta) {
+    if (emailAperta.report) {
+      const m = emailAperta;
+      return `<button class="btn link indietro" data-azione="chiudi-email">‹ Posta</button>
+      <div class="scheda email">
+        <div class="nota">Da: <b style="color:var(--testo)">👔 ${esc(m.mittente)}</b> · ${nomeGiorno(m.giorno)}</div>
+        <h2 style="margin:4px 0 0">${esc(m.oggetto)}</h2>
+        <ul class="report-righe">${m.righe.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        ${m.consigli.length ? `<h3 class="sezione-dip">I miei consigli</h3>${m.consigli.map((c, i) => `<div class="consiglio"><p>${esc(c.testo)}</p>
+          ${c.fatto ? '<span class="badge">fatto</span>' : `<button class="btn piccolo primario" data-azione="consiglio" data-mag="${m.mag}" data-g="${m.giorno}" data-i="${i}">${c.tipo === 'licenzia' ? 'Licenzialo' : 'Vendilo'}</button>`}</div>`).join('')}`
+          : '<p class="nota">Nessun consiglio: è tutto a posto.</p>'}
+        <button class="btn" data-azione="archivia">Archivia</button>
+      </div>`;
+    }
     const m = emailAperta, e = trovaEmail(m.id), mancano = m.scadenza - S.giorno;
     return `<button class="btn link indietro" data-azione="chiudi-email">‹ Posta</button>
     <div class="scheda email">
@@ -846,8 +896,8 @@ function vistaPosta() {
     </div>`;
   }
   if (emailAperta === null && posta.some(m => m.risposta !== null)) { pulisciPosta(); return vistaPosta(); }
-  const lista = posta.map((m, i) => `<button class="voce-email ${m.risposta === null ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
-      <span class="mittente">${m.risposta === null ? `<i class="punto-blu ${m.grave ? 'rosso' : ''}"></i>` : ''}${m.grave ? '<span class="badge grave">Grave</span>' : ''}${esc(m.mittente)}</span>
+  const lista = posta.map((m, i) => `<button class="voce-email ${(m.report ? !m.letta : m.risposta === null) ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
+      <span class="mittente">${(m.report ? !m.letta : m.risposta === null) ? `<i class="punto-blu ${m.grave ? 'rosso' : ''}"></i>` : ''}${m.grave ? '<span class="badge grave">Grave</span>' : ''}${esc(m.mittente)}</span>
       <span class="quando">${nomeGiorno(m.giorno)}</span>
       <b>${esc(m.oggetto)}</b>
       <span class="anteprima">${m.risposta === null ? esc(m.testo) : m.risposta === -1 ? 'Scaduta senza risposta · reputazione −1' : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
@@ -946,14 +996,20 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'vai-magazzino': { S.magAttivo = id; flottaAperti = null; pianoMostrato = null; const m = magazzino(id); if (m && mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: Math.max(mappa.getZoom(), 12) }); ridisegna(); break; }
+    case 'assumi-resp': esito(assumiResponsabile(id), 'Responsabile assunto: ora puoi comprare un altro magazzino.'); break;
+    case 'licenzia-resp': if (b.dataset.conferma) { licenziaResponsabile(id); esito(null, 'Torni a gestirlo tu.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
+    case 'consiglio': { const m = (S.posta || []).find(x => x.report && x.giorno === +b.dataset.g && x.mag === b.dataset.mag); if (m) { seguiConsiglio(m, +b.dataset.i); esito(null, 'Fatto.'); } break; }
+    case 'compra-gestionale': esito(compraGestionale(), 'Gestionale comprato: da domani organizza lui la flotta.'); break;
+    case 'archivia': { const m = emailAperta; if (m) { m.archiviato = true; emailAperta = null; pulisciPosta(); } ridisegna(); break; }
     case 'filtro-personale': personaleFiltro = b.dataset.v; ridisegna(); break;
     case 'percorso': percorsoAperto = !percorsoAperto; ridisegna(); break;
     case 'licenza': esito(compraLicenza(id), 'Licenza comprata!'); aggiornaZoneMappa(); break;
-    case 'capoturno': S.capoturno = !S.capoturno; esito(null, S.capoturno ? 'Il capoturno organizzerà la flotta ogni mattina.' : 'Capoturno spento: organizzi tu.'); break;
+    case 'capoturno': S.capoturno = !S.capoturno; esito(null, S.capoturno ? 'Il gestionale organizzerà la flotta ogni mattina.' : 'Gestionale spento: organizzi tu.'); break;
     case 'espandi-furgone': flottaEspanso = flottaEspanso === id ? null : id; ridisegna(); break;
     case 'apri-gruppo': { flottaAperti = flottaAperti || new Set(); flottaAperti.has(id) ? flottaAperti.delete(id) : flottaAperti.add(id); ridisegna(); break; }
     case 'filtro-flotta': flottaFiltro = b.dataset.v; ridisegna(); break;
-    case 'organizza': pianoMostrato = pianoOrganizza(); $('#contenuto').scrollTop = 0; ridisegna(); break;
+    case 'organizza': pianoMostrato = pianoOrganizza(magAttivo()); $('#contenuto').scrollTop = 0; ridisegna(); break;
     case 'annulla-piano': pianoMostrato = null; ridisegna(); break;
     case 'applica-piano': { const n = applicaPiano(pianoMostrato); pianoMostrato = null; flottaAperti = null; esito(null, n + ' cambi applicati.'); break; }
     case 'apri-email': apriEmail(+b.dataset.i); $('#contenuto').scrollTop = 0; break;
@@ -968,6 +1024,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-dettaglio': dettaglio = null; $('#contenuto').scrollTop = 0; ridisegna(); break;
     case 'potenzia': esito(compraPotenziamento(id, b.dataset.p), 'Potenziamento montato!'); break;
     case 'corso': esito(corsoAutista(id), 'Corso fatto: esperienza aumentata.'); break;
+    case 'corso-tutti': esito(corsoATutti(magAttivo()), 'Corsi fatti: esperienza aumentata.'); break;
     case 'aumento': if (b.dataset.conferma) esito(aumentoDipendente(id), 'Aumento concesso.'); else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'migliora': esito(compraMiglioramento(id), 'Miglioramento comprato!'); break;
     case 'compra': { const err = compraFurgone(id, negozioUsato); if (!err) negozioAperto = false; esito(err, 'Furgone comprato: ora assegnagli un autista e una zona.'); break; }
@@ -1022,7 +1079,7 @@ function scegliCitta(c) {
 }
 $('#contenuto').addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.azione === 'assegna') { if (assegna(t.dataset.id, t.dataset.campo, t.value) === 'licenza') toast('Per quella zona serve la licenza: comprala nella scheda Azienda.'); if (t.dataset.campo === 'zona' && flottaAperti) flottaAperti.add(t.value || 'deposito'); t.blur(); esito(); }
+  if (t.dataset.azione === 'assegna') { { const r = assegna(t.dataset.id, t.dataset.campo, t.value); if (r === 'licenza') toast('Per quella zona serve la licenza: comprala nella scheda Azienda.'); if (r === 'altro-magazzino') toast('Quella zona è di un altro magazzino.'); } if (t.dataset.campo === 'zona' && flottaAperti) flottaAperti.add(t.value || 'deposito'); t.blur(); esito(); }
   if (t.dataset.azione === 'citta-mag') { spostaMagazziniere(t.dataset.id, t.value); t.blur(); esito(null, 'Magazziniere spostato.'); }
   if (t.dataset.azione === 'stipendio') { S.offerta[t.dataset.ruolo] = +t.value; t.blur(); salva(); if (daRidisegnare) ridisegna(); }
 });

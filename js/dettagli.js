@@ -43,6 +43,18 @@ function corsoAutista(id) {
   notizia(`${d.nome} ha fatto un corso di guida: esperienza +${CORSO_AUTISTA.esperienza}.`, 'buono');
   return null;
 }
+// autisti che possono fare il corso adesso: non al massimo e senza corso negli ultimi 30 giorni
+function autistiDaFormare(mag) {
+  return S.dipendenti.filter(d => d.ruolo === 'autista' && (!mag || magDi(d) === mag) && d.esperienza < 100
+    && (d.ultimoCorso === undefined || S.giorno - d.ultimoCorso >= CORSO_AUTISTA.pausaGiorni));
+}
+function corsoATutti(mag) {
+  const lista = autistiDaFormare(mag); if (!lista.length) return 'Nessun autista può fare il corso adesso.';
+  if (S.cassa < lista.length * CORSO_AUTISTA.costo) return 'Non hai abbastanza soldi.';
+  lista.forEach(d => { movimento('miglioramenti', -CORSO_AUTISTA.costo); d.esperienza = Math.min(100, d.esperienza + CORSO_AUTISTA.esperienza); d.ultimoCorso = S.giorno; });
+  notizia(`${lista.length} autisti hanno fatto il corso di guida: esperienza +${CORSO_AUTISTA.esperienza}.`, 'buono');
+  return null;
+}
 function aumentoDipendente(id, euro = 100) {
   const d = dipendente(id); if (!d) return null;
   d.stipendio += euro; d.ultimoAumento = S.giorno;
