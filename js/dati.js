@@ -41,6 +41,7 @@ const CATALOGO = [
   { id: 'trancit',  nome: 'Ford Trancit',   tipo: 'diesel',    prezzo: 34000, consumo: 8.2, manutKm: 0.062 },
   { id: 'sprinta',  nome: 'Mercedez Sprinta', tipo: 'diesel',  prezzo: 42000, consumo: 8.0, manutKm: 0.068 },
   { id: 'mastre',   nome: 'Renò Mastre',    tipo: 'diesel',    prezzo: 31000, consumo: 8.9, manutKm: 0.066 },
+  { id: 'edaily',   nome: 'e-Daylì',        tipo: 'elettrico', prezzo: 62000, consumo: 27,  manutKm: 0.028, capacita: 1.3 },   // grande: 30% di pacchi in più
 ];
 const SCONTO_USATO = 0.45;          // l'usato costa il 45% del nuovo
 const GUASTO_GIORNO = { nuovo: 0.003, usato: 0.018 };

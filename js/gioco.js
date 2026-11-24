@@ -6,7 +6,7 @@ const VOCI = {
   incassi: 'Consegne', contratti: 'Contratti', premi: 'Premi obiettivi', vendite: 'Vendite (mezzi e magazzini)',
   personale: 'Personale', carburante: 'Carburante', ricarica: 'Ricarica',
   manutenzione: 'Manutenzione', assicurazione: 'Assicurazione', mezzi: 'Acquisto mezzi',
-  magazzini: 'Acquisto magazzini', miglioramenti: 'Miglioramenti', penali: 'Penali contratti', eventi: 'Imprevisti', annunci: 'Annunci di lavoro',
+  magazzini: 'Acquisto magazzini', licenze: 'Licenze di zona', miglioramenti: 'Miglioramenti', penali: 'Penali contratti', eventi: 'Imprevisti', annunci: 'Annunci di lavoro',
 };
 // zona speciale: il furgone va ogni giorno dove ci sono più pacchi in attesa
 const ZONA_JOLLY = 'jolly';
@@ -64,7 +64,7 @@ function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); r
 
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   S = {
-    citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
+    citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, xp: 0, licenze: {}, capoturno: false, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
     depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino, true) }],
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
@@ -158,9 +158,10 @@ function licenzia(id) {
 }
 
 /* ---------- flotta ---------- */
-function prezzoAcquisto(m, usato) { return Math.round(m.prezzo * (usato ? SCONTO_USATO : 1)); }
+function prezzoAcquisto(m, usato) { return Math.round(m.prezzo * (usato ? SCONTO_USATO : 1) * (!usato && S && sbloccato('scontoFurgoni') ? 0.9 : 1)); }
 function compraFurgone(idModello, usato) {
   const m = modello(idModello), prezzo = prezzoAcquisto(m, usato);
+  if (!sbloccato("modelli", m.id)) return `${m.nome}: si sblocca al livello ${livelloPer("modelli", m.id)}.`;
   if (S.cassa < prezzo) return 'Non hai abbastanza soldi.';
   movimento('mezzi', -prezzo);
   S.furgoni.push({ id: nuovoId('f'), modello: m.id, usato, km: usato ? casoInt(90000, 180000) : 0,
@@ -206,7 +207,11 @@ function assegna(idFurgone, campo, valore) {
   if (campo === 'autista') {
     S.furgoni.forEach(x => { if (x.autistaId === valore && valore) x.autistaId = null; });
     f.autistaId = valore || null;
-  } else f.zona = valore || null;
+  } else {
+    const z = valore && !String(valore).startsWith(ZONA_JOLLY) ? zona(valore) : null;
+    if (z && !haLicenza(z)) { notizia(`Per consegnare in ${nomeZona(z)} serve la licenza (${prezzoLicenza(z).toLocaleString('it-IT')} €).`, 'male'); return 'licenza'; }
+    f.zona = valore || null;
+  }
 }
 function autistaSospeso(f) { const d = f.autistaId && dipendente(f.autistaId); return !!(d && d.sospesoFino >= S.giorno); }
 function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0 && !f.daRiparare && !autistaSospeso(f); }
@@ -271,6 +276,7 @@ function giornoLavorativo() {
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));  // i jolly non aprono zone nuove
   forseEvento();
   controllaPosta();
+  if (S.capoturno && sbloccato('capoturno')) { const n = applicaPiano(pianoOrganizza()); if (n) notizia(`Il capoturno ha riorganizzato la flotta (${n} cambi).`, 'info', 'capoturno'); }
   effettiDipendenti();
   const sciopero = effetto.sciopero();
   if (sciopero) notizia('Sciopero: oggi i furgoni restano in deposito.', 'male', 'sciopero');
@@ -428,6 +434,7 @@ function giornoLavorativo() {
   S.inCorso = { giorno: S.giorno, incasso, accreditato: 0, perFurgone, jolly: jollyOggi, contratti: chiusi, premio,
     costi: { carburante: Math.round(carburante), ricarica: Math.round(ricarica), manutenzione: Math.round(manut) } };
   S.ieri = { festivo: false, consegne: consegneTot, incasso, perZona };
+  aggiungiEsperienza(consegneTot);
   aggiornaReputazione(perZona);
   if (consegneTot) notizia(`${consegneTot} consegne, incasso ${incasso.toLocaleString('it-IT')} €.`, 'buono', 'giornata');
 }
@@ -475,6 +482,8 @@ function carica() {
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
       if (!S.citta.id) S.citta.id = 'c1';
       if (!S.filiali) S.filiali = [];
+      // livelli e licenze: l'esperienza parte dalle consegne già fatte; le zone di periferia già servite restano tue
+      if (S.xp === undefined) { S.xp = totaleConsegne(); S.licenze = {}; S.zone.filter(z => /(^|-)a2-/.test(z.id) && S.furgoni.some(f => f.zona === z.id)).forEach(z => { S.licenze[z.id] = true; }); }
       // reputazione v2: livello di servizio + fama (vedi aggiornaReputazione)
       if (S.servizio === undefined) { S.servizio = Math.max(0.9, 1 - (85 - Math.min(S.reputazione, 85)) / 150); S.fama = Math.max(0, S.reputazione - 85); S.reputazione = calcolaReputazione(); }
       // grafica delle zone v2: più grandi sulla mappa (pacchi e km invariati)
@@ -542,6 +551,7 @@ function recuperaOffline() {
 const FILIALE = { costo: 50000, furgoni: 5, reputazione: 60 };
 function requisitiFiliale() {
   const mancano = [];
+  if (!sbloccato('filiali')) mancano.push(`il livello ${livelloPer('filiali')} dell'azienda`);
   if (S.furgoni.length < FILIALE.furgoni) mancano.push(`almeno ${FILIALE.furgoni} furgoni (ne hai ${S.furgoni.length})`);
   if (S.reputazione < FILIALE.reputazione) mancano.push(`reputazione almeno ${FILIALE.reputazione} (ora ${Math.round(S.reputazione)})`);
   if (S.cassa < FILIALE.costo + prezzoMagazzinoMin()) mancano.push(`almeno ${(FILIALE.costo + prezzoMagazzinoMin()).toLocaleString('it-IT')} € in cassa`);

@@ -514,3 +514,20 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .filtri-flotta button { font-size: 13px; padding: 6px 10px; white-space: nowrap; }
 .gruppo-flotta, .scheda.piano { min-height: max-content; }
 .contenuto { grid-auto-rows: max-content; }   /* le righe della griglia non si schiacciano mai */
+
+/* livelli e licenze */
+.numero-livello { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 19px; color: #fff;
+  background: linear-gradient(150deg, #ff9f0a, #ff375f); box-shadow: 0 6px 16px rgba(255,55,95,.35); margin-right: 10px; }
+.numero-livello.grande { width: 64px; height: 64px; font-size: 30px; border-radius: 18px; margin: 0 auto 8px; }
+.carta-livello .riga { justify-content: flex-start; }
+.percorso { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 10px; }
+.percorso li { display: flex; gap: 10px; align-items: flex-start; opacity: .75; }
+.percorso li.fatto { opacity: 1; }
+.tappa { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.1); }
+.percorso li.fatto .tappa { background: #30d158; color: #000; }
+.livello-su { text-align: center; }
+.sbloccati { text-align: left; margin: 0 auto; display: grid; gap: 4px; }
+.bloccato { text-align: center; padding: 8px; border-radius: 12px; background: rgba(255,255,255,.06); color: var(--testo-2); font-size: 13px; }
+.riga.licenza { padding: 6px 10px; border-radius: 10px; background: rgba(255,214,10,.1); color: #ffd60a; }
+.capoturno { padding: 8px 12px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid var(--bordo); flex: none; }
+.btn.link.link-blu { color: #0a84ff; }

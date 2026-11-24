@@ -31,14 +31,15 @@ function centroide(poli) {
 function geoZone() {
   return { type: 'FeatureCollection', features: zoneAttuali().map(z => {
     const servita = S && S.furgoni.some(f => f.zona === z.id);
-    return { type: 'Feature', properties: { id: z.id, nome: z.nome, colore: z.colore, servita: servita ? 1 : 0 },
+    const chiusa = S && typeof haLicenza === 'function' && !haLicenza(z);
+    return { type: 'Feature', properties: { id: z.id, nome: z.nome, colore: chiusa ? '#636366' : z.colore, servita: servita ? 1 : 0 },
       geometry: { type: 'Polygon', coordinates: [[...z.poligono, z.poligono[0]]] } };
   }) };
 }
 function geoEtichette() {
   return { type: 'FeatureCollection', features: zoneAttuali().map(z => ({ type: 'Feature',
     properties: { nome: z.nome, info: (S && S.ieri && S.ieri.perZona && S.ieri.perZona[z.id] ? `${S.ieri.perZona[z.id].consegne} consegne oggi` : `${z.pacchi} pacchi/giorno`)
-      + (S && S.piccoOggi && S.piccoOggi[z.id] ? `\n▲ picco +${S.piccoOggi[z.id]} pacchi` : '') },
+      + (S && S.piccoOggi && S.piccoOggi[z.id] ? `\n▲ picco +${S.piccoOggi[z.id]} pacchi` : '') + (S && typeof haLicenza === 'function' && !haLicenza(z) ? '\nserve la licenza' : '') },
     geometry: { type: 'Point', coordinates: z.etichetta || z.centro || centroide(z.poligono) } })) };
 }
 
