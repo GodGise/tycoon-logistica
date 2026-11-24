@@ -332,6 +332,8 @@ function vistaMagazzini() {
     <h2 style="margin:0">Magazzini <small>di tua proprietà</small></h2>
     ${lista}
     ${posizionando ? `<p class="nota" style="color:var(--accento)">Clicca sulla mappa dove vuoi il nuovo magazzino.</p><button class="btn" data-azione="annulla-magazzino">Annulla</button>`
+      : miglioramentiMancanti().length ? `<div class="bloccato">🔒 Per comprare il ${S.depositi.length + 1}° magazzino completa prima tutti i miglioramenti del magazzino.<br>
+          Mancano: <b>${miglioramentiMancanti().map(id => MIGLIORAMENTI[id].nome + (MIGLIORAMENTI[id].livelli.length > 1 ? ` (liv. ${livello(id)}/${MIGLIORAMENTI[id].livelli.length})` : '')).join(', ')}</b> · ${eur.format(costoMiglioramentiMancanti())} in tutto</div>`
       : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < prezzoMagazzinoMin() ? 'disabled' : ''}>Compra il ${S.depositi.length + 1}° magazzino (${eur.format(prezzoMagazzinoMin())}–${eur.format(prezzoMagazzinoMax())})</button>`}
     <p class="nota">Costa di più in centro e meno verso la periferia. Una volta comprato è tuo: niente affitto.</p>
     <p class="nota">Ogni zona parte dal magazzino più vicino: più è lontano, più km fanno i furgoni ogni giorno.</p>

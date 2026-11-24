@@ -117,3 +117,9 @@ function aggiornaEvento(dt) {
   if (S.evento.restano <= 0) { decidiEvento(S.evento.scelte.length - 1); return true; }
   return false;
 }
+
+// Prima di comprare un altro magazzino (o aprire una filiale) bisogna completare tutti i miglioramenti del magazzino
+function miglioramentiMancanti() { return Object.keys(MIGLIORAMENTI).filter(id => prezzoMiglioramento(id) !== null); }
+function costoMiglioramentiMancanti() {
+  return miglioramentiMancanti().reduce((t, id) => t + MIGLIORAMENTI[id].livelli.slice(livello(id)).reduce((a, b) => a + b, 0), 0);
+}
