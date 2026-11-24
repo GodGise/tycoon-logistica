@@ -487,6 +487,8 @@ function carica() {
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
       if (!S.citta.id) S.citta.id = 'c1';
       if (!S.filiali) S.filiali = [];
+      // posta: via le email già risposte, al massimo 3 da leggere (le più recenti)
+      if (S.posta && S.postaRicevute === undefined) { S.postaUsate = S.posta.map(m => m.id).slice(0, 30); S.postaRicevute = S.posta.length; S.posta = S.posta.filter(m => m.risposta === null).slice(0, 3); }
       // livelli e licenze: l'esperienza parte dalle consegne già fatte; le zone di periferia già servite restano tue
       // carattere nascosto anche per chi era già assunto (stesse probabilità dei nuovi)
       S.dipendenti.forEach(d => { if (d.indole === undefined) { d.indole = indoleCasuale(); d.reg = d.reg || []; } });
