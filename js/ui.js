@@ -144,12 +144,39 @@ function vistaTraguardi() {
       return `<div class="medaglia ${ok ? 'presa' : ''}" title="${esc(t.descr)}"><span class="disco" aria-hidden="true">${ok ? '★' : '☆'}</span><b>${esc(t.nome)}</b><span>${esc(t.descr)}</span><em>${ok ? 'preso' : '+' + eur.format(t.premio)}</em></div>`; }).join('')}</div></div>`;
 }
 
+// icone semplici a linee, stile SF Symbols
+const ICONE_MIGLIORAMENTI = {
+  nastro: '<path d="M3 15h18M5 15a2 2 0 1 0 0 4h14a2 2 0 1 0 0-4"/><rect x="6" y="7" width="5" height="5" rx="1"/><rect x="13" y="5" width="5" height="7" rx="1"/>',
+  software: '<path d="M12 21s-6-5.5-6-11a6 6 0 1 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
+  pubblicita: '<path d="M4 10v4h3l6 4V6L7 10H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+  formazione: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4v6M5.5 15.5l4.8-2.5M18.5 15.5l-4.8-2.5"/>',
+  officina: '<path d="M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.5 2.5-2.5-.5-.5-2.5z"/>',
+};
+// prima → dopo, con i numeri veri della tua azienda
+function primaDopo(id) {
+  const l = livello(id), servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));
+  const n = v => intero.format(Math.round(v));
+  if (id === 'nastro') { const mags = S.dipendenti.filter(d => d.ruolo === 'magazziniere').length, base = mags * COSTANTI.pacchiMagazziniere;
+    return ['Smistamento al giorno', `${n(base)} pacchi`, `${n(base * 1.5)} pacchi`, mags ? '' : 'Assumi dei magazzinieri per sfruttarlo.']; }
+  if (id === 'software') { const km = servite.reduce((t, z) => t + kmGiro(z), 0);
+    return ['Km dei giri al giorno', `${n(km * (1 - 0.1 * l))} km`, `${n(km * (1 - 0.1 * (l + 1)))} km`, servite.length ? '' : 'Conta quando hai furgoni nelle zone.']; }
+  if (id === 'pubblicita') { const p = servite.reduce((t, z) => t + z.pacchi, 0);
+    return ['Pacchi al giorno nelle tue zone', `${n(p * (1 + 0.1 * l))}`, `${n(p * (1 + 0.1 * (l + 1)))}`, '']; }
+  if (id === 'formazione') return ['Incidenti', 'normali', '4 su 10 evitati', ''];
+  if (id === 'officina') return ['Guasti', 'ripari tu, prezzo pieno', 'da soli, anche di notte, a metà', ''];
+  return null;
+}
 function vistaMiglioramenti() {
-  return `<div class="scheda"><h2 style="margin:0">Miglioramenti</h2>${Object.entries(MIGLIORAMENTI).map(([id, m]) => {
-    const l = livello(id), prezzo = prezzoMiglioramento(id), multi = m.livelli.length > 1;
-    return `<div class="miglioramento"><div><b>${m.nome}${multi ? ` <small class="nota">livello ${l}/${m.livelli.length}</small>` : ''}</b><div class="nota">${m.descr}</div></div>
-      ${prezzo === null ? '<span class="badge">Fatto</span>' : `<button class="btn piccolo" data-azione="migliora" data-id="${id}" ${S.cassa < prezzo ? 'disabled' : ''}>${eur.format(prezzo)}</button>`}</div>`;
-  }).join('')}</div>`;
+  return `<div><h2>Miglioramenti del magazzino</h2><div class="griglia-miglioramenti">${Object.entries(MIGLIORAMENTI).map(([id, m]) => {
+    const l = livello(id), prezzo = prezzoMiglioramento(id), max = m.livelli.length, pd = primaDopo(id), fatto = prezzo === null;
+    return `<div class="carta-miglioramento ${fatto ? 'fatto' : ''} ${l ? 'attivo' : ''}">
+      <div class="testa-carta"><span class="icona-carta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONE_MIGLIORAMENTI[id] || ''}</svg></span>
+        <div><b>${m.nome}</b><div class="motto">${m.motto || m.descr}</div></div></div>
+      ${max > 1 ? `<div class="livelli">${m.livelli.map((_, i) => `<i class="${i < l ? 'pieno' : ''}"></i>`).join('')}<span>livello ${l} di ${max}</span></div>` : ''}
+      ${pd ? `<div class="prima-dopo"><span class="etichetta-pd">${pd[0]}</span>${fatto ? `<b class="dopo">${pd[1]}</b>` : `<span class="prima">${pd[1]}</span><span class="freccia">→</span><b class="dopo">${pd[2]}</b>`}</div>${pd[3] && !fatto ? `<div class="nota">${pd[3]}</div>` : ''}` : ''}
+      ${fatto ? '<div class="attivo-ok">✓ Attivo</div>' : `<button class="btn ${S.cassa >= prezzo ? 'primario' : ''}" data-azione="migliora" data-id="${id}" ${S.cassa < prezzo ? 'disabled' : ''}>${l ? 'Livello ' + (l + 1) + ' · ' : 'Compra · '}${eur.format(prezzo)}</button>`}
+    </div>`;
+  }).join('')}</div></div>`;
 }
 
 // Finestra al centro per gli eventi rari (con decisione) e per il riepilogo a gioco chiuso

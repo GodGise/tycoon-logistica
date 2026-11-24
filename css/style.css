@@ -449,3 +449,27 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .esito-email p { margin: 0; color: var(--testo-2); }
 @media (max-width: 760px) { .schede button { font-size: 12px; padding: 7px 3px; } }
 @media (min-width: 761px) { .schede button { padding: 7px 5px; font-size: 13px; } }
+
+/* miglioramenti: carte con icona, prima → dopo e livelli */
+.griglia-miglioramenti { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.carta-miglioramento { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: 18px;
+  background: linear-gradient(160deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); border: 1px solid var(--bordo); }
+.carta-miglioramento.attivo { border-color: rgba(10,132,255,.45); }
+.carta-miglioramento.fatto { border-color: rgba(48,209,88,.45); background: linear-gradient(160deg, rgba(48,209,88,.12), rgba(255,255,255,.02)); }
+.testa-carta { display: flex; gap: 10px; align-items: flex-start; }
+.testa-carta b { font-size: 15px; }
+.icona-carta { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(150deg, #0a84ff, #5e5ce6); box-shadow: 0 6px 16px rgba(10,132,255,.35); }
+.fatto .icona-carta { background: linear-gradient(150deg, #30d158, #0a9d48); box-shadow: 0 6px 16px rgba(48,209,88,.3); }
+.icona-carta svg { width: 22px; height: 22px; }
+.motto { color: var(--testo-2); font-size: 13px; line-height: 1.3; margin-top: 2px; }
+.livelli { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--testo-2); }
+.livelli i { width: 22px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.14); }
+.livelli i.pieno { background: #0a84ff; }
+.livelli span { margin-left: 6px; }
+.prima-dopo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 10px; border-radius: 12px; background: rgba(0,0,0,.22); }
+.etichetta-pd { width: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--testo-2); }
+.prima-dopo .prima { color: var(--testo-2); text-decoration: line-through; text-decoration-color: rgba(255,255,255,.3); }
+.prima-dopo .freccia { color: #0a84ff; }
+.prima-dopo .dopo { color: #30d158; font-size: 16px; }
+.attivo-ok { color: #30d158; font-weight: 600; text-align: center; padding: 6px 0; }

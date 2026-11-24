@@ -393,11 +393,11 @@ function giornoLavorativo() {
         const costo = Math.round(casoInt(300, 1200) * effetto.guasti());
         stat(f, 'guasti', 1);
         // resta fermo finché il giocatore non paga la riparazione
-        if (S.recuperoOffline) {
-          // a gioco chiuso ci pensa il capo officina: riparato e pagato in automatico, un giorno di fermo
+        if (livello('officina')) {
+          // con l'officina nel magazzino il meccanico ripara da solo (anche a gioco chiuso): un giorno di fermo
           movimento('manutenzione', -costo); stat(f, 'manutenzione', costo);
           f.fermo = 1; f.motivo = 'guasto'; f.fermoDal = S.giorno;
-          notizia(`Guasto al ${m.nome} mentre eri via: riparato in automatico (${costo} €).`, 'info', 'gua-' + f.id);
+          notizia(`Guasto al ${m.nome}: l'officina l'ha già riparato (${costo} €), domani torna in strada.`, 'info', 'gua-' + f.id);
         } else {
           f.daRiparare = costo; f.fermo = 1; f.motivo = 'guasto'; f.fermoDal = S.giorno;
           notizia(`Guasto al ${m.nome}${f.usato ? ' usato' : ''}: resta fermo finché non lo ripari (${costo} €).`, 'male', 'gua-' + f.id);
@@ -508,8 +508,8 @@ function recuperaOffline() {
   const secondi = Math.min(OFFLINE_MAX_SECONDI, (Date.now() - S.salvatoIl) / 1000);
   if (secondi < 60) return null;
   const prima = { cassa: S.cassa, giorno: S.giorno, consegne: 0, servizio: S.servizio, reputazione: S.reputazione };
-  // mentre sei via i furgoni già guasti li ripara il capo officina
-  S.furgoni.filter(f => f.daRiparare).forEach(f => { movimento('manutenzione', -f.daRiparare); f.daRiparare = 0; f.fermo = 0; f.motivo = null; });
+  // con l'officina nel magazzino i furgoni già guasti si riparano mentre sei via
+  if (livello('officina')) S.furgoni.filter(f => f.daRiparare).forEach(f => { movimento('manutenzione', -f.daRiparare); f.daRiparare = 0; f.fermo = 0; f.motivo = null; });
   const durata = COSTANTI.secondiPerGiorno;
   S.recuperoOffline = true;
   S.offertaContratto = null;

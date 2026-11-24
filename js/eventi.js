@@ -2,11 +2,11 @@
 
 /* ---------- miglioramenti ---------- */
 const MIGLIORAMENTI = {
-  nastro:    { nome: 'Nastro di smistamento', descr: 'Ogni magazziniere smista il 50% di pacchi in più.', livelli: [40000] },
-  software:  { nome: 'Software per i percorsi', descr: 'Giri più corti: −10% di km per ogni livello.', livelli: [25000, 60000] },
-  pubblicita:{ nome: 'Pubblicità', descr: '+10% di pacchi in tutte le zone per ogni livello.', livelli: [15000, 35000, 70000] },
-  formazione:{ nome: 'Corso di guida sicura', descr: 'Gli autisti fanno il 40% di incidenti in meno.', livelli: [20000] },
-  officina:  { nome: 'Officina interna', descr: 'Riparazioni dei guasti a metà prezzo.', livelli: [50000] },
+  nastro:    { nome: 'Nastro trasportatore', motto: 'I pacchi corrono da soli verso i furgoni.', descr: 'Ogni magazziniere smista il 50% di pacchi in più.', livelli: [40000] },
+  software:  { nome: 'Navigatore intelligente', motto: 'Meno strada, meno gasolio, giri più rapidi.', descr: 'Giri più corti: −10% di km per ogni livello.', livelli: [25000, 60000] },
+  pubblicita:{ nome: 'Pubblicità in città', motto: 'Cartelloni, social e furgoni con il tuo logo.', descr: '+10% di pacchi in tutte le zone per ogni livello.', livelli: [15000, 35000, 70000] },
+  formazione:{ nome: 'Corso di guida sicura', motto: 'Autisti più attenti, furgoni sempre in strada.', descr: 'Gli autisti fanno il 40% di incidenti in meno.', livelli: [20000] },
+  officina:  { nome: 'Officina nel magazzino', motto: 'Un meccanico tutto tuo, giorno e notte.', descr: 'Ripara i guasti da solo, anche a gioco chiuso, a metà prezzo.', livelli: [50000] },
 };
 function livello(id) { return (S.miglioramenti && S.miglioramenti[id]) || 0; }
 function prezzoMiglioramento(id) { const l = MIGLIORAMENTI[id].livelli; return livello(id) < l.length ? l[livello(id)] : null; }
