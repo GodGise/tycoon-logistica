@@ -51,9 +51,9 @@ const RINCARO_MAGAZZINO = 1.2;
 function rincaroMagazzini() { return S ? Math.pow(RINCARO_MAGAZZINO, S.depositi.length) : 1; }
 function prezzoMagazzinoMin() { return Math.round(COSTANTI.prezzoMagazzinoMin * rincaroMagazzini() / 5000) * 5000; }
 function prezzoMagazzinoMax() { return Math.round(COSTANTI.prezzoMagazzinoMax * rincaroMagazzini() / 5000) * 5000; }
-function prezzoMagazzino(citta, lngLat) {
+function prezzoMagazzino(citta, lngLat, primo) {
   const t = limita(distanzaKm([citta.lng, citta.lat], lngLat) / (citta.raggio * 1.15), 0, 1);
-  const p = (COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t) * rincaroMagazzini();
+  const p = (COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t) * (primo ? 1 : rincaroMagazzini());
   return Math.round(p / 5000) * 5000;
 }
 function kmGiro(z) { return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * magazzinoVicino(z.centro, idCitta(z)).km); }
@@ -65,7 +65,7 @@ function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); r
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   S = {
     citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
-    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
+    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino, true) }],
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
     cassa: COSTANTI.cassaIniziale, reputazione: 70, servizio: 0.94, fama: 0,

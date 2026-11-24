@@ -91,13 +91,17 @@ function vistaObiettivoEContratti() {
 }
 
 // Scheda dell'offerta di contratto, in basso sopra la mappa
-// Riquadri fissi per i furgoni guasti: restano finché non premi Ripara
+// Riquadri fissi per i furgoni guasti (finché non premi Ripara) e per la posta non letta (finché non la apri)
 function disegnaGuasti() {
   const el = $('#guasti'), lista = furgoniDaRiparare();
-  const chiave = lista.map(f => f.id + ':' + f.daRiparare + ':' + (S.cassa >= f.daRiparare)).join('|');
+  const nuove = S ? (S.posta || []).map((m, i) => ({ m, i })).filter(x => !x.m.letta && x.m.risposta === null) : [];
+  const chiave = nuove.map(x => 'm' + x.i).join('|') + '#' + lista.map(f => f.id + ':' + f.daRiparare + ':' + (S.cassa >= f.daRiparare)).join('|');
   if (el.dataset.chiave === chiave) return;
   el.dataset.chiave = chiave;
-  el.innerHTML = lista.map(f => {
+  el.innerHTML = nuove.map(({ m, i }) => `<div class="guasto avviso-posta vetro" role="alert">
+      <div class="riga"><b>✉︎ Nuova email</b><span class="badge">${m.scadenza - S.giorno > 0 ? (m.scadenza - S.giorno) + ' giorni per rispondere' : 'ultimo giorno'}</span></div>
+      <p class="nota"><b style="color:var(--testo)">${esc(m.mittente)}</b><br>${esc(m.oggetto)}</p>
+      <button class="btn primario" data-leggi="${i}">Leggi e decidi</button></div>`).join('') + lista.map(f => {
     const m = modello(f.modello), dove = isJolly(f) ? 'jolly' : f.zona ? 'zona ' + nomeZona(zona(f.zona)) : 'in deposito', basta = S.cassa >= f.daRiparare;
     return `<div class="guasto vetro" role="alert">
       <div class="riga"><b>Guasto: ${esc(m.nome)}${f.usato ? ' usato' : ''}</b><span class="badge fermo">fermo</span></div>
@@ -107,6 +111,8 @@ function disegnaGuasti() {
   }).join('');
 }
 $('#guasti').addEventListener('click', e => {
+  const l = e.target.closest('[data-leggi]');
+  if (l) { apriEmail(+l.dataset.leggi); return; }
   const b = e.target.closest('[data-ripara]'); if (!b) return;
   const err = ripara(b.dataset.ripara);
   if (err) toast(err); else { toast('Furgone riparato: dalla prossima giornata torna a lavorare.'); salva(); }
@@ -681,6 +687,13 @@ const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita,
 
 /* ---------- posta: una email decisionale a settimana ---------- */
 let emailAperta = null;
+function apriEmail(i) {
+  emailAperta = i; if (S.posta[i]) S.posta[i].letta = true;
+  dettaglio = null; scheda = 'posta';
+  document.querySelectorAll('.schede button').forEach(x => x.setAttribute('aria-selected', x.dataset.scheda === 'posta'));
+  const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
+  $('#guasti').dataset.chiave = '-'; disegnaGuasti(); ridisegna(); muoviIndicatore();
+}
 function vistaPosta() {
   const posta = S.posta || [];
   if (emailAperta !== null && posta[emailAperta]) {
@@ -797,7 +810,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
-    case 'apri-email': emailAperta = +b.dataset.i; $('#contenuto').scrollTop = 0; break;
+    case 'apri-email': apriEmail(+b.dataset.i); $('#contenuto').scrollTop = 0; break;
     case 'chiudi-email': emailAperta = null; break;
     case 'rispondi': { const err = rispondiEmail(emailAperta, +b.dataset.i); esito(err); break; }
     case 'salva-online': accountAttesa = true; ridisegna(); salvaOnline(false).then(r => { accountAttesa = false; dopoCambioPartita(r === 'ok' ? 'Partita salvata online.' : r === 'altro' ? 'Ho caricato la partita più recente dall\'altro dispositivo.' : null); }); break;

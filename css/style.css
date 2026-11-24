@@ -473,3 +473,4 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .prima-dopo .freccia { color: #0a84ff; }
 .prima-dopo .dopo { color: #30d158; font-size: 16px; }
 .attivo-ok { color: #30d158; font-weight: 600; text-align: center; padding: 6px 0; }
+.avviso-posta { border-color: rgba(10,132,255,.6); }

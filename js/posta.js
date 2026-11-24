@@ -126,7 +126,8 @@ function controllaPosta() {
     applicaRisposta(m, peggiore, true);
   });
   if (!S.furgoni.length) return;
-  if (dataDelGiorno(S.giorno).getDay() !== POSTA.giornoSettimana) return;
+  // la prima email arriva subito (il primo giorno con un furgone), poi una ogni lunedì
+  if (S.posta.length && dataDelGiorno(S.giorno).getDay() !== POSTA.giornoSettimana) return;
   if (S.posta.some(m => m.giorno === S.giorno)) return;
   const usate = S.posta.map(m => m.id);
   const libere = EMAIL.filter(e => !usate.slice(-EMAIL.length + 3).includes(e.id));
