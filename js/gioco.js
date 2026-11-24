@@ -591,3 +591,51 @@ function cambiaFama(punti) {
   S.fama = limita((S.fama || 0) + punti, -30, 15);
   S.reputazione = limita(S.reputazione + punti, 0, 100);
 }
+
+/* ---------- Organizza: assegnazione automatica di autisti, furgoni e zone ----------
+   1) gli autisti liberi vanno sui furgoni senza autista (prima i più esperti);
+   2) ogni zona già servita riceve i furgoni che le servono per i suoi pacchi;
+   3) i furgoni in più (o in deposito) vanno alle zone che ne hanno bisogno, poi diventano jolly della loro città;
+   4) i giri più lunghi ai furgoni che costano meno al km, i jolly a quelli che consumano di più.
+   Restituisce l'elenco dei cambi senza applicarli, così il giocatore li vede prima. */
+function pianoOrganizza() {
+  const cambi = [], prova = S.furgoni.map(f => ({ f, autista: f.autistaId, zona: f.zona }));
+  const occupati = new Set(prova.map(p => p.autista).filter(Boolean));
+  const liberi = S.dipendenti.filter(d => d.ruolo === 'autista' && !occupati.has(d.id) && !(d.sospesoFino >= S.giorno)).sort((a, b) => b.esperienza - a.esperienza);
+  prova.filter(p => !p.autista && !p.f.daRiparare).forEach(p => { const d = liberi.shift(); if (d) p.autista = d.id; });
+  const pacchi = z => z.pacchi * (1 + 0.1 * livello('pubblicita'));
+  const pronto = p => p.autista && !p.f.daRiparare && p.f.fermo === 0;
+  tutteCitta().forEach(c => {
+    const jolly = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id;
+    const diCitta = p => p.zona ? (p.zona.startsWith(ZONA_JOLLY) ? (p.zona.split(':')[1] || 'c1') === c.id : idCitta(zona(p.zona)) === c.id)
+      : (S.depositi.find(m => idCitta(m) === c.id) && c.id === 'c1');   // i furgoni in deposito li prende la sede
+    const miei = prova.filter(diCitta);
+    const servite = S.zone.filter(z => idCitta(z) === c.id && miei.some(p => p.zona === z.id));
+    const posti = z => miei.filter(p => p.zona === z.id && pronto(p)).reduce((t, p) => t + capacitaFurgone(p.f), 0);
+    // furgoni da ridistribuire: in deposito con autista, jolly, e quelli in più nelle zone servite
+    const pool = miei.filter(p => pronto(p) && (!p.zona || p.zona === jolly));
+    servite.forEach(z => {
+      const nella = miei.filter(p => p.zona === z.id && pronto(p)).sort((a, b) => capacitaFurgone(a.f) - capacitaFurgone(b.f));
+      while (nella.length > 1 && posti(z) - capacitaFurgone(nella[0].f) >= pacchi(z)) { const p = nella.shift(); p.zona = null; pool.push(p); }
+    });
+    // zone sotto capacità (prima quelle con più pacchi scoperti)
+    const scoperte = () => servite.map(z => ({ z, manca: pacchi(z) - posti(z) })).filter(x => x.manca > COSTANTI.maxConsegneCorriere * 0.25).sort((a, b) => b.manca - a.manca);
+    let s;
+    while (pool.length && (s = scoperte()).length) { const p = pool.shift(); p.zona = s[0].z.id; }
+    pool.forEach(p => { p.zona = jolly; });
+    // 4) i giri con più km ai furgoni che costano meno al km (elettrici, poco consumo);
+    //    i jolly, che fanno pochi km, ai furgoni che consumano di più. Si scambiano solo i posti, non i numeri.
+    const posto = p => p.zona === jolly ? 0 : kmGiro(zona(p.zona));
+    const attivi = miei.filter(p => pronto(p) && p.zona);
+    const posti2 = attivi.map(p => p.zona).sort((a, b) => posto({ zona: b }) - posto({ zona: a }));
+    const euroKm = p => { const k = costoKm(modello(p.f.modello), p.f.usato); return k.energia + k.manutenzione; };
+    const perCosto = [...attivi].sort((a, b) => euroKm(a) - euroKm(b));
+    perCosto.forEach((p, i) => { p.zona = posti2[i]; });
+  });
+  prova.forEach(p => {
+    if (p.autista !== p.f.autistaId) cambi.push({ f: p.f, campo: 'autista', da: p.f.autistaId, a: p.autista });
+    if ((p.zona || null) !== (p.f.zona || null)) cambi.push({ f: p.f, campo: 'zona', da: p.f.zona, a: p.zona });
+  });
+  return cambi;
+}
+function applicaPiano(cambi) { cambi.forEach(c => assegna(c.f.id, c.campo, c.a)); return cambi.length; }

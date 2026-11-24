@@ -622,38 +622,105 @@ function vistaNegozio() {
     <p class="nota">Prezzi provvisori, da verificare con i listini reali.</p>`;
 }
 
-function vistaFlotta() {
-  if (negozioAperto) return vistaNegozio();
-  const autisti = S.dipendenti.filter(d => d.ruolo === 'autista');
-  const carte = S.furgoni.map(f => {
-    const m = modello(f.modello);
-    const stato = f.daRiparare ? `<button class="btn piccolo primario" data-azione="ripara" data-id="${f.id}">Ripara · ${eur.format(f.daRiparare)}</button>` : f.fermo > 0 ? `<span class="badge fermo">fermo ${f.fermo} gg · ${f.motivo}</span>` : furgoneOperativo(f) ? '<span class="badge">operativo</span>' : '<span class="badge fermo">non operativo</span>';
-    const optA = ['<option value="">Nessun autista</option>', ...autisti.map(a => {
-      const altro = S.furgoni.find(x => x.autistaId === a.id && x.id !== f.id);
-      return `<option value="${a.id}" ${f.autistaId === a.id ? 'selected' : ''}>${esc(a.nome)}${altro ? ' (su altro furgone)' : ''}</option>`;
+/* ---------- Flotta: furgoni raggruppati per zona, filtri e "Organizza" ---------- */
+let flottaFiltro = 'tutti', flottaAperti = null, flottaEspanso = null, pianoMostrato = null;
+function problemaFurgone(f) {
+  if (f.daRiparare) return 'guasto';
+  if (!f.autistaId) return 'senza autista';
+  if (autistaSospeso(f)) return 'autista sospeso';
+  if (f.fermo > 0) return 'fermo ' + f.fermo + ' gg';
+  return null;
+}
+function rigaFurgone(f, autisti) {
+  const m = modello(f.modello), a = f.autistaId && dipendente(f.autistaId), prob = problemaFurgone(f), aperto = flottaEspanso === f.id;
+  let editor = '';
+  if (aperto) {
+    const optA = ['<option value="">Nessun autista</option>', ...autisti.map(x => {
+      const altro = S.furgoni.find(y => y.autistaId === x.id && y.id !== f.id);
+      return `<option value="${x.id}" ${f.autistaId === x.id ? 'selected' : ''}>${esc(x.nome)}${altro ? ' (su altro furgone)' : ''}</option>`;
     })].join('');
+    const quanti = id => { const n = S.furgoni.filter(x => x.zona === id && x.autistaId).length; return ` (${n} autist${n === 1 ? 'a' : 'i'})`; };
     const optZ = '<option value="">In deposito</option>' + tutteCitta().map(c => {
       const j = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id;
-      // tra parentesi: quanti autisti (furgoni con autista) lavorano già in quella zona
-      const quanti = id => { const n = S.furgoni.filter(x => x.zona === id && x.autistaId).length; return ` (${n} autist${n === 1 ? 'a' : 'i'})`; };
       const opts = `<option value="${j}" ${f.zona === j ? 'selected' : ''}>Jolly: va dove ci sono più pacchi${quanti(j)}</option>` + S.zone.filter(z => idCitta(z) === c.id).map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}${quanti(z.id)}</option>`).join('');
       return tutteCitta().length > 1 ? `<optgroup label="${esc(c.nome)}">${opts}</optgroup>` : opts;
     }).join('');
-    return `<div class="scheda">
-      <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="furgone" data-id="${f.id}">${esc(m.nome)}${f.usato ? ' <small class="nota">usato</small>' : ''} ›</button><span class="badge ${m.tipo}">${m.tipo}</span></div>
-      <div class="riga"><span>${intero.format(f.km)} km</span>${stato}</div>
-      <div class="riga"><span>Assicurazione</span><span class="num ${f.premio > 1 ? 'meno' : ''}">${eur.format(assicurazioneFurgone(f))}/mese${f.premio > 1 ? ` · +${Math.round((f.premio - 1) * 100)}% (${f.incidenti} incident${f.incidenti === 1 ? 'e' : 'i'})` : ''}</span></div>
-      ${f.premio >= 1.75 ? '<p class="nota" style="color:var(--avviso)">Assicurazione molto cara: forse conviene venderlo e comprarne un altro.</p>' : ''}
+    const k = costoKm(m, f.usato);
+    editor = `<div class="editor-furgone">
       <div class="due">
         <label><span class="nota">Autista</span><select data-azione="assegna" data-campo="autista" data-id="${f.id}">${optA}</select></label>
         <label><span class="nota">Zona</span><select data-azione="assegna" data-campo="zona" data-id="${f.id}">${optZ}</select></label>
       </div>
-      <div class="riga"><span>Valore di rivendita</span><button class="btn piccolo" data-azione="vendi" data-id="${f.id}">Vendi per ${eur.format(f.valore * COSTANTI.valoreRivendita)}</button></div>
+      <div class="riga"><span class="nota">${intero.format(f.km)} km · ${eurCent.format(k.energia + k.manutenzione)}/km · assicurazione ${eur.format(assicurazioneFurgone(f))}/mese${f.premio > 1 ? ` (+${Math.round((f.premio - 1) * 100)}%)` : ''}</span></div>
+      <div class="riga">${f.daRiparare ? `<button class="btn piccolo primario" data-azione="ripara" data-id="${f.id}">Ripara · ${eur.format(f.daRiparare)}</button>` : '<span></span>'}
+        <span style="display:flex;gap:6px"><button class="btn piccolo" data-azione="dettaglio" data-tipo="furgone" data-id="${f.id}">Dettagli</button>
+        <button class="btn piccolo" data-azione="vendi" data-id="${f.id}">Vendi ${eur.format(f.valore * COSTANTI.valoreRivendita)}</button></span></div>
+    </div>`;
+  }
+  return `<div class="riga-furgone ${aperto ? 'aperta' : ''} ${prob ? 'con-problema' : ''}">
+    <button class="testa-furgone" data-azione="espandi-furgone" data-id="${f.id}">
+      <i class="tipo-pallino ${m.tipo}"></i>
+      <span class="nome-f">${esc(m.nome)}${f.usato ? ' <small>usato</small>' : ''}</span>
+      <span class="autista-f ${a ? '' : 'meno'}">${a ? esc(a.nome) : 'senza autista'}</span>
+      ${prob ? `<span class="badge fermo">${prob}</span>` : '<span class="ok-f">✓</span>'}
+    </button>${editor}</div>`;
+}
+function vistaFlotta() {
+  if (negozioAperto) return vistaNegozio();
+  const autisti = S.dipendenti.filter(d => d.ruolo === 'autista');
+  if (!S.furgoni.length) return `<button class="btn primario" data-azione="apri-negozio">Compra un furgone</button>
+    <p class="nota">Non hai ancora furgoni. Comincia da uno: un diesel usato costa poco, un elettrico nuovo consuma meno.</p>`;
+  const filtri = { tutti: () => true, problemi: f => !!problemaFurgone(f), jolly: f => isJolly(f), deposito: f => !f.zona };
+  const conta = k => S.furgoni.filter(filtri[k]).length;
+  const visibili = S.furgoni.filter(filtri[flottaFiltro]);
+  // gruppi: per ogni città le sue zone servite, il jolly, poi il deposito
+  const gruppi = [];
+  tutteCitta().forEach(c => {
+    const pref = tutteCitta().length > 1 ? c.nome + ' · ' : '';
+    S.zone.filter(z => idCitta(z) === c.id).forEach(z => {
+      const fs = visibili.filter(f => f.zona === z.id); if (!fs.length) return;
+      const posti = S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f)).reduce((t, f) => t + capacitaFurgone(f), 0);
+      const pacchi = Math.round(z.pacchi * (1 + 0.1 * livello('pubblicita')));
+      gruppi.push({ id: z.id, titolo: pref + z.nome, colore: z.colore, fs, info: `${intero.format(posti)} posti · ${intero.format(pacchi)} pacchi`, corto: posti < pacchi });
+    });
+    const j = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id, fj = visibili.filter(f => f.zona === j);
+    if (fj.length) gruppi.push({ id: j, titolo: pref + 'Jolly', colore: '#ffd60a', fs: fj, info: 'vanno dove servono' });
+  });
+  const dep = visibili.filter(f => !f.zona);
+  if (dep.length) gruppi.push({ id: 'deposito', titolo: 'In deposito', colore: '#8e8e93', fs: dep, info: 'non lavorano' });
+  if (!flottaAperti) flottaAperti = new Set(gruppi.filter(g => g.fs.some(problemaFurgone)).map(g => g.id));
+  const tuttoAperto = flottaFiltro !== 'tutti';
+  const html = gruppi.map(g => {
+    const aperto = tuttoAperto || flottaAperti.has(g.id), problemi = g.fs.filter(problemaFurgone).length;
+    return `<div class="gruppo-flotta ${aperto ? 'aperto' : ''}">
+      <button class="testa-gruppo" data-azione="apri-gruppo" data-id="${g.id}">
+        <i class="pallino" style="background:${g.colore}"></i><b>${esc(g.titolo)}</b>
+        <span class="conta-g">${g.fs.length}</span>
+        <span class="info-g ${g.corto ? 'meno' : ''}">${g.info}</span>
+        ${problemi ? `<span class="badge fermo">${problemi} da sistemare</span>` : ''}
+        <span class="freccia-g">›</span>
+      </button>
+      ${aperto ? `<div class="corpo-gruppo">${g.fs.map(f => rigaFurgone(f, autisti)).join('')}</div>` : ''}
     </div>`;
   }).join('');
-  return `<button class="btn primario" data-azione="apri-negozio">Compra un furgone</button>
-    ${carte || '<p class="nota">Non hai ancora furgoni. Comincia da uno: un diesel usato costa poco, un elettrico nuovo consuma meno.</p>'}
-    <p class="nota">Un furgone senza autista resta fermo, ma assicurazione e costi del mezzo li paghi lo stesso.</p>`;
+  const piano = pianoMostrato ? `<div class="scheda piano">
+      <div class="riga"><h2 style="margin:0">Organizza</h2><span class="badge">${pianoMostrato.length} cambi</span></div>
+      ${pianoMostrato.length ? `<ul class="lista-piano">${pianoMostrato.slice(0, 30).map(c => {
+        const n = esc(modello(c.f.modello).nome);
+        if (c.campo === 'autista') { const d = c.a && dipendente(c.a); return `<li>${n}: autista <b>${d ? esc(d.nome) : 'nessuno'}</b></li>`; }
+        const dove = v => !v ? 'deposito' : v.startsWith(ZONA_JOLLY) ? 'jolly' : esc(nomeZona(zona(v)));
+        return `<li>${n}: ${dove(c.da)} → <b>${dove(c.a)}</b></li>`;
+      }).join('')}${pianoMostrato.length > 30 ? `<li>…e altri ${pianoMostrato.length - 30}</li>` : ''}</ul>
+      <p class="nota">Autisti liberi sui furgoni liberi, a ogni zona i furgoni che servono per i suoi pacchi, il resto jolly. I giri più lunghi ai furgoni che costano meno al km (elettrici), i jolly a quelli che consumano di più.</p>
+      <div class="riga"><button class="btn" data-azione="annulla-piano">Annulla</button><button class="btn primario" data-azione="applica-piano">Applica</button></div>`
+      : '<p class="nota">È già tutto organizzato al meglio.</p><button class="btn" data-azione="annulla-piano">Chiudi</button>'}
+    </div>` : '';
+  return `<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
+    ${piano}
+    <div class="filtri-flotta interruttore">${[['tutti', 'Tutti'], ['problemi', 'Problemi'], ['jolly', 'Jolly'], ['deposito', 'In deposito']].map(([k, t]) =>
+      `<button data-azione="filtro-flotta" data-v="${k}" aria-pressed="${flottaFiltro === k}">${t} <span>${conta(k)}</span></button>`).join('')}</div>
+    ${html || '<p class="nota">Nessun furgone in questo filtro.</p>'}
+    <p class="nota">Tocca una zona per vedere i suoi furgoni, tocca un furgone per cambiare autista o zona.</p>`;
 }
 
 function vistaPersonale() {
@@ -814,6 +881,12 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'espandi-furgone': flottaEspanso = flottaEspanso === id ? null : id; ridisegna(); break;
+    case 'apri-gruppo': { flottaAperti = flottaAperti || new Set(); flottaAperti.has(id) ? flottaAperti.delete(id) : flottaAperti.add(id); ridisegna(); break; }
+    case 'filtro-flotta': flottaFiltro = b.dataset.v; ridisegna(); break;
+    case 'organizza': pianoMostrato = pianoOrganizza(); $('#contenuto').scrollTop = 0; ridisegna(); break;
+    case 'annulla-piano': pianoMostrato = null; ridisegna(); break;
+    case 'applica-piano': { const n = applicaPiano(pianoMostrato); pianoMostrato = null; flottaAperti = null; esito(null, n + ' cambi applicati.'); break; }
     case 'apri-email': apriEmail(+b.dataset.i); $('#contenuto').scrollTop = 0; break;
     case 'chiudi-email': emailAperta = null; ridisegna(); $('#contenuto').scrollTop = 0; break;
     case 'rispondi': { const err = rispondiEmail(emailAperta, +b.dataset.i); esito(err); break; }
@@ -880,7 +953,7 @@ function scegliCitta(c) {
 }
 $('#contenuto').addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.azione === 'assegna') { assegna(t.dataset.id, t.dataset.campo, t.value); t.blur(); esito(); }
+  if (t.dataset.azione === 'assegna') { assegna(t.dataset.id, t.dataset.campo, t.value); if (t.dataset.campo === 'zona' && flottaAperti) flottaAperti.add(t.value || 'deposito'); t.blur(); esito(); }
   if (t.dataset.azione === 'citta-mag') { spostaMagazziniere(t.dataset.id, t.value); t.blur(); esito(null, 'Magazziniere spostato.'); }
   if (t.dataset.azione === 'stipendio') { S.offerta[t.dataset.ruolo] = +t.value; t.blur(); salva(); if (daRidisegnare) ridisegna(); }
 });
