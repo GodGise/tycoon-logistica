@@ -130,6 +130,7 @@ function generaCandidati(ruolo) {
   S.candidati[ruolo] = Array.from({ length: n }, () => ({
     id: nuovoId('c'), nome: scegli(NOMI) + ' ' + scegli(COGNOMI), ruolo, stipendio: stip,
     esperienza: ruolo === 'autista' ? Math.round(limita(10 + t * 65 + caso(-15, 15), 0, 95)) : null,
+    indole: indoleCasuale(),   // nascosto: non dipende dall'esperienza
   }));
 }
 function pubblicaAnnuncio(ruolo, stipendio) {
@@ -145,13 +146,15 @@ function assumi(candId, ruolo) {
   const i = S.candidati[ruolo].findIndex(c => c.id === candId);
   if (i < 0) return 'Candidato non più disponibile.';
   const c = S.candidati[ruolo].splice(i, 1)[0];
-  S.dipendenti.push({ id: nuovoId('d'), nome: c.nome, ruolo, stipendio: c.stipendio, esperienza: c.esperienza, assuntoGiorno: S.giorno });
+  S.dipendenti.push({ id: nuovoId('d'), nome: c.nome, ruolo, stipendio: c.stipendio, esperienza: c.esperienza, assuntoGiorno: S.giorno, indole: c.indole, reg: [] });
   notizia(`Assunto ${c.nome} come ${RUOLI[ruolo].nome.toLowerCase()}.`, 'buono');
   return null;
 }
 function licenzia(id) {
   const d = dipendente(id); if (!d) return;
   pagaPersonaleParziale(d);
+  const liquidazione = costoLicenziamento(d);
+  if (liquidazione) { movimento('personale', -liquidazione); notizia(`Liquidazione a ${d.nome}: ${liquidazione.toLocaleString('it-IT')} € (era fuori dal periodo di prova).`, 'info'); }
   S.dipendenti = S.dipendenti.filter(x => x.id !== id);
   S.furgoni.forEach(f => { if (f.autistaId === id) f.autistaId = null; });
   notizia(`${d.nome} non lavora più per te.`, 'male');
@@ -314,7 +317,8 @@ function giornoLavorativo() {
   const quota = {}, multi = S.filiali && S.filiali.length;
   tutteCitta().forEach(c => {
     const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && idCitta(x) === c.id && !(x.sospesoFino >= S.giorno));
-    const cap = Math.round(mags.length * COSTANTI.pacchiMagazziniere * effetto.smistamento());
+    const cap = Math.round(mags.reduce((t, m) => t + fattoreSmistamento(m), 0) * COSTANTI.pacchiMagazziniere * effetto.smistamento());
+    mags.forEach(giornataMagazziniere);
     const tot = servite.filter(z => idCitta(z) === c.id).reduce((t, z) => t + arrivo[z.id], 0);
     quota[c.id] = tot > 0 ? Math.min(1, cap / tot) : 0;
     mags.forEach(x => { stat(x, 'giorni', 1); stat(x, 'pacchi', Math.floor(tot * quota[c.id]) / mags.length); });
@@ -396,10 +400,11 @@ function giornoLavorativo() {
       stat(f, m.tipo === 'diesel' ? 'carburante' : 'ricarica', km * c.energia); stat(f, 'manutenzione', km * c.manutenzione);
       stat(f, 'incasso', mie * tariffa() * effetto.tariffaZona(z.id));
       stat(a, 'giorni', 1); stat(a, 'consegne', mie); stat(a, 'km', km);
+      giornataAutista(a, f, mie, S.giacenze[z.id] === 0);
       // incidente: dipende dall'esperienza
-      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1) * (a.rischio || 1) * (f.difettoFino >= S.giorno ? 2 : 1);
-      if (Math.random() < pKm * km) {
-        stat(f, 'incidenti', 1); stat(a, 'incidenti', 1);
+      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1) * (a.rischio || 1) * fattoreIncidenti(a) * (f.difettoFino >= S.giorno ? 2 : 1);
+      if (Math.random() < Math.max(pKm * km, a.indole === 'distratto' ? 0.15 : 0)) {   // il distratto: circa 3 incidenti al mese
+        stat(f, 'incidenti', 1); stat(a, 'incidenti', 1); registra(a, 'incidente');
         f.fermo = casoInt(1, 3); f.motivo = 'incidente'; f.fermoDal = S.giorno;
         f.premio = (f.premio || 1) + COSTANTI.aumentoPremioIncidente; f.incidenti = (f.incidenti || 0) + 1;
         notizia(`Incidente: ${a.nome} con il ${m.nome}. Furgone fermo ${f.fermo} gg, assicurazione di questo furgone a ${assicurazioneFurgone(f)} €/mese. La riparazione è trattenuta dallo stipendio.`, 'male', 'inc-' + f.id);
@@ -483,6 +488,8 @@ function carica() {
       if (!S.citta.id) S.citta.id = 'c1';
       if (!S.filiali) S.filiali = [];
       // livelli e licenze: l'esperienza parte dalle consegne già fatte; le zone di periferia già servite restano tue
+      // carattere nascosto anche per chi era già assunto (stesse probabilità dei nuovi)
+      S.dipendenti.forEach(d => { if (d.indole === undefined) { d.indole = indoleCasuale(); d.reg = d.reg || []; } });
       if (S.xp === undefined) { S.xp = totaleConsegne(); S.licenze = {}; S.zone.filter(z => /(^|-)a2-/.test(z.id) && S.furgoni.some(f => f.zona === z.id)).forEach(z => { S.licenze[z.id] = true; }); }
       // reputazione v2: livello di servizio + fama (vedi aggiornaReputazione)
       if (S.servizio === undefined) { S.servizio = Math.max(0.9, 1 - (85 - Math.min(S.reputazione, 85)) / 150); S.fama = Math.max(0, S.reputazione - 85); S.reputazione = calcolaReputazione(); }

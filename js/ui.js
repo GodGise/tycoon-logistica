@@ -498,6 +498,9 @@ function dettaglioDipendente(d) {
       ${autista ? `<div><b>${Math.round(d.esperienza)}</b><span>esperienza /100</span></div>` : `<div><b>${intero.format(Math.round(COSTANTI.pacchiMagazziniere * effetto.smistamento()))}</b><span>pacchi al giorno</span></div>`}
       <div><b>${eurCent.format(costoUnita('prec') || costoUnita('mese'))}</b><span>costo per ${autista ? 'consegna' : 'pacco'}</span></div></div>
     ${autista ? `<div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
+    <div class="scheda valutazione"><div class="riga"><b>Valutazione</b>${htmlStelle(d)}</div>
+      <p class="nota" style="margin:0">${stelleDi(d) === null ? `Lavora da poco: le stelle compaiono dopo ${STELLE.giorniValutazione} giornate di lavoro. ` : ''}${riepilogoTesto(d)}</p>
+      ${inProva(d) ? `<p class="nota" style="margin:0">In prova ancora ${STELLE.prova - (S.giorno - d.assuntoGiorno)} giorni: se lo licenzi ora non paghi la liquidazione.</p>` : `<p class="nota" style="margin:0">Fuori dal periodo di prova: licenziarlo costa ${eur.format(costoLicenziamento(d))} di liquidazione.</p>`}</div>
     ${d.sospesoFino >= S.giorno ? `<div class="riga"><span>Sospeso</span><span class="num meno">ancora ${d.sospesoFino - S.giorno + 1} giorn${d.sospesoFino - S.giorno ? 'i' : 'o'}</span></div>` : ''}
     ${d.rischio > 1 ? '<div class="riga"><span>Rischio incidenti</span><span class="num meno">+50%</span></div>' : ''}
     ${d.ruba ? '<div class="riga"><span>Sotto sospetto</span><span class="num meno">pacchi che spariscono</span></div>' : ''}
@@ -511,7 +514,7 @@ function dettaglioDipendente(d) {
       <div class="miglioramento"><div><b>Aumento di 100 €/mese</b><div class="nota">Per 60 giorni non chiederà aumenti e non rischi che si dimetta.</div></div>
         <button class="btn piccolo" data-azione="aumento" data-id="${d.id}">+100 €</button></div>
       <div class="miglioramento"><div><b>Licenzia</b><div class="nota">Paghi i giorni lavorati questo mese.</div></div>
-        <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia</button></div>
+        <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia${costoLicenziamento(d) ? ' · ' + eur.format(costoLicenziamento(d)) : ' gratis'}</button></div>
     </div>`;
 }
 function dettaglioMagazzino(mz) {
@@ -690,7 +693,7 @@ function rigaFurgone(f, autisti) {
     <button class="testa-furgone" data-azione="espandi-furgone" data-id="${f.id}">
       <i class="tipo-pallino ${m.tipo}"></i>
       <span class="nome-f">${esc(m.nome)}${f.usato ? ' <small>usato</small>' : ''}</span>
-      <span class="autista-f ${a ? '' : 'meno'}">${a ? esc(a.nome) : 'senza autista'}</span>
+      <span class="autista-f ${a ? '' : 'meno'}">${a ? `<span class="n">${esc(a.nome)}</span>${htmlStelle(a, true)}` : 'senza autista'}</span>
       ${prob ? `<span class="badge fermo">${prob}</span>` : '<span class="ok-f">✓</span>'}
     </button>${editor}</div>`;
 }
@@ -756,11 +759,35 @@ function vistaFlotta() {
     <p class="nota">Tocca una zona per vedere i suoi furgoni, tocca un furgone per cambiare autista o zona.</p>`;
 }
 
+/* ---------- stelle dei dipendenti ---------- */
+function htmlStelle(d, piccole) {
+  const s = stelleDi(d);
+  if (s === null) return `<span class="stelle in-val ${piccole ? 'piccole' : ''}">in valutazione</span>`;
+  let h = ''; for (let i = 1; i <= 5; i++) h += `<i class="${s >= i ? 'piena' : s >= i - 0.5 ? 'mezza' : ''}">★</i>`;
+  return `<span class="stelle ${s < 3 ? 'basse' : ''} ${piccole ? 'piccole' : ''}" title="${s} stelle su 5">${h}</span>`;
+}
+function riepilogoTesto(d) {
+  const r = riepilogo(d), parti = [];
+  if (d.ruolo === 'autista') {
+    parti.push(`${r.incidenti} incident${r.incidenti === 1 ? 'e' : 'i'}`, `${r.persi} pacch${r.persi === 1 ? 'o perso' : 'i persi'}`,
+      `${r.lamentele} lamentel${r.lamentele === 1 ? 'a' : 'e'}`, `${r.complimenti} compliment${r.complimenti === 1 ? 'o' : 'i'}`);
+  } else {
+    parti.push(`${r.rotti} pacch${r.rotti === 1 ? 'o rotto' : 'i rotti'}`, r.lento > r.giorni / 2 ? 'smista più lento della media' : 'velocità nella media', `${r.lamentele} litigi`);
+  }
+  return `Ultimi 30 giorni (${r.giorni} giornate di lavoro): ` + parti.join(' · ');
+}
+let personaleFiltro = 'tutti';
+
 function vistaPersonale() {
-  return ['autista', 'magazziniere'].map(ruolo => {
-    const r = RUOLI[ruolo], staff = S.dipendenti.filter(d => d.ruolo === ruolo);
+  const basse = S.dipendenti.filter(d => { const s = stelleDi(d); return s !== null && s < 3; }).length;
+  const filtro = `<div class="interruttore filtri-flotta"><button data-azione="filtro-personale" data-v="tutti" aria-pressed="${personaleFiltro === 'tutti'}">Tutti <span>${S.dipendenti.length}</span></button>
+    <button data-azione="filtro-personale" data-v="basse" aria-pressed="${personaleFiltro === 'basse'}">Sotto le 3 stelle <span>${basse}</span></button>
+    <button data-azione="filtro-personale" data-v="prova" aria-pressed="${personaleFiltro === 'prova'}">In prova <span>${S.dipendenti.filter(inProva).length}</span></button></div>`;
+  return filtro + ['autista', 'magazziniere'].map(ruolo => {
+    const r = RUOLI[ruolo], staff = S.dipendenti.filter(d => d.ruolo === ruolo).filter(d => personaleFiltro === 'tutti' || (personaleFiltro === 'prova' ? inProva(d) : (stelleDi(d) !== null && stelleDi(d) < 3)));
     const lista = staff.map(d => `<div class="scheda">
       <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="dipendente" data-id="${d.id}">${esc(d.nome)} ›</button><span class="num">${eur.format(d.stipendio)}/mese</span></div>
+      <div class="riga">${htmlStelle(d)}${inProva(d) ? `<span class="badge">in prova ancora ${STELLE.prova - (S.giorno - d.assuntoGiorno)} gg</span>` : ''}</div>
       ${ruolo === 'autista' ? `<div class="riga"><span>Esperienza</span><span class="num">${Math.round(d.esperienza)}/100</span></div><div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
       ${ruolo === 'magazziniere' && S.filiali && S.filiali.length ? `<label><span class="nota">Lavora a</span><select data-azione="citta-mag" data-id="${d.id}">${tutteCitta().map(c => `<option value="${c.id}" ${idCitta(d) === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>` : ''}
       <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id && isJolly(f)) ? '<b style="color:#ffd60a">Jolly</b>' : S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
@@ -914,6 +941,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'filtro-personale': personaleFiltro = b.dataset.v; ridisegna(); break;
     case 'percorso': percorsoAperto = !percorsoAperto; ridisegna(); break;
     case 'licenza': esito(compraLicenza(id), 'Licenza comprata!'); aggiornaZoneMappa(); break;
     case 'capoturno': S.capoturno = !S.capoturno; esito(null, S.capoturno ? 'Il capoturno organizzerà la flotta ogni mattina.' : 'Capoturno spento: organizzi tu.'); break;

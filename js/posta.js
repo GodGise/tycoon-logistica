@@ -414,7 +414,7 @@ const EMAIL_GRAVI = [
       { testo: 'Ne prendo un paio per i picchi', rep: -8, soldi: -6000, fai: () => {}, esito: 'Controllo dei Carabinieri: lavoro nero e sfruttamento. Multa enorme e notizia ovunque.' },
     ] },
 ];
-function trovaEmail(id) { return EMAIL.find(x => x.id === id) || EMAIL_GRAVI.find(x => x.id === id); }
+function trovaEmail(id) { return EMAIL.find(x => x.id === id) || EMAIL_GRAVI.find(x => x.id === id) || EMAIL_LAMENTELE.find(x => x.id === id); }
 
 // al massimo una email grave al mese, in un giorno a caso dopo il 5 del mese
 function forseEmailGrave() {
