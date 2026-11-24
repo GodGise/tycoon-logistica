@@ -63,7 +63,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
     depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino) }],
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
-    cassa: COSTANTI.cassaIniziale, reputazione: 70,
+    cassa: COSTANTI.cassaIniziale, reputazione: 70, servizio: 0.94, fama: 0,
     furgoni: [], dipendenti: [],
     offerta: { autista: RUOLI.autista.stipDefault, magazziniere: RUOLI.magazziniere.stipDefault },
     candidati: { autista: [], magazziniere: [] }, annunciInArrivo: {},
@@ -264,6 +264,7 @@ function concludiGiornata() {
 function giornoLavorativo() {
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));  // i jolly non aprono zone nuove
   forseEvento();
+  controllaPosta();
   const sciopero = effetto.sciopero();
   if (sciopero) notizia('Sciopero: oggi i furgoni restano in deposito.', 'male', 'sciopero');
   if (effetto.capacita() < 1) notizia('Neve: oggi i furgoni vanno piano e fanno meno consegne.', 'male', 'neve');
@@ -275,16 +276,20 @@ function giornoLavorativo() {
   // picchi di ordini: ogni giorno in qualche zona di ogni città arrivano più pacchi del solito.
   // Sono il lavoro del jolly: abbastanza da tenerlo occupato, non tanto da intasare tutto.
   const picco = {};
+  // Con almeno 4 zone servite: 2 zone in picco al giorno, in tutto ~1,5–2 furgoni di pacchi in più = lavoro per 2 jolly.
+  // Le zone cambiano ogni giorno (oggi il Centro, domani il Nord...).
+  const ieri = S.picchiIeri || [];
   tutteCitta().forEach(c => {
     const zc = servite.filter(z => idCitta(z) === c.id); if (zc.length < 2) return;
-    const quante = Math.max(1, Math.round(zc.length / 5));
-    let extraCitta = 0;
-    [...zc].sort(() => Math.random() - 0.5).slice(0, quante).forEach(z => {
-      const extra = Math.min(Math.round(z.pacchi * caso(0.35, 0.6)), 1.5 * COSTANTI.maxConsegneCorriere - extraCitta);
-      if (extra > 0) { picco[z.id] = extra; extraCitta += extra; }
-    });
+    const quante = zc.length >= 4 ? 2 : 1;
+    const totale = Math.round(COSTANTI.maxConsegneCorriere * (quante === 2 ? caso(1.5, 2) : caso(0.3, 0.5)));
+    const scelte = [...zc].sort(() => Math.random() - 0.5).sort((a, b) => ieri.includes(a.id) - ieri.includes(b.id)).slice(0, quante);
+    const quota = quante === 2 ? [0.6, 0.4] : [1];
+    scelte.forEach((z, i) => { picco[z.id] = Math.round(totale * quota[i]); });
   });
-  servite.forEach(z => { arrivo[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + (picco[z.id] || 0) + S.giacenze[z.id]; totale += arrivo[z.id]; });
+  S.picchiIeri = Object.keys(picco); S.piccoOggi = picco;
+  const nuovi = {};
+  servite.forEach(z => { nuovi[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + (picco[z.id] || 0); arrivo[z.id] = nuovi[z.id] + S.giacenze[z.id]; totale += arrivo[z.id]; });
   const zonePicco = Object.keys(picco).map(id => zona(id));
   if (zonePicco.length) {
     const haJolly = S.furgoni.some(f => isJolly(f) && furgoneOperativo(f));
@@ -350,15 +355,12 @@ function giornoLavorativo() {
     S.giacenze[z.id] = restano - persi;
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0);
     stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
-    perZona[z.id] = { picco: picco[z.id] || 0, arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
+    perZona[z.id] = { picco: picco[z.id] || 0, nuovi: nuovi[z.id], arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
       giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly, fuori: r.fuori, sciopero: !!sciopero };
     consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
 
     if (restano > 0 && (giri.length || daJolly)) notizia(`Zona ${z.nome}: pacchi in giacenza, la reputazione scende.`, 'male', 'giac-' + z.id);
     if (!giri.length && !daJolly && !sciopero) notizia(`Zona ${z.nome}: nessun furgone operativo oggi.`, 'male', 'ferma-' + z.id);
-    // reputazione: scende solo se resta indietro più del 10% dei pacchi della zona, sale se si consegna tutto
-    const soglia = z.pacchi * 0.1;
-    S.reputazione = limita(S.reputazione + (restano > soglia ? -Math.min(2, restano / 50) : restano > 0 ? 0 : 0.4), 0, 100);
     if (persi > 0) notizia(`Zona ${z.nome}: ${persi} ordini persi per le giacenze.`, 'male', 'persi-' + z.id);
 
     // giri dei furgoni: quelli della zona si dividono le loro consegne, i jolly portano le loro
@@ -391,8 +393,15 @@ function giornoLavorativo() {
         const costo = Math.round(casoInt(300, 1200) * effetto.guasti());
         stat(f, 'guasti', 1);
         // resta fermo finché il giocatore non paga la riparazione
-        f.daRiparare = costo; f.fermo = 1; f.motivo = 'guasto'; f.fermoDal = S.giorno;
-        notizia(`Guasto al ${m.nome}${f.usato ? ' usato' : ''}: resta fermo finché non lo ripari (${costo} €).`, 'male', 'gua-' + f.id);
+        if (S.recuperoOffline) {
+          // a gioco chiuso ci pensa il capo officina: riparato e pagato in automatico, un giorno di fermo
+          movimento('manutenzione', -costo); stat(f, 'manutenzione', costo);
+          f.fermo = 1; f.motivo = 'guasto'; f.fermoDal = S.giorno;
+          notizia(`Guasto al ${m.nome} mentre eri via: riparato in automatico (${costo} €).`, 'info', 'gua-' + f.id);
+        } else {
+          f.daRiparare = costo; f.fermo = 1; f.motivo = 'guasto'; f.fermoDal = S.giorno;
+          notizia(`Guasto al ${m.nome}${f.usato ? ' usato' : ''}: resta fermo finché non lo ripari (${costo} €).`, 'male', 'gua-' + f.id);
+        }
       }
     });
   });
@@ -411,6 +420,7 @@ function giornoLavorativo() {
   S.inCorso = { giorno: S.giorno, incasso, accreditato: 0, perFurgone, jolly: jollyOggi, contratti: chiusi, premio,
     costi: { carburante: Math.round(carburante), ricarica: Math.round(ricarica), manutenzione: Math.round(manut) } };
   S.ieri = { festivo: false, consegne: consegneTot, incasso, perZona };
+  aggiornaReputazione(perZona);
   if (consegneTot) notizia(`${consegneTot} consegne, incasso ${incasso.toLocaleString('it-IT')} €.`, 'buono', 'giornata');
 }
 
@@ -457,6 +467,8 @@ function carica() {
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
       if (!S.citta.id) S.citta.id = 'c1';
       if (!S.filiali) S.filiali = [];
+      // reputazione v2: livello di servizio + fama (vedi aggiornaReputazione)
+      if (S.servizio === undefined) { S.servizio = Math.max(0.9, 1 - (85 - Math.min(S.reputazione, 85)) / 150); S.fama = Math.max(0, S.reputazione - 85); S.reputazione = calcolaReputazione(); }
       // grafica delle zone v2: più grandi sulla mappa (pacchi e km invariati)
       if ((S.versioneZone || 1) < 2) { tutteCitta().forEach(c => ridisegnaZone(S.zone.filter(z => idCitta(z) === c.id), c)); S.versioneZone = 2; }
       if (!S.contrattiAttivi) S.contrattiAttivi = [];
@@ -495,7 +507,9 @@ function recuperaOffline() {
   if (!S || !S.salvatoIl) return null;
   const secondi = Math.min(OFFLINE_MAX_SECONDI, (Date.now() - S.salvatoIl) / 1000);
   if (secondi < 60) return null;
-  const prima = { cassa: S.cassa, giorno: S.giorno, consegne: 0 };
+  const prima = { cassa: S.cassa, giorno: S.giorno, consegne: 0, servizio: S.servizio, reputazione: S.reputazione };
+  // mentre sei via i furgoni già guasti li ripara il capo officina
+  S.furgoni.filter(f => f.daRiparare).forEach(f => { movimento('manutenzione', -f.daRiparare); f.daRiparare = 0; f.fermo = 0; f.motivo = null; });
   const durata = COSTANTI.secondiPerGiorno;
   S.recuperoOffline = true;
   S.offertaContratto = null;
@@ -511,6 +525,8 @@ function recuperaOffline() {
     if (sabato) simulaGiorno();
   }
   delete S.recuperoOffline;
+  // a gioco chiuso la reputazione può scendere al massimo di 5 punti
+  if (S.reputazione < prima.reputazione - 5) { S.servizio = Math.max(S.servizio, prima.servizio - 0.02); S.reputazione = prima.reputazione - 5; }
   return { secondi, ridotto: (Date.now() - S.salvatoIl) / 1000 > OFFLINE_MAX_SECONDI, giorni: S.giorno - prima.giorno, consegne, differenza: S.cassa - prima.cassa };
 }
 
@@ -541,3 +557,29 @@ function apriFiliale(citta, lngLat, zonePronte) {
   return null;
 }
 function spostaMagazziniere(id, cittaId) { const d = dipendente(id); if (d) d.cittaId = cittaId; }
+
+/* ---------- reputazione ----------
+   Reputazione = servizio + fama.
+   - servizio: media degli ultimi giorni (circa una settimana) della quota di pacchi consegnati.
+     Consegnare tutto vale 85 punti; ogni 1% di pacchi lasciati indietro ne toglie 1,5. Un giorno storto pesa poco.
+   - fama: le scelte nelle email, negli eventi e nei contratti (da −30 a +15), torna piano piano verso 0.
+   Ogni giorno la reputazione si muove al massimo di 3 punti per il servizio. */
+function calcolaReputazione() {
+  const base = limita(85 - 150 * (1 - S.servizio), 0, 85);
+  return limita(base + (S.fama || 0), 0, 100);
+}
+function aggiornaReputazione(perZona) {
+  // quota del giorno: pacchi consegnati / pacchi arrivati oggi (gli arretrati smaltiti contano a favore)
+  const z = Object.values(perZona || {}); const arrivo = z.reduce((t, x) => t + (x.nuovi || x.arrivo), 0);
+  if (arrivo > 0) {
+    const oggi = Math.min(1, z.reduce((t, x) => t + x.consegne, 0) / arrivo);
+    S.servizio = 0.85 * (S.servizio === undefined ? oggi : S.servizio) + 0.15 * oggi;
+  }
+  S.fama = (S.fama || 0) * 0.99;
+  const obiettivo = calcolaReputazione();
+  S.reputazione = limita(S.reputazione + limita(obiettivo - S.reputazione, -3, 3), 0, 100);
+}
+function cambiaFama(punti) {
+  S.fama = limita((S.fama || 0) + punti, -30, 15);
+  S.reputazione = limita(S.reputazione + punti, 0, 100);
+}

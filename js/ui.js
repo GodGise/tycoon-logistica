@@ -650,10 +650,40 @@ function vistaPersonale() {
   }).join('');
 }
 
-const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale };
+const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale, posta: vistaPosta };
+
+/* ---------- posta: una email decisionale a settimana ---------- */
+let emailAperta = null;
+function vistaPosta() {
+  const posta = S.posta || [];
+  if (emailAperta !== null && posta[emailAperta]) {
+    const m = posta[emailAperta], e = EMAIL.find(x => x.id === m.id), mancano = m.scadenza - S.giorno;
+    return `<button class="btn link indietro" data-azione="chiudi-email">‹ Posta</button>
+    <div class="scheda email">
+      <div class="nota">Da: <b style="color:var(--testo)">${esc(m.mittente)}</b> · ${nomeGiorno(m.giorno)}</div>
+      <h2 style="margin:4px 0 0">${esc(m.oggetto)}</h2>
+      <p class="testo-email">${esc(m.testo)}</p>
+      ${m.risposta === null ? `<p class="nota">${mancano > 0 ? `Hai ${mancano} giorn${mancano === 1 ? 'o' : 'i'} per rispondere.` : 'Ultimo giorno per rispondere!'} Se non rispondi vale la scelta peggiore.</p>
+        <div class="scelte">${e.scelte.map((s, i) => `<button class="btn" data-azione="rispondi" data-i="${i}">${esc(s.testo)}</button>`).join('')}</div>`
+      : `<div class="esito-email ${m.rep > 0 ? 'buono' : m.rep < 0 ? 'male' : ''}"><b>Hai scelto:</b> ${esc(e.scelte[m.risposta].testo)}<p>${esc(m.esito)}</p>
+          <div class="riga"><span>Reputazione</span><span class="num ${m.rep > 0 ? 'piu' : m.rep < 0 ? 'meno' : ''}">${m.rep > 0 ? '+' : ''}${m.rep}</span></div>
+          ${m.soldi ? `<div class="riga"><span>Soldi</span><span class="num ${m.soldi > 0 ? 'piu' : 'meno'}">${m.soldi > 0 ? '+' : '−'}${eur.format(Math.abs(m.soldi))}</span></div>` : ''}</div>`}
+    </div>`;
+  }
+  const lista = posta.map((m, i) => `<button class="voce-email ${m.risposta === null ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
+      <span class="mittente">${m.risposta === null ? '<i class="punto-blu"></i>' : ''}${esc(m.mittente)}</span>
+      <span class="quando">${nomeGiorno(m.giorno)}</span>
+      <b>${esc(m.oggetto)}</b>
+      <span class="anteprima">${m.risposta === null ? esc(m.testo) : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
+    </button>`).join('');
+  return `<div class="scheda"><div class="riga"><h2 style="margin:0">Posta</h2><span class="badge">Reputazione ${Math.round(S.reputazione)}</span></div>
+    <p class="nota">Ogni lunedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai ${POSTA.giorniPerRispondere} giorni per rispondere.</p></div>
+    ${lista ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per ora. La prima arriva lunedì, quando hai almeno un furgone.</p>'}`;
+}
 
 function testata() {
   $('#nome-azienda').textContent = S ? S.nomeAzienda : 'Tycoon Logistica';
+  { const n = S ? emailNonLette() : 0, p = document.querySelector('.pallino-posta'); if (p) { p.hidden = !n; p.textContent = n; } }
   $('#sotto-marchio').textContent = S ? `Tycoon Logistica · ${S.citta.nome}${S.filiali && S.filiali.length ? ' + ' + S.filiali.length + ' filial' + (S.filiali.length > 1 ? 'i' : 'e') : ''}` : 'nome del gioco provvisorio';
   $('#logo').textContent = S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL';
   if (!S) { $('#cassa').textContent = '–'; $('#utile-mese').textContent = 'Scegli una città per iniziare'; $('#data').textContent = 'Nuova partita'; return; }
@@ -740,6 +770,9 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'apri-email': emailAperta = +b.dataset.i; $('#contenuto').scrollTop = 0; break;
+    case 'chiudi-email': emailAperta = null; break;
+    case 'rispondi': { const err = rispondiEmail(emailAperta, +b.dataset.i); esito(err); break; }
     case 'salva-online': accountAttesa = true; ridisegna(); salvaOnline(false).then(r => { accountAttesa = false; dopoCambioPartita(r === 'ok' ? 'Partita salvata online.' : r === 'altro' ? 'Ho caricato la partita più recente dall\'altro dispositivo.' : null); }); break;
     case 'esci-account': accountAttesa = true; ridisegna(); esciAccount().then(() => { accountAttesa = false; dopoCambioPartita('Sei uscito. La partita resta anche su questo dispositivo.'); }); break;
     case 'ripara': { const err = ripara(id); esito(err, 'Furgone riparato: dalla prossima giornata torna a lavorare.'); $('#guasti').dataset.chiave = '-'; disegnaGuasti(); break; }
