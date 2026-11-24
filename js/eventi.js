@@ -8,27 +8,28 @@ const MIGLIORAMENTI = {
   formazione:{ nome: 'Corso di guida sicura', motto: 'Autisti più attenti, furgoni sempre in strada.', descr: 'Gli autisti fanno il 40% di incidenti in meno.', livelli: [20000] },
   officina:  { nome: 'Officina nel magazzino', motto: 'Un meccanico tutto tuo, giorno e notte.', descr: 'Ripara i guasti da solo, anche a gioco chiuso, a metà prezzo.', livelli: [50000] },
 };
-function livello(id) { return (S.miglioramenti && S.miglioramenti[id]) || 0; }
-function prezzoMiglioramento(id) { const l = MIGLIORAMENTI[id].livelli; return livello(id) < l.length ? l[livello(id)] : null; }
+// i miglioramenti sono di ogni magazzino (di default quello che stai gestendo)
+function livello(id, mag) { const m = S.depositi && magazzino(mag || magAttivo()); return (m && m.migl && m.migl[id]) || 0; }
+function prezzoMiglioramento(id, mag) { const l = MIGLIORAMENTI[id].livelli; return livello(id, mag) < l.length ? l[livello(id, mag)] : null; }
 function compraMiglioramento(id) {
   if (!sbloccato('miglioramenti', id)) return `Si sblocca al livello ${livelloPer('miglioramenti', id)}.`;
   const prezzo = prezzoMiglioramento(id);
   if (prezzo === null) return 'Hai già il livello massimo.';
   if (S.cassa < prezzo) return 'Non hai abbastanza soldi.';
   movimento('miglioramenti', -prezzo);
-  S.miglioramenti = S.miglioramenti || {};
-  S.miglioramenti[id] = livello(id) + 1;
-  notizia(`Comprato: ${MIGLIORAMENTI[id].nome}${MIGLIORAMENTI[id].livelli.length > 1 ? ' livello ' + livello(id) : ''}.`, 'buono');
+  const m = magazzino(magAttivo()); m.migl = m.migl || {};
+  m.migl[id] = livello(id) + 1;
+  notizia(`${m.nome}: ${MIGLIORAMENTI[id].nome}${MIGLIORAMENTI[id].livelli.length > 1 ? ' livello ' + livello(id) : ''}.`, 'buono');
   return null;
 }
 // moltiplicatori usati dalla simulazione
 const effetto = {
-  smistamento: () => livello('nastro') ? 1.5 : 1,
-  km: zonaId => (1 - 0.1 * livello('software')) * (S.effetti && S.effetti.lavori && S.effetti.lavori.zona === zonaId && S.giorno <= S.effetti.lavori.fino ? 1.3 : 1),
-  pacchi: zonaId => (1 + 0.1 * livello('pubblicita')) * (S.effetti && S.effetti.accordo && S.effetti.accordo.zona === zonaId && S.giorno <= S.effetti.accordo.fino ? 1.25 : 1),
+  smistamento: mag => livello('nastro', mag) ? 1.5 : 1,
+  km: zonaId => (1 - 0.1 * livello('software', magDi(zona(zonaId)))) * (S.effetti && S.effetti.lavori && S.effetti.lavori.zona === zonaId && S.giorno <= S.effetti.lavori.fino ? 1.3 : 1),
+  pacchi: zonaId => (1 + 0.1 * livello('pubblicita', magDi(zona(zonaId)))) * (S.effetti && S.effetti.accordo && S.effetti.accordo.zona === zonaId && S.giorno <= S.effetti.accordo.fino ? 1.25 : 1),
   tariffaZona: zonaId => S.effetti && S.effetti.accordo && S.effetti.accordo.zona === zonaId && S.giorno <= S.effetti.accordo.fino ? 0.9 : 1,
-  incidenti: () => livello('formazione') ? 0.6 : 1,
-  guasti: () => livello('officina') ? 0.5 : 1,
+  incidenti: mag => livello('formazione', mag) ? 0.6 : 1,
+  guasti: mag => livello('officina', mag) ? 0.5 : 1,
   capacita: () => S.effetti && S.effetti.neve === S.giorno ? 0.6 : 1,
   sciopero: () => S.effetti && S.effetti.sciopero === S.giorno,
 };
@@ -119,7 +120,9 @@ function aggiornaEvento(dt) {
 }
 
 // Prima di comprare un altro magazzino (o aprire una filiale) bisogna completare tutti i miglioramenti del magazzino
-function miglioramentiMancanti() { return Object.keys(MIGLIORAMENTI).filter(id => prezzoMiglioramento(id) !== null); }
-function costoMiglioramentiMancanti() {
-  return miglioramentiMancanti().reduce((t, id) => t + MIGLIORAMENTI[id].livelli.slice(livello(id)).reduce((a, b) => a + b, 0), 0);
+function miglioramentiMancanti(mag) { return Object.keys(MIGLIORAMENTI).filter(id => prezzoMiglioramento(id, mag) !== null); }
+function costoMiglioramentiMancanti(mag) {
+  return miglioramentiMancanti(mag).reduce((t, id) => t + MIGLIORAMENTI[id].livelli.slice(livello(id, mag)).reduce((a, b) => a + b, 0), 0);
 }
+// un altro magazzino si compra solo quando tutti quelli che hai hanno un responsabile
+function magazziniSenzaResponsabile() { return S.depositi.filter(m => !m.responsabile); }

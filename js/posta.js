@@ -4,10 +4,10 @@
 
 const POSTA = { giorniSettimana: [1], giorniPerRispondere: 7, massimoInAttesa: 3 };   // una email ogni lunedì
 // al massimo 3 email da leggere alla volta, anche dopo tanto tempo offline
-function postaPiena() { return (S.posta || []).filter(m => m.risposta === null).length >= POSTA.massimoInAttesa; }
+function postaPiena() { return (S.posta || []).filter(m => m.risposta === null && !m.report).length >= POSTA.massimoInAttesa; }
 function segnaUsata(id) { S.postaUsate = (S.postaUsate || []).concat(id).slice(-30); S.postaRicevute = (S.postaRicevute || 0) + 1; }
 // le email già risposte o scadute spariscono dall'elenco
-function pulisciPosta() { S.posta = (S.posta || []).filter(m => m.risposta === null); }   // lunedì e giovedì
+function pulisciPosta() { S.posta = (S.posta || []).filter(m => m.risposta === null && !m.archiviato); }   // lunedì e giovedì
 
 // Ogni scelta: rep (punti reputazione), soldi (+/−), esito (spiegazione mostrata dopo).
 // La prima email arriva quando l'azienda ha almeno un furgone.
@@ -292,7 +292,7 @@ function testoDi(v) { return typeof v === 'function' ? v() : v; }
 function controllaPosta() {
   S.posta = S.posta || [];
   // a gioco chiuso le email non scadono: aspettano che torni
-  if (S.recuperoOffline) S.posta.filter(m => m.risposta === null).forEach(m => { m.scadenza = Math.max(m.scadenza, S.giorno + 1); });
+  if (S.recuperoOffline) S.posta.filter(m => m.risposta === null && !m.report).forEach(m => { m.scadenza = Math.max(m.scadenza, S.giorno + 1); });
   // scadute dopo una settimana: nessuna scelta, solo −1 di reputazione
   S.posta.filter(m => m.risposta === null && S.giorno > m.scadenza).forEach(m => {
     m.risposta = -1; m.letta = true; m.rep = -1; m.soldi = 0; m.esito = 'Non hai risposto in tempo: il mittente è rimasto senza risposta.';
@@ -331,7 +331,7 @@ function rispondiEmail(indice, scelta) {
   applicaRisposta(m, scelta, false);
   return null;
 }
-function emailNonLette() { return (S && S.posta || []).filter(m => m.risposta === null).length; }
+function emailNonLette() { return (S && S.posta || []).filter(m => m.report ? !m.letta : m.risposta === null).length; }
 
 /* ---------- email gravi: una al mese, con conseguenze vere su un dipendente o un furgone ---------- */
 // ctx: chi è coinvolto. Le scelte hanno rep/soldi/esito come le altre, più fai(ctx) con l'effetto sul gioco.

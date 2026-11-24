@@ -56,7 +56,11 @@ function prezzoMagazzino(citta, lngLat, primo) {
   const p = (COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t) * (primo ? 1 : rincaroMagazzini());
   return Math.round(p / 5000) * 5000;
 }
-function kmGiro(z) { return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * magazzinoVicino(z.centro, idCitta(z)).km); }
+function kmGiro(z) {
+  // i km partono dal magazzino a cui appartiene la zona (o dal più vicino)
+  const m = z.mag && S.depositi.find(x => x.id === z.mag);
+  return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * (m ? distanzaKm([m.lng, m.lat], z.centro) : magazzinoVicino(z.centro, idCitta(z)).km));
+}
 function dipendente(id) { return S.dipendenti.find(d => d.id === id); }
 function nuovoId(pref) { S.seq += 1; return pref + S.seq; }
 
@@ -65,7 +69,7 @@ function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); r
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   S = {
     citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, xp: 0, licenze: {}, capoturno: false, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
-    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino, true) }],
+    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino, true), migl: {} }], magAttivo: 'm1',
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
     cassa: COSTANTI.cassaIniziale, reputazione: 70, servizio: 0.94, fama: 0,
@@ -77,7 +81,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
     feed: [], prezzi: prezzi || PREZZI_RISERVA, tempoGiorno: 0,
     offertaContratto: null, contrattiAttivi: [], obiettivo: null, miglioramenti: {}, effetti: {}, evento: null,
   };
-  S.zone.forEach(z => S.giacenze[z.id] = 0);
+  S.zone.forEach(z => { S.giacenze[z.id] = 0; z.mag = 'm1'; });
   movimento('magazzini', -S.depositi[0].valore);
   generaCandidati('autista'); generaCandidati('magazziniere');
   notizia(`Benvenuto, ${S.nomeAzienda}! Sei a ${citta.nome}. Compra un furgone, assumi un autista e un magazziniere, poi assegna il furgone a una zona.`, 'info');
@@ -146,7 +150,7 @@ function assumi(candId, ruolo) {
   const i = S.candidati[ruolo].findIndex(c => c.id === candId);
   if (i < 0) return 'Candidato non più disponibile.';
   const c = S.candidati[ruolo].splice(i, 1)[0];
-  S.dipendenti.push({ id: nuovoId('d'), nome: c.nome, ruolo, stipendio: c.stipendio, esperienza: c.esperienza, assuntoGiorno: S.giorno, indole: c.indole, reg: [] });
+  S.dipendenti.push({ id: nuovoId('d'), nome: c.nome, ruolo, stipendio: c.stipendio, esperienza: c.esperienza, assuntoGiorno: S.giorno, indole: c.indole, reg: [], mag: magAttivo() });
   notizia(`Assunto ${c.nome} come ${RUOLI[ruolo].nome.toLowerCase()}.`, 'buono');
   return null;
 }
@@ -168,7 +172,7 @@ function compraFurgone(idModello, usato) {
   if (S.cassa < prezzo) return 'Non hai abbastanza soldi.';
   movimento('mezzi', -prezzo);
   S.furgoni.push({ id: nuovoId('f'), modello: m.id, usato, km: usato ? casoInt(90000, 180000) : 0,
-    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0 });
+    autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0, mag: magAttivo() });
   notizia(`Comprato ${m.nome}${usato ? ' usato' : ''} per ${prezzo.toLocaleString('it-IT')} €.`, 'info');
   return null;
 }
@@ -185,13 +189,14 @@ function puoiMettereMagazzino(lngLat) {
   return km <= citta.raggio * COSTANTI.distanzaMaxMagazzino ? null : `Troppo lontano dalle tue città (${Math.round(km)} km dal centro di ${citta.nome}).`;
 }
 function apriMagazzino(lngLat) {
-  if (miglioramentiMancanti().length) return 'Prima completa tutti i miglioramenti del magazzino.';
+  if (magazziniSenzaResponsabile().length) return 'Prima completa i miglioramenti e affida ogni magazzino a un responsabile.';
   const err = puoiMettereMagazzino(lngLat); if (err) return err;
   const cittaM = cittaVicina(lngLat).citta, prezzo = prezzoMagazzino(cittaM, lngLat);
   if (S.cassa < prezzo) return `Qui un magazzino costa ${prezzo.toLocaleString('it-IT')} €: non hai abbastanza soldi.`;
   movimento('magazzini', -prezzo);
   const n = S.depositi.length + 1;
-  S.depositi.push({ id: nuovoId('m'), cittaId: cittaM.id, nome: 'Magazzino ' + n + (S.filiali.length ? ' ' + cittaM.nome : ''), lng: lngLat[0], lat: lngLat[1], valore: prezzo });
+  const nuovo = { id: nuovoId('m'), cittaId: cittaM.id, nome: 'Magazzino ' + n + (S.filiali.length ? ' ' + cittaM.nome : ''), lng: lngLat[0], lat: lngLat[1], valore: prezzo, migl: {} };
+  S.depositi.push(nuovo); assegnaZoneNuovoMagazzino(nuovo); S.magAttivo = nuovo.id;
   notizia(`Comprato il Magazzino ${n} per ${prezzo.toLocaleString('it-IT')} €. Ogni zona parte dal magazzino più vicino.`, 'buono');
   return null;
 }
@@ -213,6 +218,7 @@ function assegna(idFurgone, campo, valore) {
     f.autistaId = valore || null;
   } else {
     const z = valore && !String(valore).startsWith(ZONA_JOLLY) ? zona(valore) : null;
+    if (z && magDi(z) !== magDi(f)) return 'altro-magazzino';
     if (z && !haLicenza(z)) { notizia(`Per consegnare in ${nomeZona(z)} serve la licenza (${prezzoLicenza(z).toLocaleString('it-IT')} €).`, 'male'); return 'licenza'; }
     f.zona = valore || null;
   }
@@ -280,7 +286,8 @@ function giornoLavorativo() {
   const servite = S.zone.filter(z => S.furgoni.some(f => f.zona === z.id));  // i jolly non aprono zone nuove
   forseEvento();
   controllaPosta();
-  if (S.capoturno && sbloccato('capoturno')) { const n = applicaPiano(pianoOrganizza()); if (n) notizia(`Il capoturno ha riorganizzato la flotta (${n} cambi).`, 'info', 'capoturno'); }
+  lavoroResponsabili(); contrattiResponsabili();
+  if (S.capoturno && S.gestionale && sbloccato('capoturno')) { let n = 0; S.depositi.filter(m => !m.responsabile).forEach(m => { n += applicaPiano(pianoOrganizza(m.id)); }); if (n) notizia(`Il capoturno ha riorganizzato la flotta (${n} cambi).`, 'info', 'capoturno'); }
   effettiDipendenti();
   const sciopero = effetto.sciopero();
   if (sciopero) notizia('Sciopero: oggi i furgoni restano in deposito.', 'male', 'sciopero');
@@ -314,14 +321,15 @@ function giornoLavorativo() {
     notizia(`Picco di ordini in ${zonePicco.map(z => nomeZona(z)).join(', ')} (+${Object.values(picco).reduce((a, b) => a + b, 0)} pacchi). ${haJolly ? 'Ci pensa il jolly.' : 'Un furgone jolly li porterebbe via.'}`, haJolly ? 'info' : 'male', 'picco');
   }
   S.zone.forEach(z => { if (!arrivo[z.id]) S.giacenze[z.id] = 0; });
-  // smistamento: ogni città ha i suoi magazzinieri
-  const quota = {}, multi = S.filiali && S.filiali.length;
-  tutteCitta().forEach(c => {
-    const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && idCitta(x) === c.id && !(x.sospesoFino >= S.giorno));
-    const cap = Math.round(mags.reduce((t, m) => t + fattoreSmistamento(m), 0) * COSTANTI.pacchiMagazziniere * effetto.smistamento());
+  // smistamento: ogni magazzino ha i suoi magazzinieri
+  const quota = {}, multi = S.depositi.length > 1;
+  S.depositi.forEach(c => {
+    const mags = S.dipendenti.filter(x => x.ruolo === 'magazziniere' && magDi(x) === c.id && !(x.sospesoFino >= S.giorno));
+    const cap = Math.round(mags.reduce((t, m) => t + fattoreSmistamento(m), 0) * COSTANTI.pacchiMagazziniere * effetto.smistamento(c.id));
     mags.forEach(giornataMagazziniere);
-    const tot = servite.filter(z => idCitta(z) === c.id).reduce((t, z) => t + arrivo[z.id], 0);
+    const tot = servite.filter(z => magDi(z) === c.id).reduce((t, z) => t + arrivo[z.id], 0);
     quota[c.id] = tot > 0 ? Math.min(1, cap / tot) : 0;
+    c.quotaIeri = tot > 0 ? quota[c.id] : 1;
     mags.forEach(x => { stat(x, 'giorni', 1); stat(x, 'pacchi', Math.floor(tot * quota[c.id]) / mags.length); });
     const dove = multi ? c.nome + ': ' : '';
     if (tot > 0 && !mags.length) notizia(`${dove}nessun magazziniere, i pacchi restano nel magazzino e i furgoni non partono.`, 'male', 'no-mag-' + c.id);
@@ -335,7 +343,7 @@ function giornoLavorativo() {
   // 1) ogni zona con i suoi furgoni: prima i contratti, poi i pacchi normali
   const ris = {};
   servite.forEach(z => {
-    const smistati = Math.floor(arrivo[z.id] * quota[idCitta(z)]);
+    const smistati = Math.floor(arrivo[z.id] * (quota[magDi(z)] || 0));
     const giri = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && furgoneOperativo(f));
     const ec = eseguiContratti(z, giri, giri.reduce((t, f) => t + capacitaFurgone(f), 0));
     chiusi.push(...ec.chiusi);
@@ -354,7 +362,8 @@ function giornoLavorativo() {
     let posto = capacitaFurgone(f); jollyOggi[f.id] = null;
     for (let giro = 0; giro < 2 && posto > 10; giro++) {
       let meglio = null, attesa = 0;
-      Object.values(ris).forEach(r => { if (idCitta(r.z) !== cittaJolly(f)) return; const pronti = r.smistati - r.consegne; if (pronti > attesa) { attesa = pronti; meglio = r; } });
+      Object.values(ris).forEach(r => { if (magDi(r.z) !== magDi(f)) return;   // il jolly lavora per il suo magazzino
+ const pronti = r.smistati - r.consegne; if (pronti > attesa) { attesa = pronti; meglio = r; } });
       if (!meglio) break;
       const extra = Math.min(attesa, posto);
       meglio.consegne += extra; meglio.jolly.push({ f, n: extra }); posto -= extra;
@@ -374,6 +383,7 @@ function giornoLavorativo() {
     S.giacenze[z.id] = restano - persi;
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0);
     stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
+    stat(magazzino(magDi(z)) || S.depositi[0], 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
     perZona[z.id] = { picco: picco[z.id] || 0, nuovi: nuovi[z.id], arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
       giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly, fuori: r.fuori, sciopero: !!sciopero };
     consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
@@ -386,13 +396,14 @@ function giornoLavorativo() {
     const totZona = consegne - daJolly + consegneCtr;
     const lavori = giri.map((f, i) => ({ f, mie: Math.floor(totZona / giri.length) + (i < totZona % giri.length ? 1 : 0) }))
       .concat(r.jolly.map(j => ({ f: j.f, mie: j.n })));
-    stat(magazzinoVicino(z.centro, idCitta(z)).magazzino, 'pacchi', r.smistati);
+    stat(magazzino(magDi(z)) || magazzinoVicino(z.centro, idCitta(z)).magazzino, 'pacchi', r.smistati);
     lavori.forEach(({ f, mie }) => {
       perFurgone[f.id] = mie;
       const km = Math.round(kmGiro(z) * effetto.km(z.id) * (ha(f, 'navigatore') ? 0.92 : 1) * (0.7 + 0.3 * Math.min(1, mie / 100)));
       const m = modello(f.modello), c = costoKm(m, f.usato);
       if (m.tipo === 'diesel') carburante += km * c.energia; else ricarica += km * c.energia;
       manut += km * c.manutenzione;
+      stat(magazzino(magDi(f)) || S.depositi[0], 'costi', km * (c.energia + c.manutenzione));
       f.km += km;
       const a = dipendente(f.autistaId);
       a.esperienza = Math.min(100, a.esperienza + 0.15);
@@ -403,17 +414,17 @@ function giornoLavorativo() {
       stat(a, 'giorni', 1); stat(a, 'consegne', mie); stat(a, 'km', km);
       giornataAutista(a, f, mie, S.giacenze[z.id] === 0);
       // incidente: dipende dall'esperienza
-      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti() * (ha(f, 'telecamere') ? 0.75 : 1) * (a.rischio || 1) * fattoreIncidenti(a) * (f.difettoFino >= S.giorno ? 2 : 1);
+      const pKm = Math.max(0.00004, 0.00032 - 0.0000028 * a.esperienza) * effetto.incidenti(magDi(a)) * (ha(f, 'telecamere') ? 0.75 : 1) * (a.rischio || 1) * fattoreIncidenti(a) * (f.difettoFino >= S.giorno ? 2 : 1);
       if (Math.random() < Math.max(pKm * km, a.indole === 'distratto' ? 0.15 : 0)) {   // il distratto: circa 3 incidenti al mese
         stat(f, 'incidenti', 1); stat(a, 'incidenti', 1); registra(a, 'incidente');
         f.fermo = casoInt(1, 3); f.motivo = 'incidente'; f.fermoDal = S.giorno;
         f.premio = (f.premio || 1) + COSTANTI.aumentoPremioIncidente; f.incidenti = (f.incidenti || 0) + 1;
         notizia(`Incidente: ${a.nome} con il ${m.nome}. Furgone fermo ${f.fermo} gg, assicurazione di questo furgone a ${assicurazioneFurgone(f)} €/mese. La riparazione è trattenuta dallo stipendio.`, 'male', 'inc-' + f.id);
       } else if (Math.random() < GUASTO_GIORNO[f.usato ? 'usato' : 'nuovo'] * (1 + f.km / 300000) * (ha(f, 'tagliandi') ? 0.6 : 1)) {
-        const costo = Math.round(casoInt(300, 1200) * effetto.guasti());
+        const costo = Math.round(casoInt(300, 1200) * effetto.guasti(magDi(f)));
         stat(f, 'guasti', 1);
         // resta fermo finché il giocatore non paga la riparazione
-        if (livello('officina')) {
+        if (livello('officina', magDi(f)) || gestito(magDi(f))) {
           // con l'officina nel magazzino il meccanico ripara da solo (anche a gioco chiuso): un giorno di fermo
           movimento('manutenzione', -costo); stat(f, 'manutenzione', costo);
           f.fermo = 1; f.motivo = 'guasto'; f.fermoDal = S.giorno;
@@ -468,13 +479,24 @@ function fineMese(d) {
   const nomeMese = d.toLocaleDateString('it-IT', { month: 'long' });
   if (personale) notizia(`Busta paga di ${nomeMese}: ${Math.round(personale)} € al personale.`, 'info', 'paga');
   if (assic) notizia(`Assicurazione flotta di ${nomeMese}: ${assic} €.`, 'info', 'assic');
-  S.furgoni.forEach(f => stat(f, 'assicurazione', assicurazioneFurgone(f)));
+  S.furgoni.forEach(f => { stat(f, 'assicurazione', assicurazioneFurgone(f)); stat(magazzino(magDi(f)) || S.depositi[0], 'costi', assicurazioneFurgone(f)); });
+  S.dipendenti.forEach(x => stat(magazzino(magDi(x)) || S.depositi[0], 'costi', x.stipendio * (S.giorno - Math.max(x.assuntoGiorno, primo) + 1) / gg));
+  reportMensile(d);
+
   S.dipendenti.forEach(x => stat(x, 'stipendio', x.stipendio * (S.giorno - Math.max(x.assuntoGiorno, primo) + 1) / gg));
   [...S.furgoni, ...S.dipendenti, ...S.depositi, ...S.zone].forEach(chiudiMeseStat);
   S.storico.unshift({ mese: S.conti.mese, voci: S.conti.voci });
   S.storico.length = Math.min(S.storico.length, 12);
   S.conti = { mese: chiaveMese(dataDelGiorno(S.giorno + 1)), voci: vociVuote() };
   if (S.cassa < 0) notizia('Cassa in rosso! Vendi un mezzo o riduci i costi.', 'male', 'rosso');
+}
+
+const COSTO_GESTIONALE = 30000;   // una volta sola, poi è tuo per sempre
+function compraGestionale() {
+  if (S.gestionale) return null;
+  if (!sbloccato('capoturno')) return 'Non ancora sbloccato.';
+  if (S.cassa < COSTO_GESTIONALE) return 'Non hai abbastanza soldi.';
+  movimento('miglioramenti', -COSTO_GESTIONALE); S.gestionale = true; S.capoturno = true; salva(); return null;
 }
 
 /* ---------- salvataggio ---------- */
@@ -488,6 +510,14 @@ function carica() {
       if (!S.nomeAzienda) S.nomeAzienda = 'Logistica ' + S.citta.nome;
       if (!S.citta.id) S.citta.id = 'c1';
       if (!S.filiali) S.filiali = [];
+      // magazzini come sedi: zone, furgoni e dipendenti appartengono a un magazzino; miglioramenti per magazzino
+      if (!S.depositi[0].migl) {
+        S.depositi.forEach(m => { m.migl = Object.assign({}, S.miglioramenti || {}); });
+        S.zone.forEach(z => { z.mag = magazzinoVicino(z.centro, idCitta(z)).magazzino.id; });
+        S.furgoni.forEach(f => { const z = f.zona && !isJolly(f) && zona(f.zona); f.mag = z ? z.mag : (S.depositi.find(m => idCitta(m) === (isJolly(f) ? cittaJolly(f) : 'c1')) || S.depositi[0]).id; });
+        S.dipendenti.forEach(d => { const f = S.furgoni.find(x => x.autistaId === d.id); d.mag = f ? f.mag : (S.depositi.find(m => idCitta(m) === idCitta(d)) || S.depositi[0]).id; });
+        S.magAttivo = S.depositi[0].id;
+      }
       // posta: via le email già risposte, al massimo 3 da leggere (le più recenti)
       if (S.posta && S.postaRicevute === undefined) { S.postaUsate = S.posta.map(m => m.id).slice(0, 30); S.postaRicevute = S.posta.length; S.posta = S.posta.filter(m => m.risposta === null).slice(0, 3); }
       // livelli e licenze: l'esperienza parte dalle consegne già fatte; le zone di periferia già servite restano tue
@@ -536,7 +566,7 @@ function recuperaOffline() {
   if (secondi < 60) return null;
   const prima = { cassa: S.cassa, giorno: S.giorno, consegne: 0, servizio: S.servizio, reputazione: S.reputazione };
   // con l'officina nel magazzino i furgoni già guasti si riparano mentre sei via
-  if (livello('officina')) S.furgoni.filter(f => f.daRiparare).forEach(f => { movimento('manutenzione', -f.daRiparare); f.daRiparare = 0; f.fermo = 0; f.motivo = null; });
+  S.furgoni.filter(f => f.daRiparare && livello('officina', magDi(f))).forEach(f => { movimento('manutenzione', -f.daRiparare); f.daRiparare = 0; f.fermo = 0; f.motivo = null; });
   const durata = COSTANTI.secondiPerGiorno;
   S.recuperoOffline = true;
   S.offertaContratto = null;
@@ -562,7 +592,7 @@ const FILIALE = { costo: 50000, furgoni: 5, reputazione: 60 };
 function requisitiFiliale() {
   const mancano = [];
   if (!sbloccato('filiali')) mancano.push(`il livello ${livelloPer('filiali')} dell'azienda`);
-  if (miglioramentiMancanti().length) mancano.push('tutti i miglioramenti del magazzino completati');
+  if (magazziniSenzaResponsabile().length) mancano.push('un responsabile in ogni magazzino');
   if (S.furgoni.length < FILIALE.furgoni) mancano.push(`almeno ${FILIALE.furgoni} furgoni (ne hai ${S.furgoni.length})`);
   if (S.reputazione < FILIALE.reputazione) mancano.push(`reputazione almeno ${FILIALE.reputazione} (ora ${Math.round(S.reputazione)})`);
   if (S.cassa < FILIALE.costo + prezzoMagazzinoMin()) mancano.push(`almeno ${(FILIALE.costo + prezzoMagazzinoMin()).toLocaleString('it-IT')} € in cassa`);
@@ -580,8 +610,9 @@ function apriFiliale(citta, lngLat, zonePronte) {
   movimento('magazzini', -(FILIALE.costo + prezzo));
   S.filiali.push(nuova);
   const zone = (zonePronte || generaZone(nuova)).map(z => Object.assign(z, { id: id + '-' + z.id, cittaId: id }));
-  zone.forEach(z => { S.zone.push(z); S.giacenze[z.id] = 0; });
-  S.depositi.push({ id: nuovoId('m'), cittaId: id, nome: 'Magazzino ' + citta.nome, lng: lngLat[0], lat: lngLat[1], valore: prezzo });
+  const mNuovo = { id: nuovoId('m'), cittaId: id, nome: 'Magazzino ' + citta.nome, lng: lngLat[0], lat: lngLat[1], valore: prezzo, migl: {} };
+  S.depositi.push(mNuovo); S.magAttivo = mNuovo.id;
+  zone.forEach(z => { z.mag = mNuovo.id; S.zone.push(z); S.giacenze[z.id] = 0; });
   notizia(`Aperta la filiale di ${citta.nome}! Assumi magazzinieri per la nuova città e assegna i furgoni alle sue zone.`, 'buono');
   return null;
 }
@@ -619,22 +650,21 @@ function cambiaFama(punti) {
    3) i furgoni in più (o in deposito) vanno alle zone che ne hanno bisogno, poi diventano jolly della loro città;
    4) i giri più lunghi ai furgoni che costano meno al km, i jolly a quelli che consumano di più.
    Restituisce l'elenco dei cambi senza applicarli, così il giocatore li vede prima. */
-function pianoOrganizza() {
-  const cambi = [], prova = S.furgoni.map(f => ({ f, autista: f.autistaId, zona: f.zona }));
-  const occupati = new Set(prova.map(p => p.autista).filter(Boolean));
-  const liberi = S.dipendenti.filter(d => d.ruolo === 'autista' && !occupati.has(d.id) && !(d.sospesoFino >= S.giorno)).sort((a, b) => b.esperienza - a.esperienza);
-  prova.filter(p => !p.autista && !p.f.daRiparare).forEach(p => { const d = liberi.shift(); if (d) p.autista = d.id; });
-  const pacchi = z => z.pacchi * (1 + 0.1 * livello('pubblicita'));
-  const pronto = p => p.autista && !p.f.daRiparare && p.f.fermo === 0;
-  tutteCitta().forEach(c => {
-    const jolly = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id;
-    const diCitta = p => p.zona ? (p.zona.startsWith(ZONA_JOLLY) ? (p.zona.split(':')[1] || 'c1') === c.id : idCitta(zona(p.zona)) === c.id)
-      : (S.depositi.find(m => idCitta(m) === c.id) && c.id === 'c1');   // i furgoni in deposito li prende la sede
-    const miei = prova.filter(diCitta);
-    const servite = S.zone.filter(z => idCitta(z) === c.id && miei.some(p => p.zona === z.id));
+function pianoOrganizza(soloMag) {
+  // lavora magazzino per magazzino: furgoni, autisti e zone non passano da un magazzino all'altro
+  const cambi = [], prova = S.furgoni.filter(f => !soloMag || magDi(f) === soloMag).map(f => ({ f, autista: f.autistaId, zona: f.zona }));
+  const pronto = p => p.autista && !p.f.daRiparare && p.f.fermo === 0 && !autistaSospeso(p.f);
+  S.depositi.filter(c => !soloMag || c.id === soloMag).forEach(c => {
+    const miei = prova.filter(p => magDi(p.f) === c.id);
+    const occupati = new Set(S.furgoni.map(f => f.autistaId).filter(Boolean));
+    const liberi = S.dipendenti.filter(d => d.ruolo === 'autista' && magDi(d) === c.id && !occupati.has(d.id) && !(d.sospesoFino >= S.giorno)).sort((a, b) => b.esperienza - a.esperienza);
+    miei.filter(p => !p.autista && !p.f.daRiparare).forEach(p => { const d = liberi.shift(); if (d) p.autista = d.id; });
+    const pacchi = z => z.pacchi * (1 + 0.1 * livello('pubblicita', c.id));
+    const jolly = (miei.find(p => p.zona && p.zona.startsWith(ZONA_JOLLY)) || {}).zona || ZONA_JOLLY;
+    const servite = S.zone.filter(z => magDi(z) === c.id && miei.some(p => p.zona === z.id));
     const posti = z => miei.filter(p => p.zona === z.id && pronto(p)).reduce((t, p) => t + capacitaFurgone(p.f), 0);
     // furgoni da ridistribuire: in deposito con autista, jolly, e quelli in più nelle zone servite
-    const pool = miei.filter(p => pronto(p) && (!p.zona || p.zona === jolly));
+    const pool = miei.filter(p => pronto(p) && (!p.zona || p.zona.startsWith(ZONA_JOLLY)));
     servite.forEach(z => {
       const nella = miei.filter(p => p.zona === z.id && pronto(p)).sort((a, b) => capacitaFurgone(a.f) - capacitaFurgone(b.f));
       while (nella.length > 1 && posti(z) - capacitaFurgone(nella[0].f) >= pacchi(z)) { const p = nella.shift(); p.zona = null; pool.push(p); }
@@ -646,7 +676,7 @@ function pianoOrganizza() {
     pool.forEach(p => { p.zona = jolly; });
     // 4) i giri con più km ai furgoni che costano meno al km (elettrici, poco consumo);
     //    i jolly, che fanno pochi km, ai furgoni che consumano di più. Si scambiano solo i posti, non i numeri.
-    const posto = p => p.zona === jolly ? 0 : kmGiro(zona(p.zona));
+    const posto = p => p.zona.startsWith(ZONA_JOLLY) ? 0 : kmGiro(zona(p.zona));
     const attivi = miei.filter(p => pronto(p) && p.zona);
     const posti2 = attivi.map(p => p.zona).sort((a, b) => posto({ zona: b }) - posto({ zona: a }));
     const euroKm = p => { const k = costoKm(modello(p.f.modello), p.f.usato); return k.energia + k.manutenzione; };

@@ -545,3 +545,12 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .autista-f { display: flex; align-items: center; gap: 4px; }
 .autista-f .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .autista-f .stelle { flex: none; }
+.sezione-dip { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--testo-2); } .sezione-dip small { opacity: .7; }
+.zona-f { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; color: var(--testo-2); } .zona-f i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.report-righe { margin: 8px 0; padding-left: 18px; line-height: 1.6; }
+.consiglio { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--bordo, rgba(255,255,255,.08)); }
+.consiglio p { margin: 0; font-size: 13px; }
+.carta-mag { padding: 10px 0; border-top: 1px solid var(--bordo, rgba(255,255,255,.08)); display: grid; gap: 6px; }
+.carta-mag.attivo .riga:first-child { color: var(--accento); }
+.barra-mag { margin-bottom: 8px; overflow-x: auto; }
+.avviso-gestito { margin: 0 0 8px; }
