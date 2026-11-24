@@ -531,3 +531,17 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .riga.licenza { padding: 6px 10px; border-radius: 10px; background: rgba(255,214,10,.1); color: #ffd60a; }
 .capoturno { padding: 8px 12px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid var(--bordo); flex: none; }
 .btn.link.link-blu { color: #0a84ff; }
+
+/* stelle */
+.stelle { display: inline-flex; gap: 1px; font-size: 16px; line-height: 1; letter-spacing: 0; }
+.stelle i { font-style: normal; color: rgba(255,255,255,.18); position: relative; }
+.stelle i.piena { color: #ffd60a; }
+.stelle i.mezza { background: linear-gradient(90deg, #ffd60a 50%, rgba(255,255,255,.18) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.stelle.basse i.piena { color: #ff9f0a; }
+.stelle.piccole { font-size: 11px; vertical-align: 1px; }
+.stelle.in-val { font-size: 12px; color: var(--testo-2); font-style: italic; }
+.stelle.in-val.piccole { font-size: 10px; }
+.scheda.valutazione { gap: 6px; }
+.autista-f { display: flex; align-items: center; gap: 4px; }
+.autista-f .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.autista-f .stelle { flex: none; }
