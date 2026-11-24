@@ -552,13 +552,12 @@ function vistaAttivita() {
 
 function vistaConti() {
   const prec = S.storico[0];
-  const nomeMese = k => { const [a, m] = k.split('-'); return new Date(+a, +m - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); };
   const righe = Object.keys(VOCI).filter(k => S.conti.voci[k] || (prec && prec.voci[k])).map(k => {
     const entra = VOCI_ENTRATA.includes(k), f = v => v ? `<span class="${entra ? 'piu' : 'meno'}">${entra ? '+' : '−'}${eur.format(v)}</span>` : '–';
     return `<tr><td>${VOCI[k]}</td><td>${f(S.conti.voci[k])}</td>${prec ? `<td>${f(prec.voci[k])}</td>` : ''}</tr>`;
   }).join('');
   return `<div class="scheda">
-    <table><thead><tr><th>Voce</th><th>${nomeMese(S.conti.mese)}</th>${prec ? `<th>${nomeMese(prec.mese)}</th>` : ''}</tr></thead>
+    <table class="tabella-conti"><thead><tr><th>Voce</th><th>Questo mese</th>${prec ? `<th>Mese scorso</th>` : ''}</tr></thead>
     <tbody>${righe || `<tr><td colspan="3">Nessun movimento questo mese.</td></tr>`}
     <tr class="totale"><td>Utile</td><td>${segnato(utileMese(S.conti.voci))}</td>${prec ? `<td>${segnato(utileMese(prec.voci))}</td>` : ''}</tr></tbody></table>
   </div>
