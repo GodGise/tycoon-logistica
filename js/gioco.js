@@ -46,9 +46,14 @@ function magazzinoVicino(punto, cittaId) {
   return { magazzino: m, km: d };
 }
 // prezzo di un magazzino: 300.000 € in centro, scende fino a 200.000 € al bordo della città
+// ogni magazzino in più costa il 20% più del precedente (2° ×1,2 · 3° ×1,44 · 4° ×1,73 · 5° ×2,07)
+const RINCARO_MAGAZZINO = 1.2;
+function rincaroMagazzini() { return S ? Math.pow(RINCARO_MAGAZZINO, S.depositi.length) : 1; }
+function prezzoMagazzinoMin() { return Math.round(COSTANTI.prezzoMagazzinoMin * rincaroMagazzini() / 5000) * 5000; }
+function prezzoMagazzinoMax() { return Math.round(COSTANTI.prezzoMagazzinoMax * rincaroMagazzini() / 5000) * 5000; }
 function prezzoMagazzino(citta, lngLat) {
   const t = limita(distanzaKm([citta.lng, citta.lat], lngLat) / (citta.raggio * 1.15), 0, 1);
-  const p = COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t;
+  const p = (COSTANTI.prezzoMagazzinoMax - (COSTANTI.prezzoMagazzinoMax - COSTANTI.prezzoMagazzinoMin) * t) * rincaroMagazzini();
   return Math.round(p / 5000) * 5000;
 }
 function kmGiro(z) { return Math.round(z.kmGiro + 2 * COSTANTI.fattoreStrada * magazzinoVicino(z.centro, idCitta(z)).km); }
@@ -276,16 +281,17 @@ function giornoLavorativo() {
   // picchi di ordini: ogni giorno in qualche zona di ogni città arrivano più pacchi del solito.
   // Sono il lavoro del jolly: abbastanza da tenerlo occupato, non tanto da intasare tutto.
   const picco = {};
-  // Con almeno 4 zone servite: 2 zone in picco al giorno, in tutto ~1,5–2 furgoni di pacchi in più = lavoro per 2 jolly.
   // Le zone cambiano ogni giorno (oggi il Centro, domani il Nord...).
   const ieri = S.picchiIeri || [];
   tutteCitta().forEach(c => {
     const zc = servite.filter(z => idCitta(z) === c.id); if (zc.length < 2) return;
-    const quante = zc.length >= 4 ? 2 : 1;
-    const totale = Math.round(COSTANTI.maxConsegneCorriere * (quante === 2 ? caso(1.5, 2) : caso(0.3, 0.5)));
+    // più zone servi, più picchi: con 13 zone circa 3,5 furgoni di pacchi in più al giorno = lavoro per 4 jolly
+    const quante = Math.min(4, Math.max(1, Math.floor(zc.length / 3)));
+    const furgoniExtra = Math.min(3.6, zc.length * 0.28) * caso(0.85, 1.05);
+    const totale = Math.round(COSTANTI.maxConsegneCorriere * furgoniExtra);
     const scelte = [...zc].sort(() => Math.random() - 0.5).sort((a, b) => ieri.includes(a.id) - ieri.includes(b.id)).slice(0, quante);
-    const quota = quante === 2 ? [0.6, 0.4] : [1];
-    scelte.forEach((z, i) => { picco[z.id] = Math.round(totale * quota[i]); });
+    const pesi = scelte.map(() => caso(0.7, 1.3)), somma = pesi.reduce((a, b) => a + b, 0);
+    scelte.forEach((z, i) => { picco[z.id] = Math.round(totale * pesi[i] / somma); });
   });
   S.picchiIeri = Object.keys(picco); S.piccoOggi = picco;
   const nuovi = {};
@@ -536,7 +542,7 @@ function requisitiFiliale() {
   const mancano = [];
   if (S.furgoni.length < FILIALE.furgoni) mancano.push(`almeno ${FILIALE.furgoni} furgoni (ne hai ${S.furgoni.length})`);
   if (S.reputazione < FILIALE.reputazione) mancano.push(`reputazione almeno ${FILIALE.reputazione} (ora ${Math.round(S.reputazione)})`);
-  if (S.cassa < FILIALE.costo + COSTANTI.prezzoMagazzinoMin) mancano.push(`almeno ${(FILIALE.costo + COSTANTI.prezzoMagazzinoMin).toLocaleString('it-IT')} € in cassa`);
+  if (S.cassa < FILIALE.costo + prezzoMagazzinoMin()) mancano.push(`almeno ${(FILIALE.costo + prezzoMagazzinoMin()).toLocaleString('it-IT')} € in cassa`);
   return mancano;
 }
 function apriFiliale(citta, lngLat, zonePronte) {

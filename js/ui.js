@@ -298,7 +298,7 @@ function vistaMagazzini() {
     <h2 style="margin:0">Magazzini <small>di tua proprietà</small></h2>
     ${lista}
     ${posizionando ? `<p class="nota" style="color:var(--accento)">Clicca sulla mappa dove vuoi il nuovo magazzino.</p><button class="btn" data-azione="annulla-magazzino">Annulla</button>`
-      : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < COSTANTI.prezzoMagazzinoMin ? 'disabled' : ''}>Compra un magazzino (${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)})</button>`}
+      : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < prezzoMagazzinoMin() ? 'disabled' : ''}>Compra il ${S.depositi.length + 1}° magazzino (${eur.format(prezzoMagazzinoMin())}–${eur.format(prezzoMagazzinoMax())})</button>`}
     <p class="nota">Costa di più in centro e meno verso la periferia. Una volta comprato è tuo: niente affitto.</p>
     <p class="nota">Ogni zona parte dal magazzino più vicino: più è lontano, più km fanno i furgoni ogni giorno.</p>
   </div>`;
@@ -315,7 +315,7 @@ function vistaInizio() {
     <div class="scheda"><h2 style="margin:0">Metti il magazzino della filiale</h2>
       <p style="margin:0">Clicca sulla mappa dove vuoi il magazzino di ${esc(c.nome)}.</p>
       <div class="riga"><span>Apertura della filiale</span><span class="num">${eur.format(FILIALE.costo)}</span></div>
-      <div class="riga"><span>Magazzino</span><span class="num">${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)}</span></div>
+      <div class="riga"><span>Magazzino (${S.depositi.length + 1}°, +20% a magazzino)</span><span class="num">${eur.format(prezzoMagazzinoMin())}–${eur.format(prezzoMagazzinoMax())}</span></div>
       <div class="riga"><span>In cassa</span><span class="num">${eur.format(S.cassa)}</span></div>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}</div>
     <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
