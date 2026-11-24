@@ -815,7 +815,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
     case 'apri-email': apriEmail(+b.dataset.i); $('#contenuto').scrollTop = 0; break;
-    case 'chiudi-email': emailAperta = null; break;
+    case 'chiudi-email': emailAperta = null; ridisegna(); $('#contenuto').scrollTop = 0; break;
     case 'rispondi': { const err = rispondiEmail(emailAperta, +b.dataset.i); esito(err); break; }
     case 'salva-online': accountAttesa = true; ridisegna(); salvaOnline(false).then(r => { accountAttesa = false; dopoCambioPartita(r === 'ok' ? 'Partita salvata online.' : r === 'altro' ? 'Ho caricato la partita più recente dall\'altro dispositivo.' : null); }); break;
     case 'esci-account': accountAttesa = true; ridisegna(); esciAccount().then(() => { accountAttesa = false; dopoCambioPartita('Sei uscito. La partita resta anche su questo dispositivo.'); }); break;
