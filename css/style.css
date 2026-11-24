@@ -480,3 +480,37 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .pallino-posta { top: 3px; right: 1px; min-width: 0; width: 8px; height: 8px; padding: 0; font-size: 0; color: transparent; box-shadow: none; }
 .badge.grave { background: rgba(255,69,58,.2); color: #ff6961; margin-right: 6px; }
 .punto-blu.rosso { background: #ff453a; }
+
+/* flotta raggruppata */
+.azioni-flotta { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.filtri-flotta { display: flex; flex-wrap: wrap; }
+.filtri-flotta button span { opacity: .6; margin-left: 3px; }
+.gruppo-flotta { border-radius: 16px; background: rgba(255,255,255,.04); border: 1px solid var(--bordo); overflow: hidden; }
+.testa-gruppo { width: 100%; display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: transparent; border: 0; color: var(--testo); font: inherit; cursor: pointer; text-align: left; flex-wrap: wrap; }
+.testa-gruppo b { font-size: 15px; }
+.conta-g { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: rgba(255,255,255,.1); font-size: 12px; display: grid; place-items: center; }
+.info-g { color: var(--testo-2); font-size: 12px; margin-left: auto; }
+.freccia-g { color: var(--testo-2); transition: transform .2s; }
+.gruppo-flotta.aperto .freccia-g { transform: rotate(90deg); }
+.corpo-gruppo { border-top: 1px solid var(--bordo); }
+.riga-furgone + .riga-furgone { border-top: 1px solid var(--bordo); }
+.testa-furgone { width: 100%; display: grid; grid-template-columns: 10px minmax(0, 1.2fr) minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px 14px; background: transparent; border: 0; color: var(--testo); font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+.testa-furgone:hover, .riga-furgone.aperta .testa-furgone { background: rgba(255,255,255,.05); }
+.nome-f, .autista-f { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nome-f small { color: var(--testo-2); }
+.autista-f { color: var(--testo-2); }
+.ok-f { color: #30d158; }
+.tipo-pallino { width: 9px; height: 9px; border-radius: 50%; background: #8e8e93; }
+.tipo-pallino.elettrico { background: #30d158; } .tipo-pallino.diesel { background: #ff9f0a; }
+.editor-furgone { display: grid; gap: 8px; padding: 4px 14px 12px; }
+.scheda.piano { border-color: rgba(10,132,255,.5); }
+.lista-piano { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13px; color: var(--testo-2); max-height: 240px; overflow: auto; }
+.lista-piano b { color: var(--testo); }
+@media (max-width: 760px) {
+  body:has(.pannello[data-foglio="alto"]) .guasti { display: none; }   /* non coprono le schede: i problemi sono in Flotta e Posta */
+  .guasti { max-height: 40dvh; overflow: auto; }
+}
+.gruppo-flotta, .azioni-flotta, .filtri-flotta, .scheda.piano { flex: none; }
+.filtri-flotta button { font-size: 13px; padding: 6px 10px; white-space: nowrap; }
+.gruppo-flotta, .scheda.piano { min-height: max-content; }
+.contenuto { grid-auto-rows: max-content; }   /* le righe della griglia non si schiacciano mai */
