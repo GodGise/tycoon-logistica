@@ -11,6 +11,7 @@ const MIGLIORAMENTI = {
 function livello(id) { return (S.miglioramenti && S.miglioramenti[id]) || 0; }
 function prezzoMiglioramento(id) { const l = MIGLIORAMENTI[id].livelli; return livello(id) < l.length ? l[livello(id)] : null; }
 function compraMiglioramento(id) {
+  if (!sbloccato('miglioramenti', id)) return `Si sblocca al livello ${livelloPer('miglioramenti', id)}.`;
   const prezzo = prezzoMiglioramento(id);
   if (prezzo === null) return 'Hai già il livello massimo.';
   if (S.cassa < prezzo) return 'Non hai abbastanza soldi.';

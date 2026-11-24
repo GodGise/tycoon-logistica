@@ -39,6 +39,9 @@ function vistaAzienda() {
     return `<div class="scheda">
       <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span><span class="num">${z.pacchi} pacchi/giorno</span></div>
       <div class="metro ${cop >= 100 ? '' : cop >= 70 ? 'medio' : 'basso'}"><i style="width:${cop}%"></i></div>
+      ${haLicenza(z) ? '' : `<div class="riga licenza"><span>🔒 Serve la licenza · ${eur.format(prezzoLicenza(z))}</span>${puoComprareLicenze()
+        ? `<button class="btn piccolo primario" data-azione="licenza" data-id="${z.id}" ${S.cassa < prezzoLicenza(z) ? 'disabled' : ''}>Compra licenza</button>`
+        : '<span class="nota">dopo il 2° magazzino</span>'}</div>`}
       <div class="riga a-capo"><span>${giri.length ? `${giri.length} furgon${giri.length > 1 ? 'i' : 'e'} · capacità ${cap} consegne` : 'Zona non servita'} · giro ${kmGiro(z)} km</span>
       <span class="num">${pz ? `oggi ${pz.consegne} cons.${pz.giacenza ? ` · <span class="meno">${pz.giacenza} in giacenza</span>` : ''}` : ''}</span></div>
     </div>`;
@@ -59,6 +62,7 @@ function vistaAzienda() {
     <div class="metro ${cls}"><i style="width:${rep}%"></i></div>
     <div class="riga"><span>Assicurazione flotta</span><span class="num">${eur.format(S.furgoni.reduce((t, f) => t + assicurazioneFurgone(f), 0))}/mese</span></div>
   </div>
+  ${vistaLivello()}
   ${vistaMagazzini()}
   ${vistaMiglioramenti()}
   ${vistaTraguardi()}
@@ -172,6 +176,30 @@ function primaDopo(id) {
   if (id === 'officina') return ['Guasti', 'ripari tu, prezzo pieno', 'da soli, anche di notte, a metà', ''];
   return null;
 }
+/* ---------- livello dell'azienda e percorso ---------- */
+let percorsoAperto = false;
+function vistaLivello() {
+  const l = livelloAzienda(), p = prossimoLivello(), xp = S.xp || 0;
+  const perc = p ? Math.round((xp - l.xp) / (p.xp - l.xp) * 100) : 100;
+  return `<div class="scheda carta-livello">
+    <div class="riga"><span class="numero-livello">${l.n}</span><div style="flex:1"><b>${esc(l.nome)}</b><div class="nota">${p ? `${intero.format(p.xp - xp)} consegne al livello ${p.n}` : 'Livello massimo raggiunto!'}</div></div></div>
+    <div class="metro"><i style="width:${perc}%"></i></div>
+    ${p ? `<div class="nota">Al livello ${p.n} sblocchi: <b style="color:var(--testo)">${p.sblocca.map(esc).join(' · ')}</b></div>` : ''}
+    <button class="btn link link-blu" data-azione="percorso">${percorsoAperto ? 'Nascondi il percorso' : 'Vedi tutto il percorso'}</button>
+    ${percorsoAperto ? `<ol class="percorso">${LIVELLI.map(x => `<li class="${x.n <= l.n ? 'fatto' : ''}"><span class="tappa">${x.n <= l.n ? '✓' : x.n}</span>
+      <div><b>${esc(x.nome)}</b> <small class="nota">${x.xp ? intero.format(x.xp) + ' consegne' : 'inizio'}</small><div class="nota">${x.sblocca.map(esc).join(' · ')}</div></div></li>`).join('')}</ol>` : ''}
+  </div>`;
+}
+function mostraNuovoLivello() {
+  const el = $('#finestra'); if (!S || !S.livelliNuovi || !S.livelliNuovi.length || !el.hidden) return;
+  const n = S.livelliNuovi.shift(), l = LIVELLI.find(x => x.n === n);
+  el.dataset.tipo = 'offline'; el.hidden = false;
+  el.innerHTML = `<div class="finestra-corpo vetro livello-su"><span class="numero-livello grande">${l.n}</span><span class="badge">Nuovo livello!</span>
+    <h2 style="margin:4px 0 0">${esc(l.nome)}</h2><p>Hai sbloccato:</p><ul class="sbloccati">${l.sblocca.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    <div class="scelte"><button class="btn primario" data-scelta="ok">Fantastico!</button></div></div>`;
+  salva();
+}
+
 function vistaMiglioramenti() {
   return `<div><h2>Miglioramenti del magazzino</h2><div class="griglia-miglioramenti">${Object.entries(MIGLIORAMENTI).map(([id, m]) => {
     const l = livello(id), prezzo = prezzoMiglioramento(id), max = m.livelli.length, pd = primaDopo(id), fatto = prezzo === null;
@@ -180,7 +208,7 @@ function vistaMiglioramenti() {
         <div><b>${m.nome}</b><div class="motto">${m.motto || m.descr}</div></div></div>
       ${max > 1 ? `<div class="livelli">${m.livelli.map((_, i) => `<i class="${i < l ? 'pieno' : ''}"></i>`).join('')}<span>livello ${l} di ${max}</span></div>` : ''}
       ${pd ? `<div class="prima-dopo"><span class="etichetta-pd">${pd[0]}</span>${fatto ? `<b class="dopo">${pd[1]}</b>` : `<span class="prima">${pd[1]}</span><span class="freccia">→</span><b class="dopo">${pd[2]}</b>`}</div>${pd[3] && !fatto ? `<div class="nota">${pd[3]}</div>` : ''}` : ''}
-      ${fatto ? '<div class="attivo-ok">✓ Attivo</div>' : `<button class="btn ${S.cassa >= prezzo ? 'primario' : ''}" data-azione="migliora" data-id="${id}" ${S.cassa < prezzo ? 'disabled' : ''}>${l ? 'Livello ' + (l + 1) + ' · ' : 'Compra · '}${eur.format(prezzo)}</button>`}
+      ${!sbloccato('miglioramenti', id) && !l ? `<div class="bloccato">🔒 Si sblocca al livello ${livelloPer('miglioramenti', id)}</div>` : fatto ? '<div class="attivo-ok">✓ Attivo</div>' : `<button class="btn ${S.cassa >= prezzo ? 'primario' : ''}" data-azione="migliora" data-id="${id}" ${S.cassa < prezzo ? 'disabled' : ''}>${l ? 'Livello ' + (l + 1) + ' · ' : 'Compra · '}${eur.format(prezzo)}</button>`}
     </div>`;
   }).join('')}</div></div>`;
 }
@@ -610,9 +638,10 @@ function vistaNegozio() {
   const lista = CATALOGO.filter(m => !(negozioUsato && m.tipo === 'elettrico')).map(m => {
     const prezzo = prezzoAcquisto(m, negozioUsato), c = costoKm(m, negozioUsato);
     return `<div class="scheda">
-      <div class="riga"><strong>${esc(m.nome)}</strong><span class="badge ${m.tipo}">${m.tipo}</span></div>
+      <div class="riga"><strong>${esc(m.nome)}</strong><span class="badge ${m.tipo}">${m.tipo}${m.capacita ? ' · grande' : ''}</span></div>
       <div class="riga"><span>${dec1.format(m.consumo)} ${m.tipo === 'diesel' ? 'l' : 'kWh'}/100 km · costo ${eur2.format(c.energia + c.manutenzione)}/km</span><span class="num"><b>${eur.format(prezzo)}</b></span></div>
-      <button class="btn primario" data-azione="compra" data-id="${m.id}" ${S.cassa < prezzo ? 'disabled' : ''}>Compra${negozioUsato ? ' usato' : ''}</button>
+      ${sbloccato('modelli', m.id) ? `<button class="btn primario" data-azione="compra" data-id="${m.id}" ${S.cassa < prezzo ? 'disabled' : ''}>Compra${negozioUsato ? ' usato' : ''}</button>`
+        : `<div class="bloccato">🔒 Si sblocca al livello ${livelloPer('modelli', m.id)}</div>`}
     </div>`;
   }).join('');
   return `<div class="riga"><h2 style="margin:0">Compra un furgone</h2><button class="btn piccolo" data-azione="chiudi-negozio">Chiudi</button></div>
@@ -642,7 +671,7 @@ function rigaFurgone(f, autisti) {
     const quanti = id => { const n = S.furgoni.filter(x => x.zona === id && x.autistaId).length; return ` (${n} autist${n === 1 ? 'a' : 'i'})`; };
     const optZ = '<option value="">In deposito</option>' + tutteCitta().map(c => {
       const j = c.id === 'c1' ? ZONA_JOLLY : ZONA_JOLLY + ':' + c.id;
-      const opts = `<option value="${j}" ${f.zona === j ? 'selected' : ''}>Jolly: va dove ci sono più pacchi${quanti(j)}</option>` + S.zone.filter(z => idCitta(z) === c.id).map(z => `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}${quanti(z.id)}</option>`).join('');
+      const opts = `<option value="${j}" ${f.zona === j ? 'selected' : ''}>Jolly: va dove ci sono più pacchi${quanti(j)}</option>` + S.zone.filter(z => idCitta(z) === c.id).map(z => haLicenza(z) ? `<option value="${z.id}" ${f.zona === z.id ? 'selected' : ''}>${esc(z.nome)}${quanti(z.id)}</option>` : `<option value="${z.id}" disabled>🔒 ${esc(z.nome)} · licenza ${eur.format(prezzoLicenza(z))}</option>`).join('');
       return tutteCitta().length > 1 ? `<optgroup label="${esc(c.nome)}">${opts}</optgroup>` : opts;
     }).join('');
     const k = costoKm(m, f.usato);
@@ -715,7 +744,11 @@ function vistaFlotta() {
       <div class="riga"><button class="btn" data-azione="annulla-piano">Annulla</button><button class="btn primario" data-azione="applica-piano">Applica</button></div>`
       : '<p class="nota">È già tutto organizzato al meglio.</p><button class="btn" data-azione="annulla-piano">Chiudi</button>'}
     </div>` : '';
+  const capo = sbloccato('capoturno') ? `<div class="riga capoturno"><span><b>Capoturno</b><span class="nota"> · fa "Organizza" da solo ogni mattina</span></span>
+      <button class="btn piccolo ${S.capoturno ? 'primario' : ''}" data-azione="capoturno">${S.capoturno ? 'Acceso' : 'Spento'}</button></div>`
+    : `<p class="nota">🔒 Al livello ${livelloPer('capoturno')} sblocchi il capoturno, che organizza la flotta da solo ogni mattina.</p>`;
   return `<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
+    ${capo}
     ${piano}
     <div class="filtri-flotta interruttore">${[['tutti', 'Tutti'], ['problemi', 'Problemi'], ['jolly', 'Jolly'], ['deposito', 'In deposito']].map(([k, t]) =>
       `<button data-azione="filtro-flotta" data-v="${k}" aria-pressed="${flottaFiltro === k}">${t} <span>${conta(k)}</span></button>`).join('')}</div>
@@ -881,6 +914,9 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'percorso': percorsoAperto = !percorsoAperto; ridisegna(); break;
+    case 'licenza': esito(compraLicenza(id), 'Licenza comprata!'); aggiornaZoneMappa(); break;
+    case 'capoturno': S.capoturno = !S.capoturno; esito(null, S.capoturno ? 'Il capoturno organizzerà la flotta ogni mattina.' : 'Capoturno spento: organizzi tu.'); break;
     case 'espandi-furgone': flottaEspanso = flottaEspanso === id ? null : id; ridisegna(); break;
     case 'apri-gruppo': { flottaAperti = flottaAperti || new Set(); flottaAperti.has(id) ? flottaAperti.delete(id) : flottaAperti.add(id); ridisegna(); break; }
     case 'filtro-flotta': flottaFiltro = b.dataset.v; ridisegna(); break;
@@ -953,7 +989,7 @@ function scegliCitta(c) {
 }
 $('#contenuto').addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.azione === 'assegna') { assegna(t.dataset.id, t.dataset.campo, t.value); if (t.dataset.campo === 'zona' && flottaAperti) flottaAperti.add(t.value || 'deposito'); t.blur(); esito(); }
+  if (t.dataset.azione === 'assegna') { if (assegna(t.dataset.id, t.dataset.campo, t.value) === 'licenza') toast('Per quella zona serve la licenza: comprala nella scheda Azienda.'); if (t.dataset.campo === 'zona' && flottaAperti) flottaAperti.add(t.value || 'deposito'); t.blur(); esito(); }
   if (t.dataset.azione === 'citta-mag') { spostaMagazziniere(t.dataset.id, t.value); t.blur(); esito(null, 'Magazziniere spostato.'); }
   if (t.dataset.azione === 'stipendio') { S.offerta[t.dataset.ruolo] = +t.value; t.blur(); salva(); if (daRidisegnare) ridisegna(); }
 });
@@ -987,6 +1023,7 @@ function ciclo(t) {
   if (aggiornaOfferte(dt)) daRidisegnare = true;
   disegnaOfferta();
   disegnaGuasti();
+  mostraNuovoLivello();
   if (aggiornaEvento(dt)) daRidisegnare = true;
   disegnaEvento();
   soldiSullaMappa(t, S.tempoGiorno / durata);

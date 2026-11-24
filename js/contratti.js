@@ -31,7 +31,7 @@ function generaOfferta() {
   const z = servite.length && Math.random() < 0.75 ? scegli(servite) : scegli(S.zone);
   const pacchi = casoInt(t.pacchi[0], t.pacchi[1]);
   const paga = Math.round(caso(t.paga[0], t.paga[1]) * 2) / 2;
-  const totale = Math.round(pacchi * paga);
+  const totale = Math.round(pacchi * paga * (sbloccato('contrattiPiu') ? 1.2 : 1));
   S.offertaContratto = { id: nuovoId('o'), cliente: scegli(CLIENTI[tipo]), tipo, zona: z.id, pacchi, paga, totale,
     giorno: prossimoFeriale(S.giorno), restano: OFFERTA.durata };
 }

@@ -19,7 +19,7 @@ const POTENZIAMENTI_FURGONE = {
   tagliandi:  { nome: 'Tagliandi programmati', descr: '−40% di guasti', costo: 2000 },
 };
 const ha = (f, p) => !!(f.pot && f.pot[p]);
-function capacitaFurgone(f) { return Math.floor(COSTANTI.maxConsegneCorriere * (ha(f, 'scaffali') ? 1.15 : 1) * effetto.capacita()); }
+function capacitaFurgone(f) { return Math.floor(COSTANTI.maxConsegneCorriere * (modello(f.modello).capacita || 1) * (ha(f, 'scaffali') ? 1.15 : 1) * effetto.capacita()); }
 function compraPotenziamento(idFurgone, p) {
   const f = S.furgoni.find(x => x.id === idFurgone), info = POTENZIAMENTI_FURGONE[p];
   if (!f || !info) return 'Potenziamento non trovato.';
