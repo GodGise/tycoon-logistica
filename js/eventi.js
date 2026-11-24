@@ -43,7 +43,7 @@ const EVENTI = [
       const n = S.dipendenti.filter(d => d.ruolo === 'autista').length, costo = n * 150;
       return { titolo: 'Sciopero dei trasporti', testo: `I sindacati hanno indetto uno sciopero per domani. Puoi pagare uno straordinario di 150 € a ogni autista (${n}) per lavorare lo stesso, oppure restare fermi un giorno.`,
         scelte: [{ testo: `Paga ${costo.toLocaleString('it-IT')} € e lavora`, fai: () => { movimento('eventi', -costo); return 'Gli autisti lavorano anche domani.'; } },
-                 { testo: 'Resta fermo domani', fai: () => { S.effetti.sciopero = prossimoFeriale(S.giorno); S.reputazione = limita(S.reputazione - 2, 0, 100); return 'Domani i furgoni restano in deposito.'; } }] };
+                 { testo: 'Resta fermo domani', fai: () => { S.effetti.sciopero = prossimoFeriale(S.giorno); cambiaFama(-2); return 'Domani i furgoni restano in deposito.'; } }] };
     } },
   { id: 'lavori', puo: () => !!servitaCasuale(), crea: () => {
       const z = servitaCasuale();
@@ -58,8 +58,8 @@ const EVENTI = [
                  { testo: 'Fai ricorso', fai: () => { if (Math.random() < 0.5) return 'Ricorso accolto: niente multa!'; movimento('eventi', -900); return 'Ricorso respinto: 900 € di multa.'; } }] };
     } },
   { id: 'smarrito', puo: () => S.furgoni.length >= 1, crea: () => ({ titolo: 'Pacco smarrito', testo: 'Un cliente denuncia la perdita di un pacco da 600 €. Non è chiaro di chi sia la colpa. Rimborsarlo costa, ma rifiutare può fare brutta pubblicità.',
-      scelte: [{ testo: 'Rimborsa 600 €', fai: () => { movimento('eventi', -600); S.reputazione = limita(S.reputazione + 1, 0, 100); return 'Cliente rimborsato e soddisfatto.'; } },
-               { testo: 'Rifiuta il rimborso', fai: () => { S.reputazione = limita(S.reputazione - 6, 0, 100); return 'Il cliente scrive recensioni negative: reputazione in calo.'; } }] }) },
+      scelte: [{ testo: 'Rimborsa 600 €', fai: () => { movimento('eventi', -600); cambiaFama(1); return 'Cliente rimborsato e soddisfatto.'; } },
+               { testo: 'Rifiuta il rimborso', fai: () => { cambiaFama(-6); return 'Il cliente scrive recensioni negative: reputazione in calo.'; } }] }) },
   { id: 'aumento', puo: () => S.dipendenti.some(d => d.ruolo === 'autista' && !(S.giorno - (d.ultimoAumento ?? -999) < 60)), crea: () => {
       const d = scegli(S.dipendenti.filter(x => x.ruolo === 'autista' && !(S.giorno - (x.ultimoAumento ?? -999) < 60)));
       return { titolo: 'Richiesta di aumento', testo: `${d.nome} chiede un aumento di 150 € al mese. Dice che altrove pagano di più. Se rifiuti, potrebbe andarsene.`,

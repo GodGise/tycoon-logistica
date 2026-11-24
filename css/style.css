@@ -417,3 +417,35 @@ tr.totale td { font-weight: 700; font-size: 16px; }
   .pannello.in-avvio .cassa-box { display: none; }
 }
 .voce-citta:disabled { opacity: .5; cursor: not-allowed; }
+
+/* tabella dei conti: la voce va a capo, le cifre no; colonne delle cifre a larghezza fissa */
+.tabella-conti { table-layout: fixed; }
+.tabella-conti th:not(:first-child), .tabella-conti td:not(:first-child) { width: 30%; padding-left: 10px; }
+.tabella-conti td:first-child { white-space: normal; line-height: 1.25; padding-right: 6px; }
+.tabella-conti th { white-space: nowrap; }
+@media (max-width: 760px) {
+  .tabella-conti { font-size: 13px; }
+  .tabella-conti th { font-size: 12px; }
+  .tabella-conti th:not(:first-child), .tabella-conti td:not(:first-child) { width: 31%; padding-left: 6px; }
+}
+@media (max-width: 760px) { .tabella-conti tr.totale td { font-size: 15px; } }
+
+/* posta */
+.pallino-posta { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px; margin-left: 5px; border-radius: 9px;
+  background: var(--rosso, #ff453a); color: #fff; font-size: 11px; font-weight: 700; vertical-align: 1px; }
+.pallino-posta[hidden] { display: none; }
+.lista-email { display: grid; gap: 1px; border-radius: 16px; overflow: hidden; background: var(--bordo); }
+.voce-email { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; text-align: left; padding: 12px 14px; border: 0; background: rgba(44,44,48,.75); color: var(--testo); font: inherit; cursor: pointer; }
+.voce-email:hover { background: rgba(58,58,62,.85); }
+.voce-email .mittente { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voce-email .quando { color: var(--testo-2); font-size: 12px; }
+.voce-email b { grid-column: 1 / -1; font-size: 14px; font-weight: 500; }
+.voce-email .anteprima { grid-column: 1 / -1; color: var(--testo-2); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.voce-email:not(.da-leggere) b { color: var(--testo-2); }
+.punto-blu { width: 9px; height: 9px; border-radius: 50%; background: #0a84ff; flex: none; }
+.testo-email { font-size: 15px; line-height: 1.5; margin: 10px 0; }
+.esito-email { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid var(--bordo); }
+.esito-email.buono { border-color: rgba(48,209,88,.4); } .esito-email.male { border-color: rgba(255,69,58,.4); }
+.esito-email p { margin: 0; color: var(--testo-2); }
+@media (max-width: 760px) { .schede button { font-size: 12px; padding: 7px 3px; } }
+@media (min-width: 761px) { .schede button { padding: 7px 5px; font-size: 13px; } }

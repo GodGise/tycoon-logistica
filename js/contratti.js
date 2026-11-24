@@ -69,8 +69,8 @@ function eseguiContratti(z, giri, capacita) {
     capacita -= fatti;
     const ricavo = Math.round(fatti * c.paga);
     const penale = Math.round((c.pacchi - fatti) * c.paga * OFFERTA.quotaPenale);
-    if (fatti < c.pacchi) S.reputazione = limita(S.reputazione - (fatti ? 3 : 6), 0, 100);
-    else S.reputazione = limita(S.reputazione + 1, 0, 100);
+    if (fatti < c.pacchi) cambiaFama(-(fatti ? 3 : 6));
+    else cambiaFama(1);
     chiusi.push({ ...c, fatti, ricavo, penale, adatto });
   });
   S.contrattiAttivi = S.contrattiAttivi.filter(c => !(c.zona === z.id && c.giorno === S.giorno));
@@ -81,7 +81,7 @@ function eseguiContratti(z, giri, capacita) {
 function contrattiNonServiti() {
   const chiusi = [];
   S.contrattiAttivi.filter(c => c.giorno <= S.giorno).forEach(c => {
-    S.reputazione = limita(S.reputazione - 6, 0, 100);
+    cambiaFama(-6);
     chiusi.push({ ...c, fatti: 0, ricavo: 0, penale: Math.round(c.pacchi * c.paga * OFFERTA.quotaPenale), adatto: false });
   });
   S.contrattiAttivi = S.contrattiAttivi.filter(c => c.giorno > S.giorno);
