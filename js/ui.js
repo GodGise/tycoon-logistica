@@ -407,7 +407,7 @@ function resocontoGiri() {
   const pz = S.ieri && S.ieri.perZona ? Object.values(S.ieri.perZona) : [];
   if (!pz.length) return '';
   const nonSmistati = pz.reduce((t, x) => t + Math.max(0, x.arrivo - x.smistati), 0);
-  const postiMancanti = pz.reduce((t, x) => t + Math.max(0, x.smistati - x.capacita - (x.jolly || 0)), 0);
+  const postiMancanti = pz.reduce((t, x) => t + Math.max(0, x.smistati - x.capacita - (x.jolly || 0) - (x.aiuto || 0)), 0);
   const fuori = pz.flatMap(x => x.fuori || []);
   const cause = [];
   if (nonSmistati > 0) {
@@ -442,7 +442,7 @@ function vistaGiri() {
     const cap = d ? d.capacita : assegnati.filter(f => furgoneOperativo(f)).reduce((t, f) => t + capacitaFurgone(f), 0);
     const arrivo = d ? d.arrivo : z.pacchi;
     const pronti = d ? d.smistati : arrivo;          // i furgoni possono portare solo i pacchi smistati
-    const jollyN = d ? d.jolly : 0;
+    const jollyN = d ? d.jolly + (d.aiuto || 0) : 0;   // jolly + furgoni vicini con posto libero
     // barra: quanto sono pieni i furgoni della zona (pacchi pronti / posti sui furgoni partiti)
     const pieno = cap ? Math.round(pronti / cap * 100) : (pronti ? 999 : 0);
     const liberi = cap - pronti;
@@ -473,7 +473,7 @@ function vistaGiri() {
         <div><b>${intero.format(arrivo)}</b><span>pacchi oggi</span></div>
         <div><b>${d ? intero.format(d.consegne) : '–'}</b><span>consegnati</span></div>
         <div><b>${partiti === assegnati.length ? partiti : partiti + '/' + assegnati.length}</b><span>furgoni partiti</span></div>
-        <div><b>${jollyN ? '+' + intero.format(jollyN) : '–'}</b><span>dal jolly</span></div>
+        <div><b>${jollyN ? '+' + intero.format(jollyN) : '–'}</b><span>da jolly e vicini</span></div>
       </div>
       ${notaPicco}${spiegazione}
     </div>`;

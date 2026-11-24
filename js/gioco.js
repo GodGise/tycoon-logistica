@@ -352,9 +352,21 @@ function giornoLavorativo() {
     // furgoni della zona che oggi non partono, con il motivo (per spiegarlo nella scheda Giri)
     const fuori = sciopero ? [] : S.furgoni.filter(f => f.zona === z.id && !furgoneOperativo(f))
       .map(f => f.fermo > 0 ? (f.motivo === 'incidente' ? 'fermo per incidente' : f.motivo === 'guasto' ? 'fermo per guasto' : 'fermo per ' + f.motivo) : !f.autistaId ? 'senza autista' : 'con l\'autista sospeso');
-    ris[z.id] = { z, smistati, giri, consegneCtr, consegne, jolly: [], fuori };
+    ris[z.id] = { z, smistati, giri, consegneCtr, consegne, jolly: [], fuori, aiuto: 0 };
   });
 
+  // 2a) con il gestionale acceso (o un responsabile) i furgoni che finiscono la zona con posto libero
+  //     passano a dare una mano nella zona vicina che ha ancora più pacchi pronti
+  let aiutati = 0;
+  Object.values(ris).forEach(r => {
+    const m = magDi(r.z);
+    if (!(gestito(m) || (S.gestionale && S.capoturno)) || !r.giri.length) return;
+    let libero = r.giri.reduce((t, f) => t + capacitaFurgone(f), 0) - r.consegne;
+    const vicine = Object.values(ris).filter(x => x !== r && magDi(x.z) === m && x.smistati > x.consegne)
+      .sort((a, b) => distanzaKm(r.z.centro, a.z.centro) - distanzaKm(r.z.centro, b.z.centro)).slice(0, 2);
+    vicine.forEach(x => { if (libero < 10) return; const n = Math.min(libero, x.smistati - x.consegne); x.consegne += n; x.aiuto += n; libero -= n; aiutati += n; });
+  });
+  if (aiutati) notizia(`Il gestionale ha mandato i furgoni con posto libero nelle zone vicine: ${aiutati} pacchi in più consegnati.`, 'info', 'aiuto');
   // 2) i jolly vanno da soli nella zona con più pacchi pronti in deposito che nessuno porta
   const jolly = sciopero ? [] : S.furgoni.filter(f => isJolly(f) && furgoneOperativo(f));
   // il jolly va nella zona con più pacchi pronti; se gli resta posto passa anche a una seconda zona
@@ -381,11 +393,11 @@ function giornoLavorativo() {
     const restano = arrivo[z.id] - consegne;
     const persi = Math.max(0, restano - z.pacchi);       // oltre un giorno di giacenza gli ordini si perdono
     S.giacenze[z.id] = restano - persi;
-    const daJolly = r.jolly.reduce((t, j) => t + j.n, 0);
+    const daJolly = r.jolly.reduce((t, j) => t + j.n, 0), daAiuto = r.aiuto;
     stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
     stat(magazzino(magDi(z)) || S.depositi[0], 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
     perZona[z.id] = { picco: picco[z.id] || 0, nuovi: nuovi[z.id], arrivo: arrivo[z.id], smistati: r.smistati, consegne: consegne + consegneCtr, giacenza: S.giacenze[z.id],
-      giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly, fuori: r.fuori, sciopero: !!sciopero };
+      giri: giri.length, capacita: giri.reduce((t, f) => t + capacitaFurgone(f), 0), jolly: daJolly, aiuto: daAiuto, fuori: r.fuori, sciopero: !!sciopero };
     consegneTot += consegne + consegneCtr; consegneNormali += consegne; incassoZone += consegne * tariffa() * effetto.tariffaZona(z.id); giacenzeTot += S.giacenze[z.id];
 
     if (restano > 0 && (giri.length || daJolly)) notizia(`Zona ${z.nome}: pacchi in giacenza, la reputazione scende.`, 'male', 'giac-' + z.id);
@@ -393,7 +405,7 @@ function giornoLavorativo() {
     if (persi > 0) notizia(`Zona ${z.nome}: ${persi} ordini persi per le giacenze.`, 'male', 'persi-' + z.id);
 
     // giri dei furgoni: quelli della zona si dividono le loro consegne, i jolly portano le loro
-    const totZona = consegne - daJolly + consegneCtr;
+    const totZona = consegne - daJolly - daAiuto + consegneCtr;
     const lavori = giri.map((f, i) => ({ f, mie: Math.floor(totZona / giri.length) + (i < totZona % giri.length ? 1 : 0) }))
       .concat(r.jolly.map(j => ({ f: j.f, mie: j.n })));
     stat(magazzino(magDi(z)) || magazzinoVicino(z.centro, idCitta(z)).magazzino, 'pacchi', r.smistati);
@@ -659,29 +671,36 @@ function pianoOrganizza(soloMag) {
     const occupati = new Set(S.furgoni.map(f => f.autistaId).filter(Boolean));
     const liberi = S.dipendenti.filter(d => d.ruolo === 'autista' && magDi(d) === c.id && !occupati.has(d.id) && !(d.sospesoFino >= S.giorno)).sort((a, b) => b.esperienza - a.esperienza);
     miei.filter(p => !p.autista && !p.f.daRiparare).forEach(p => { const d = liberi.shift(); if (d) p.autista = d.id; });
-    const pacchi = z => z.pacchi * (1 + 0.1 * livello('pubblicita', c.id));
-    const jolly = (miei.find(p => p.zona && p.zona.startsWith(ZONA_JOLLY)) || {}).zona || ZONA_JOLLY;
+    // pacchi normali attesi in ogni zona (come li calcola la giornata). Picchi e pacchi rimasti in deposito
+    // cambiano zona ogni giorno: li coprono i jolly, che vanno dove servono.
+    const repFatt = 0.85 + S.reputazione / 100 * 0.3;
+    const serve = z => z.pacchi * repFatt * effetto.pacchi(z.id);
     const servite = S.zone.filter(z => magDi(z) === c.id && miei.some(p => p.zona === z.id));
-    const posti = z => miei.filter(p => p.zona === z.id && pronto(p)).reduce((t, p) => t + capacitaFurgone(p.f), 0);
-    // furgoni da ridistribuire: in deposito con autista, jolly, e quelli in più nelle zone servite
-    const pool = miei.filter(p => pronto(p) && (!p.zona || p.zona.startsWith(ZONA_JOLLY)));
-    servite.forEach(z => {
-      const nella = miei.filter(p => p.zona === z.id && pronto(p)).sort((a, b) => capacitaFurgone(a.f) - capacitaFurgone(b.f));
-      while (nella.length > 1 && posti(z) - capacitaFurgone(nella[0].f) >= pacchi(z)) { const p = nella.shift(); p.zona = null; pool.push(p); }
-    });
-    // zone sotto capacità (prima quelle con più pacchi scoperti)
-    const scoperte = () => servite.map(z => ({ z, manca: pacchi(z) - posti(z) })).filter(x => x.manca > COSTANTI.maxConsegneCorriere * 0.25).sort((a, b) => b.manca - a.manca);
-    let s;
-    while (pool.length && (s = scoperte()).length) { const p = pool.shift(); p.zona = s[0].z.id; }
-    pool.forEach(p => { p.zona = jolly; });
-    // 4) i giri con più km ai furgoni che costano meno al km (elettrici, poco consumo);
-    //    i jolly, che fanno pochi km, ai furgoni che consumano di più. Si scambiano solo i posti, non i numeri.
-    const posto = p => p.zona.startsWith(ZONA_JOLLY) ? 0 : kmGiro(zona(p.zona));
-    const attivi = miei.filter(p => pronto(p) && p.zona);
-    const posti2 = attivi.map(p => p.zona).sort((a, b) => posto({ zona: b }) - posto({ zona: a }));
+    const jolly = (miei.find(p => p.zona && p.zona.startsWith(ZONA_JOLLY)) || {}).zona || ZONA_JOLLY;
+    const pool = miei.filter(pronto), assegnati = new Map(), manca = new Map(servite.map(z => [z.id, serve(z)]));
+    const soglia = COSTANTI.maxConsegneCorriere * 0.5;   // sotto mezzo furgone di pacchi ci pensano i jolly
+    // a turno, la zona più scoperta prende un furgone: prima uno che era già lì, poi quello che la copre meglio
+    for (;;) {
+      let peggio = null; manca.forEach((m, id) => { if (m > soglia && (!peggio || m > manca.get(peggio))) peggio = id; });
+      if (!peggio || !pool.length) break;
+      const m = manca.get(peggio);
+      let i = pool.findIndex(p => p.zona === peggio);
+      if (i < 0) { const basta = pool.map((p, k) => ({ k, c: capacitaFurgone(p.f) })).filter(x => x.c >= m).sort((x, y) => x.c - y.c)[0];
+        i = basta ? basta.k : pool.reduce((best, p, k) => capacitaFurgone(p.f) > capacitaFurgone(pool[best].f) ? k : best, 0); }
+      const p = pool.splice(i, 1)[0]; assegnati.set(p, peggio); manca.set(peggio, m - capacitaFurgone(p.f));
+    }
+    assegnati.forEach((z, p) => { p.zona = z; });
+    pool.forEach(p => { p.zona = jolly; });   // gli altri fanno i jolly: vanno dove restano pacchi
+    // i giri con più km ai furgoni che costano meno al km (elettrici), i jolly a quelli che consumano di più.
+    // Si scambiano i posti solo tra furgoni con la stessa capienza, così ogni zona resta coperta.
+    const posto = z => z.startsWith(ZONA_JOLLY) ? 0 : kmGiro(zona(z));
     const euroKm = p => { const k = costoKm(modello(p.f.modello), p.f.usato); return k.energia + k.manutenzione; };
-    const perCosto = [...attivi].sort((a, b) => euroKm(a) - euroKm(b));
-    perCosto.forEach((p, i) => { p.zona = posti2[i]; });
+    const perCapienza = {};
+    miei.filter(p => pronto(p) && p.zona).forEach(p => { (perCapienza[capacitaFurgone(p.f)] = perCapienza[capacitaFurgone(p.f)] || []).push(p); });
+    Object.values(perCapienza).forEach(g => {
+      const posti = g.map(p => p.zona).sort((a, b) => posto(b) - posto(a));
+      [...g].sort((a, b) => euroKm(a) - euroKm(b)).forEach((p, i) => { p.zona = posti[i]; });
+    });
   });
   prova.forEach(p => {
     if (p.autista !== p.f.autistaId) cambi.push({ f: p.f, campo: 'autista', da: p.f.autistaId, a: p.autista });
