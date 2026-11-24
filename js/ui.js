@@ -801,7 +801,8 @@ function vistaFlotta() {
       <button class="btn piccolo primario" data-azione="compra-gestionale" ${S.cassa < COSTO_GESTIONALE ? 'disabled' : ''}>Compra ${eur.format(COSTO_GESTIONALE)}</button></div>`
     : `<div class="riga capoturno"><span><b>Gestionale automatizzato</b><span class="nota"> · fa "Organizza" da solo ogni mattina</span></span>
       <button class="switch" role="switch" aria-checked="${!!S.capoturno}" aria-label="Gestionale ${S.capoturno ? 'acceso' : 'spento'}" data-azione="capoturno"><i></i></button></div>
-    ${S.capoturno ? `<div class="riga capoturno"><span><b>Taglia chi è in più</b><span class="nota"> · il lunedì licenzia gli autisti senza furgone (ne tiene uno di riserva) e vende i jolly che non servono</span></span>
+    ${S.capoturno && furgoniMag.filter(isJolly).length < JOLLY_MINIMI ? `<p class="nota" style="color:#ff9f0a">Hai ${furgoniMag.filter(isJolly).length} jolly: per averne ${JOLLY_MINIMI} di riserva, dopo aver coperto ogni zona, ti servono circa ${JOLLY_MINIMI - furgoniMag.filter(isJolly).length} furgoni in più con autista.</p>` : ''}
+    ${S.capoturno ? `<div class="riga capoturno"><span><b>Taglia chi è in più</b><span class="nota"> · il lunedì licenzia gli autisti senza furgone (ne tiene uno di riserva) e vende i jolly che non servono, ma ne tiene sempre almeno 5</span></span>
       <button class="switch" role="switch" aria-checked="${S.taglia !== false}" aria-label="Taglia chi è in più" data-azione="taglia"><i></i></button></div>` : ''}`;
   return `${barraMagazzini()}<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
     ${capo}
