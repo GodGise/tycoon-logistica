@@ -800,7 +800,9 @@ function vistaFlotta() {
     : !S.gestionale ? `<div class="riga capoturno"><span><b>Gestionale automatizzato</b><span class="nota"> · fa "Organizza" da solo ogni mattina · lo paghi una volta, è tuo per sempre</span></span>
       <button class="btn piccolo primario" data-azione="compra-gestionale" ${S.cassa < COSTO_GESTIONALE ? 'disabled' : ''}>Compra ${eur.format(COSTO_GESTIONALE)}</button></div>`
     : `<div class="riga capoturno"><span><b>Gestionale automatizzato</b><span class="nota"> · fa "Organizza" da solo ogni mattina</span></span>
-      <button class="switch" role="switch" aria-checked="${!!S.capoturno}" aria-label="Gestionale ${S.capoturno ? 'acceso' : 'spento'}" data-azione="capoturno"><i></i></button></div>`;
+      <button class="switch" role="switch" aria-checked="${!!S.capoturno}" aria-label="Gestionale ${S.capoturno ? 'acceso' : 'spento'}" data-azione="capoturno"><i></i></button></div>
+    ${S.capoturno ? `<div class="riga capoturno"><span><b>Taglia chi è in più</b><span class="nota"> · il lunedì licenzia gli autisti senza furgone (ne tiene uno di riserva) e vende i jolly che non servono</span></span>
+      <button class="switch" role="switch" aria-checked="${S.taglia !== false}" aria-label="Taglia chi è in più" data-azione="taglia"><i></i></button></div>` : ''}`;
   return `${barraMagazzini()}<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
     ${capo}
     ${piano}
@@ -1027,6 +1029,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'assumi-resp': esito(assumiResponsabile(id), 'Responsabile assunto: ora puoi comprare un altro magazzino.'); break;
     case 'licenzia-resp': if (b.dataset.conferma) { licenziaResponsabile(id); esito(null, 'Torni a gestirlo tu.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'consiglio': { const m = (S.posta || []).find(x => x.report && x.giorno === +b.dataset.g && x.mag === b.dataset.mag); if (m) { seguiConsiglio(m, +b.dataset.i); esito(null, 'Fatto.'); } break; }
+    case 'taglia': S.taglia = S.taglia === false; esito(null, S.taglia ? 'Il lunedì il gestionale taglierà autisti e jolly in più.' : 'Il gestionale non licenzia più nessuno.'); break;
     case 'compra-gestionale': esito(compraGestionale(), 'Gestionale comprato: da domani organizza lui la flotta.'); break;
     case 'archivia': { const m = emailAperta; if (m) { m.archiviato = true; emailAperta = null; pulisciPosta(); } ridisegna(); break; }
     case 'filtro-personale': personaleFiltro = b.dataset.v; ridisegna(); break;
