@@ -87,12 +87,11 @@ const TESTI_LAMENTELA = [
   n => `Il corriere ${n} ha lanciato il pacco oltre il cancello. L'ho visto dalla finestra.`,
 ];
 function emailLamentela(a) {
-  if ((a.ultimaLamentela || -99) > S.giorno - 7) { notizia(`Lamentela di un cliente su ${a.nome}.`, 'male', 'lam-' + a.id); return; }
+  if ((a.ultimaLamentela || -99) > S.giorno - 7 || postaPiena()) { notizia(`Lamentela di un cliente su ${a.nome}.`, 'male', 'lam-' + a.id); return; }
   a.ultimaLamentela = S.giorno;
   S.posta = S.posta || [];
   S.posta.unshift({ id: 'lamentela', lamentela: true, ctx: { id: a.id }, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
     mittente: 'Un cliente', oggetto: `Lamentela sul corriere ${a.nome}`, testo: scegli(TESTI_LAMENTELA)(a.nome), letta: false, risposta: null, esito: '' });
-  S.posta = S.posta.slice(0, 40);
 }
 
 // licenziamento: gratis durante la prova, dopo costa un mese di stipendio

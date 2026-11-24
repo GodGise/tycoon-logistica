@@ -2,7 +2,12 @@
    Le scelte non sono banali: quella giusta alza la reputazione, a volte costa soldi subito.
    Se non rispondi entro una settimana l'email scade e perdi 1 punto di reputazione. */
 
-const POSTA = { giorniSettimana: [1, 4], giorniPerRispondere: 7 };   // lunedì e giovedì
+const POSTA = { giorniSettimana: [1, 4], giorniPerRispondere: 7, massimoInAttesa: 3 };
+// al massimo 3 email da leggere alla volta, anche dopo tanto tempo offline
+function postaPiena() { return (S.posta || []).filter(m => m.risposta === null).length >= POSTA.massimoInAttesa; }
+function segnaUsata(id) { S.postaUsate = (S.postaUsate || []).concat(id).slice(-30); S.postaRicevute = (S.postaRicevute || 0) + 1; }
+// le email già risposte o scadute spariscono dall'elenco
+function pulisciPosta() { S.posta = (S.posta || []).filter(m => m.risposta === null); }   // lunedì e giovedì
 
 // Ogni scelta: rep (punti reputazione), soldi (+/−), esito (spiegazione mostrata dopo).
 // La prima email arriva quando l'azienda ha almeno un furgone.
@@ -294,17 +299,19 @@ function controllaPosta() {
     cambiaFama(-1);
     notizia(`Email scaduta senza risposta: "${m.oggetto}". Reputazione −1.`, 'male');
   });
-  if (!S.furgoni.length) return;
+  pulisciPosta();
+  if (!S.furgoni.length || postaPiena()) return;
   forseEmailGrave();
+  if (postaPiena()) return;
   // la prima email arriva subito (il primo giorno con un furgone), poi una il lunedì e una il giovedì
-  if (S.posta.length && !POSTA.giorniSettimana.includes(dataDelGiorno(S.giorno).getDay())) return;
+  if (S.postaRicevute && !POSTA.giorniSettimana.includes(dataDelGiorno(S.giorno).getDay())) return;
   if (S.posta.some(m => m.giorno === S.giorno)) return;
-  const usate = S.posta.map(m => m.id);
-  const libere = EMAIL.filter(e => !usate.slice(-EMAIL.length + 3).includes(e.id));
+  const usate = S.postaUsate || [];
+  const libere = EMAIL.filter(e => !usate.includes(e.id));
   const e = scegli(libere.length ? libere : EMAIL);
   S.posta.unshift({ id: e.id, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
     mittente: testoDi(e.mittente), oggetto: e.oggetto, testo: testoDi(e.testo), letta: false, risposta: null, esito: '' });
-  S.posta = S.posta.slice(0, 40);
+  segnaUsata(e.id);
   notizia(`Nuova email: "${e.oggetto}". Rispondi entro ${POSTA.giorniPerRispondere} giorni nella scheda Posta.`, 'info', 'posta');
 }
 
@@ -422,7 +429,7 @@ function forseEmailGrave() {
   const d = dataDelGiorno(S.giorno), mese = d.getFullYear() + '-' + d.getMonth();
   if (S.meseGrave === mese || d.getDate() < 5) return;
   if (d.getDate() < 25 && Math.random() > 0.15) return;
-  const usate = (S.posta || []).map(m => m.id).slice(0, 12);
+  const usate = (S.postaUsate || []).slice(-12);
   const possibili = EMAIL_GRAVI.filter(e => e.puo() && !usate.includes(e.id));
   if (!possibili.length) return;
   const e = scegli(possibili), ctx = e.prepara();
@@ -430,6 +437,7 @@ function forseEmailGrave() {
   S.posta.unshift({ id: e.id, grave: true, ctx, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
     mittente: e.mittente(ctx), oggetto: e.oggetto(ctx), testo: e.testo(ctx), letta: false, risposta: null, esito: '' });
   notizia(`Email urgente: "${S.posta[0].oggetto}". Decidi nella scheda Posta.`, 'male', 'posta-grave');
+  segnaUsata(e.id);
 }
 
 // effetti che durano: rimborsi per chi ruba

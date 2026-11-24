@@ -818,7 +818,8 @@ const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita,
 /* ---------- posta: una email decisionale a settimana ---------- */
 let emailAperta = null;
 function apriEmail(i) {
-  emailAperta = i; if (S.posta[i]) S.posta[i].letta = true;
+  // si tiene l'email (non la posizione): se ne arriva una nuova mentre leggi, non cambia sotto i tuoi occhi
+  emailAperta = S.posta[i] || null; if (emailAperta) emailAperta.letta = true;
   dettaglio = null; scheda = 'posta';
   document.querySelectorAll('.schede button').forEach(x => x.setAttribute('aria-selected', x.dataset.scheda === 'posta'));
   const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
@@ -826,8 +827,9 @@ function apriEmail(i) {
 }
 function vistaPosta() {
   const posta = S.posta || [];
-  if (emailAperta !== null && posta[emailAperta]) {
-    const m = posta[emailAperta], e = trovaEmail(m.id), mancano = m.scadenza - S.giorno;
+  if (emailAperta && !posta.includes(emailAperta)) emailAperta = null;
+  if (emailAperta) {
+    const m = emailAperta, e = trovaEmail(m.id), mancano = m.scadenza - S.giorno;
     return `<button class="btn link indietro" data-azione="chiudi-email">‹ Posta</button>
     <div class="scheda email">
       <div class="nota">Da: <b style="color:var(--testo)">${esc(m.mittente)}</b> · ${nomeGiorno(m.giorno)}</div>
@@ -841,6 +843,7 @@ function vistaPosta() {
           ${m.soldi ? `<div class="riga"><span>Soldi</span><span class="num ${m.soldi > 0 ? 'piu' : 'meno'}">${m.soldi > 0 ? '+' : '−'}${eur.format(Math.abs(m.soldi))}</span></div>` : ''}</div>`}
     </div>`;
   }
+  if (emailAperta === null && posta.some(m => m.risposta !== null)) { pulisciPosta(); return vistaPosta(); }
   const lista = posta.map((m, i) => `<button class="voce-email ${m.risposta === null ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
       <span class="mittente">${m.risposta === null ? `<i class="punto-blu ${m.grave ? 'rosso' : ''}"></i>` : ''}${m.grave ? '<span class="badge grave">Grave</span>' : ''}${esc(m.mittente)}</span>
       <span class="quando">${nomeGiorno(m.giorno)}</span>
@@ -952,8 +955,8 @@ $('#contenuto').addEventListener('click', e => {
     case 'annulla-piano': pianoMostrato = null; ridisegna(); break;
     case 'applica-piano': { const n = applicaPiano(pianoMostrato); pianoMostrato = null; flottaAperti = null; esito(null, n + ' cambi applicati.'); break; }
     case 'apri-email': apriEmail(+b.dataset.i); $('#contenuto').scrollTop = 0; break;
-    case 'chiudi-email': emailAperta = null; ridisegna(); $('#contenuto').scrollTop = 0; break;
-    case 'rispondi': { const err = rispondiEmail(emailAperta, +b.dataset.i); esito(err); break; }
+    case 'chiudi-email': emailAperta = null; pulisciPosta(); ridisegna(); $('#contenuto').scrollTop = 0; break;
+    case 'rispondi': { const err = rispondiEmail(S.posta.indexOf(emailAperta), +b.dataset.i); esito(err); break; }
     case 'salva-online': accountAttesa = true; ridisegna(); salvaOnline(false).then(r => { accountAttesa = false; dopoCambioPartita(r === 'ok' ? 'Partita salvata online.' : r === 'altro' ? 'Ho caricato la partita più recente dall\'altro dispositivo.' : null); }); break;
     case 'esci-account': accountAttesa = true; ridisegna(); esciAccount().then(() => { accountAttesa = false; dopoCambioPartita('Sei uscito. La partita resta anche su questo dispositivo.'); }); break;
     case 'ripara': { const err = ripara(id); esito(err, 'Furgone riparato: dalla prossima giornata torna a lavorare.'); $('#guasti').dataset.chiave = '-'; disegnaGuasti(); break; }
