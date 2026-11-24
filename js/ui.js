@@ -800,7 +800,7 @@ function vistaFlotta() {
     : !S.gestionale ? `<div class="riga capoturno"><span><b>Gestionale automatizzato</b><span class="nota"> · fa "Organizza" da solo ogni mattina · lo paghi una volta, è tuo per sempre</span></span>
       <button class="btn piccolo primario" data-azione="compra-gestionale" ${S.cassa < COSTO_GESTIONALE ? 'disabled' : ''}>Compra ${eur.format(COSTO_GESTIONALE)}</button></div>`
     : `<div class="riga capoturno"><span><b>Gestionale automatizzato</b><span class="nota"> · fa "Organizza" da solo ogni mattina</span></span>
-      <button class="btn piccolo ${S.capoturno ? 'primario' : ''}" data-azione="capoturno">${S.capoturno ? 'Acceso' : 'Spento'}</button></div>`;
+      <button class="switch" role="switch" aria-checked="${!!S.capoturno}" aria-label="Gestionale ${S.capoturno ? 'acceso' : 'spento'}" data-azione="capoturno"><i></i></button></div>`;
   return `${barraMagazzini()}<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
     ${capo}
     ${piano}

@@ -562,3 +562,10 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .filtri-chip button span { opacity: .55; margin-left: 4px; }
 .filtri-chip button[aria-pressed="true"] { background: var(--testo); color: #1c1c1e; }
 .filtri-chip button[aria-pressed="true"] span { opacity: .6; }
+.riga.capoturno { gap: 12px; align-items: center; }
+.riga.capoturno > span { flex: 1; min-width: 0; }
+.riga.capoturno .btn { flex: none; white-space: nowrap; }
+.switch { flex: none; width: 51px; height: 31px; border-radius: 999px; border: 0; padding: 2px; cursor: pointer; background: rgba(120,120,128,0.32); position: relative; transition: background .2s; }
+.switch i { display: block; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3); transition: transform .2s; }
+.switch[aria-checked="true"] { background: #30d158; }
+.switch[aria-checked="true"] i { transform: translateX(20px); }
