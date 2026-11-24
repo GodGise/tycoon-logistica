@@ -387,6 +387,32 @@ function vistaInizio() {
 }
 
 // Scheda Giri: per ogni zona quanti pacchi ci sono e quanti aspettano in deposito
+// In cima alla scheda Giri: perché restano pacchi oggi, con la causa principale per prima
+function resocontoGiri() {
+  const pz = S.ieri && S.ieri.perZona ? Object.values(S.ieri.perZona) : [];
+  if (!pz.length) return '';
+  const nonSmistati = pz.reduce((t, x) => t + Math.max(0, x.arrivo - x.smistati), 0);
+  const postiMancanti = pz.reduce((t, x) => t + Math.max(0, x.smistati - x.capacita - (x.jolly || 0)), 0);
+  const fuori = pz.flatMap(x => x.fuori || []);
+  const cause = [];
+  if (nonSmistati > 0) {
+    const servono = Math.ceil(nonSmistati / (COSTANTI.pacchiMagazziniere * effetto.smistamento()));
+    cause.push({ n: nonSmistati, t: `<b>Pochi magazzinieri:</b> ${intero.format(nonSmistati)} pacchi non smistati. Assumi ${servono} magazzinier${servono === 1 ? 'e' : 'i'} in più (scheda Personale).` });
+  }
+  if (fuori.length) {
+    const senza = fuori.filter(m => m === 'senza autista').length, sosp = fuori.filter(m => m.includes('sospeso')).length, fermi = fuori.length - senza - sosp;
+    const pezzi = [senza && `${senza} senza autista`, fermi && `${fermi} fermi per guasto o incidente`, sosp && `${sosp} con l'autista sospeso`].filter(Boolean);
+    cause.push({ n: fuori.length * COSTANTI.maxConsegneCorriere, t: `<b>Furgoni che non partono:</b> ${pezzi.join(', ')}. Controlla la Flotta (filtro Problemi).` });
+  }
+  if (postiMancanti > 0) {
+    const servono = Math.ceil(postiMancanti / COSTANTI.maxConsegneCorriere);
+    cause.push({ n: postiMancanti, t: `<b>Pochi furgoni:</b> mancano ${intero.format(postiMancanti)} posti. Servono circa ${servono} furgon${servono === 1 ? 'e' : 'i'} o jolly in più.` });
+  }
+  if (!cause.length) return '<p class="nota piu" style="margin:0">Oggi è andato tutto: nessun pacco fermo per colpa tua.</p>';
+  cause.sort((a, b) => b.n - a.n);
+  return `<div class="perche"><b>Perché restano pacchi</b><ul>${cause.map(c => `<li>${c.t}</li>`).join('')}</ul></div>`;
+}
+
 function vistaGiri() {
   const pz = (S.ieri && S.ieri.perZona) || {};
   const jolly = S.furgoni.filter(f => isJolly(f));
@@ -439,6 +465,7 @@ function vistaGiri() {
   }).join('');
   return `<div class="scheda">
       <div class="riga"><h2 style="margin:0">Pacchi in attesa in deposito</h2><span class="num ${totAttesa ? 'meno' : 'piu'}"><b>${intero.format(totAttesa)}</b></span></div>
+      ${resocontoGiri()}
       <p class="nota">Sono i pacchi rimasti in magazzino che domani si aggiungono a quelli nuovi. Oltre un giorno di ritardo i clienti annullano gli ordini e la reputazione scende.</p>
       <p class="nota">In ogni zona la barra mostra quanto sono pieni i furgoni partiti: verde c'è spazio, arancione quasi pieni, rossa non bastano. Sotto trovi il motivo quando restano pacchi.</p>
     </div>
