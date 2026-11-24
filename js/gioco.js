@@ -285,9 +285,9 @@ function giornoLavorativo() {
   const ieri = S.picchiIeri || [];
   tutteCitta().forEach(c => {
     const zc = servite.filter(z => idCitta(z) === c.id); if (zc.length < 2) return;
-    // più zone servi, più picchi: con 13 zone circa 3,5 furgoni di pacchi in più al giorno = lavoro per 4 jolly
-    const quante = Math.min(4, Math.max(1, Math.floor(zc.length / 3)));
-    const furgoniExtra = Math.min(3.6, zc.length * 0.28) * caso(0.85, 1.05);
+    // più zone servi, più picchi: con 13 zone circa 5 furgoni di pacchi in più al giorno = lavoro per 5 jolly
+    const quante = Math.min(5, Math.max(1, Math.floor(zc.length / 2.6)));
+    const furgoniExtra = Math.min(5.4, Math.max(0.4, (zc.length - 2) * 0.5)) * caso(0.85, 1.05);
     const totale = Math.round(COSTANTI.maxConsegneCorriere * furgoniExtra);
     const scelte = [...zc].sort(() => Math.random() - 0.5).sort((a, b) => ieri.includes(a.id) - ieri.includes(b.id)).slice(0, quante);
     const pesi = scelte.map(() => caso(0.7, 1.3)), somma = pesi.reduce((a, b) => a + b, 0);
