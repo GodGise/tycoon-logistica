@@ -703,7 +703,8 @@ function vistaPosta() {
       <div class="nota">Da: <b style="color:var(--testo)">${esc(m.mittente)}</b> · ${nomeGiorno(m.giorno)}</div>
       <h2 style="margin:4px 0 0">${esc(m.oggetto)}</h2>
       <p class="testo-email">${esc(m.testo)}</p>
-      ${m.risposta === null ? `<p class="nota">${mancano > 0 ? `Hai ${mancano} giorn${mancano === 1 ? 'o' : 'i'} per rispondere.` : 'Ultimo giorno per rispondere!'} Se non rispondi vale la scelta peggiore.</p>
+      ${m.risposta === -1 ? `<div class="esito-email male"><b>Scaduta senza risposta</b><div class="riga"><span>Reputazione</span><span class="num meno">−1</span></div></div>`
+      : m.risposta === null ? `<p class="nota">${mancano > 0 ? `Hai ${mancano} giorn${mancano === 1 ? 'o' : 'i'} per rispondere.` : 'Ultimo giorno per rispondere!'} Dopo scade e perdi 1 punto di reputazione.</p>
         <div class="scelte">${e.scelte.map((s, i) => `<button class="btn" data-azione="rispondi" data-i="${i}">${esc(s.testo)}</button>`).join('')}</div>`
       : `<div class="esito-email ${m.rep > 0 ? 'buono' : m.rep < 0 ? 'male' : ''}"><b>Hai scelto:</b> ${esc(e.scelte[m.risposta].testo)}<p>${esc(m.esito)}</p>
           <div class="riga"><span>Reputazione</span><span class="num ${m.rep > 0 ? 'piu' : m.rep < 0 ? 'meno' : ''}">${m.rep > 0 ? '+' : ''}${m.rep}</span></div>
@@ -714,11 +715,11 @@ function vistaPosta() {
       <span class="mittente">${m.risposta === null ? '<i class="punto-blu"></i>' : ''}${esc(m.mittente)}</span>
       <span class="quando">${nomeGiorno(m.giorno)}</span>
       <b>${esc(m.oggetto)}</b>
-      <span class="anteprima">${m.risposta === null ? esc(m.testo) : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
+      <span class="anteprima">${m.risposta === null ? esc(m.testo) : m.risposta === -1 ? 'Scaduta senza risposta · reputazione −1' : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
     </button>`).join('');
   return `<div class="scheda"><div class="riga"><h2 style="margin:0">Posta</h2><span class="badge">Reputazione ${Math.round(S.reputazione)}</span></div>
-    <p class="nota">Ogni lunedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai ${POSTA.giorniPerRispondere} giorni per rispondere.</p></div>
-    ${lista ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per ora. La prima arriva lunedì, quando hai almeno un furgone.</p>'}`;
+    <p class="nota">Ogni lunedì e giovedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai una settimana per rispondere, poi l'email scade (−1 di reputazione).</p></div>
+    ${lista ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per ora. La prima arriva appena hai un furgone.</p>'}`;
 }
 
 function testata() {
