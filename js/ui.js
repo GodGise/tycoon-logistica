@@ -851,7 +851,7 @@ function vistaPosta() {
       <span class="anteprima">${m.risposta === null ? esc(m.testo) : m.risposta === -1 ? 'Scaduta senza risposta · reputazione −1' : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
     </button>`).join('');
   return `<div class="scheda"><div class="riga"><h2 style="margin:0">Posta</h2><span class="badge">Reputazione ${Math.round(S.reputazione)}</span></div>
-    <p class="nota">Ogni lunedì e giovedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai una settimana per rispondere, poi l'email scade (−1 di reputazione).</p></div>
+    <p class="nota">Ogni lunedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai una settimana per rispondere, poi l'email scade (−1 di reputazione).</p></div>
     ${lista ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per ora. La prima arriva appena hai un furgone.</p>'}`;
 }
 
