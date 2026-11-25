@@ -600,3 +600,15 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .voce-mag .info-mag small { opacity: .7; font-size: 12px; }
 .marchio > div { min-width: 0; }
 #sotto-marchio { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* logo caricato dal giocatore */
+.logo img, .icona-az img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+.logo.con-immagine { background: #fff; overflow: hidden; }
+.icona-az { overflow: hidden; }
+.anteprima-logo { width: 56px; height: 56px; flex: none; overflow: hidden; }
+.marker-deposito.con-logo { width: 40px; height: 40px; border-radius: 12px; padding: 0; overflow: hidden; background: #fff;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 0 0 7px rgba(10,132,255,.35), 0 4px 14px rgba(0,0,0,.5); }
+.marker-deposito.con-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* impostazioni: sotto il pulsante Azienda */
+.pulsante-imp { top: calc(50% + 64px); }
+.pulsante-imp .icona-az { background: rgba(255,255,255,.12); color: var(--testo); }
+@media (max-width: 760px) { .pulsante-imp { top: 166px; } }

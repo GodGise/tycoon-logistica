@@ -48,7 +48,6 @@ function vistaAzienda() {
   }).join('');
   const p = S.prezzi;
   return `${selettoreAzienda()}
-  <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
   <div class="kpi">
     <div><b>${S.furgoni.filter(delMag(magAttivo())).length}</b><span>Furgoni</span></div>
     <div><b>${autisti}</b><span>Autisti</span></div>
@@ -67,7 +66,6 @@ function vistaAzienda() {
   ${vistaMiglioramenti()}
   ${vistaTraguardi()}
   ${vistaFiliali()}
-  ${vistaAccount()}
   <div><h2>Zone di consegna <small>${esc(nomeMag(magAttivo()))} · ${zoneMag.length} zone</small></h2>
   <div style="display:grid;gap:8px">${zone}</div>
   <p class="nota" style="margin-top:8px">Un corriere fa al massimo ${COSTANTI.maxConsegneCorriere} consegne al giorno; un magazziniere smista ${COSTANTI.pacchiMagazziniere} pacchi.</p></div>
@@ -77,8 +75,43 @@ function vistaAzienda() {
     <div class="riga"><span>Ricarica in deposito</span><span class="num">${eur2.format(prezzoRicaricaDeposito())}/kWh</span></div>
     <div class="riga"><span>Energia all'ingrosso (PUN)</span><span class="num">${eur2.format(p.pun_eur_kwh)}/kWh</span></div>
     <p class="nota">Fonte: ${esc(p.fonte || '')}</p>
+  </div>`;
+}
+
+/* ---------- impostazioni: nome, logo, account, salvataggio ---------- */
+function vistaImpostazioni() {
+  return `<div class="scheda"><h2 style="margin:0">Impostazioni</h2>
+    <label class="nota" for="input-nome">Nome dell'azienda</label>
+    <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
   </div>
+  <div class="scheda"><h2 style="margin:0">Logo dell'azienda</h2>
+    <div class="riga"><span class="logo anteprima-logo">${htmlLogo()}</span><span class="nota" style="flex:1">Compare in alto a sinistra e sulla mappa al posto dei pallini dei magazzini.</span></div>
+    <div class="riga"><label class="btn primario" style="flex:1;text-align:center">Carica un'immagine<input type="file" accept="image/*" id="file-logo" hidden></label>
+      ${S.logo ? '<button class="btn" data-azione="togli-logo">Togli</button>' : ''}</div>
+  </div>
+  <div class="scheda"><h2 style="margin:0">Salvataggio</h2>
+    <p class="nota">La partita si salva da sola su questo dispositivo${account.token ? ' e sul tuo account' : ''}.${account.ultimo ? ` Ultimo salvataggio online alle ${new Date(account.ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.` : ''}</p>
+    <button class="btn primario" data-azione="salva-ora">Salva la partita adesso</button>
+  </div>
+  ${vistaAccount()}
   <button class="btn link" data-azione="nuova">Ricomincia da capo</button>`;
+}
+// il logo: l'immagine caricata, oppure le iniziali
+function htmlLogo() { return S && S.logo ? `<img src="${S.logo}" alt="">` : esc(iniziali()); }
+function iniziali() { return S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL'; }
+// l'immagine viene ridotta a 128×128 (quadrata, ritagliata al centro) così pesa pochi KB nel salvataggio
+function caricaLogo(file) {
+  if (!file || !file.type.startsWith('image/')) return toast('Scegli un\'immagine.');
+  const img = new Image(), url = URL.createObjectURL(file);
+  img.onload = () => {
+    const lato = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = 128;
+    c.getContext('2d').drawImage(img, (img.width - lato) / 2, (img.height - lato) / 2, lato, lato, 0, 0, 128, 128);
+    URL.revokeObjectURL(url);
+    S.logo = c.toDataURL('image/png'); if (S.logo.length > 60000) S.logo = c.toDataURL('image/jpeg', 0.85);
+    salva(); aggiornaDepositiMappa(); ridisegna(); toast('Logo caricato.');
+  };
+  img.onerror = () => toast('Non riesco a leggere questa immagine.');
+  img.src = url;
 }
 
 function vistaObiettivoEContratti() {
@@ -919,7 +952,7 @@ function vistaPersonale() {
   }).join('');
 }
 
-const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale, posta: vistaPosta };
+const VISTE = { impostazioni: vistaImpostazioni, azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale, posta: vistaPosta };
 
 /* ---------- posta: una email decisionale a settimana ---------- */
 let emailAperta = null;
@@ -980,11 +1013,12 @@ function testata() {
   $('#nome-azienda').textContent = S ? S.nomeAzienda : 'Tycoon Logistica';
   { const n = S ? emailNonLette() : 0, p = document.querySelector('.pallino-posta'); if (p) { p.hidden = !n; p.textContent = n; } }
   { const b = $('#pulsante-azienda'); b.hidden = !S;
-    if (S) { $('#logo-az').textContent = S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+    $('#pulsante-impostazioni').hidden = !S; $('#pulsante-impostazioni').classList.toggle('attivo', scheda === 'impostazioni');
+    if (S) { $('#logo-az').innerHTML = htmlLogo();
       $('#mag-az').textContent = nomeMag(magAttivo()); b.classList.toggle('attivo', scheda === 'azienda');
       b.querySelector('.pallino-az').hidden = !S.depositi.some(m => m.id !== magAttivo() && nonLetteDi(m.id)); } }
   $('#sotto-marchio').textContent = S ? `Tycoon Logistica · ${S.citta.nome}${S.filiali && S.filiali.length ? ' + ' + S.filiali.length + ' filial' + (S.filiali.length > 1 ? 'i' : 'e') : ''}` : 'nome del gioco provvisorio';
-  $('#logo').textContent = S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL';
+  $('#logo').innerHTML = htmlLogo(); $('#logo').classList.toggle('con-immagine', !!(S && S.logo));
   if (!S) { $('#cassa').textContent = '–'; $('#utile-mese').textContent = 'Scegli una città per iniziare'; $('#data').textContent = 'Nuova partita'; return; }
   $('#cassa').textContent = eur.format(S.cassa);
   $('#cassa').className = 'cifra-grande' + (S.cassa < 0 ? ' meno' : '');
@@ -1059,6 +1093,12 @@ function ridisegnaSePossibile() {
 }
 
 /* ---------- eventi ---------- */
+$('#pulsante-impostazioni').addEventListener('click', () => {
+  scheda = 'impostazioni'; negozioAperto = false; dettaglio = null; $('#contenuto').scrollTop = 0;
+  const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
+  ridisegna(); muoviIndicatore();
+});
+document.addEventListener('change', e => { if (e.target.id === 'file-logo') caricaLogo(e.target.files[0]); });
 $('#pulsante-azienda').addEventListener('click', () => {
   scheda = 'azienda'; negozioAperto = false; dettaglio = null; $('#contenuto').scrollTop = 0;
   const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
@@ -1076,6 +1116,8 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'togli-logo': delete S.logo; salva(); aggiornaDepositiMappa(); ridisegna(); break;
+    case 'salva-ora': salva(); if (account.token) salvaOnline(true).then(() => ridisegna()); toast(account.token ? 'Partita salvata, anche sul tuo account.' : 'Partita salvata su questo dispositivo. Con un account la ritrovi anche sul telefono.'); break;
     case 'vai-magazzino': { S.magAttivo = id; flottaAperti = null; pianoMostrato = null; const m = magazzino(id); if (m && mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: Math.max(mappa.getZoom(), 12) }); ridisegna(); break; }
     case 'assumi-resp': esito(assumiResponsabile(id), 'Responsabile assunto: ora puoi comprare un altro magazzino.'); break;
     case 'licenzia-resp': if (b.dataset.conferma) { licenziaResponsabile(id); esito(null, 'Torni a gestirlo tu.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
