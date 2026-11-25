@@ -785,10 +785,10 @@ function vistaNegozio() {
 /* ---------- Flotta: furgoni raggruppati per zona, filtri e "Organizza" ---------- */
 let flottaFiltro = 'tutti', flottaAperti = null, flottaEspanso = null, pianoMostrato = null;
 function problemaFurgone(f) {
-  if (f.daRiparare) return 'guasto';
+  if (f.daRiparare) return 'guasto: da riparare';
   if (!f.autistaId) return 'senza autista';
   if (autistaSospeso(f)) return 'autista sospeso';
-  if (f.fermo > 0) return 'fermo ' + f.fermo + ' gg';
+  if (f.fermo > 0) return (f.motivo === 'incidente' ? 'incidente' : f.motivo === 'guasto' ? 'in riparazione' : 'fermo') + ` · ${f.fermo} gg`;
   return null;
 }
 function rigaFurgone(f, autisti) {
@@ -833,8 +833,9 @@ function vistaFlotta() {
   if (!furgoniMag.length) return barraMagazzini() + `<button class="btn primario" data-azione="apri-negozio">Compra un furgone</button>
     <p class="nota">Non hai ancora furgoni. Comincia da uno: un diesel usato costa poco, un elettrico nuovo consuma meno.</p>`;
   // furgoni divisi per stato: assegnati a una zona, jolly, senza autista, in deposito
-  const statoF = f => !f.zona ? 'deposito' : !f.autistaId ? 'senza' : isJolly(f) ? 'jolly' : 'assegnati';
-  const STATI = [['assegnati', 'Assegnati a una zona', '#30d158', 'lavorano nella loro zona'], ['jolly', 'Jolly', '#ffd60a', 'vanno dove servono'],
+  // i furgoni fermi (guasto, incidente, autista sospeso) stanno in un gruppo a parte, in cima
+  const statoF = f => !f.zona ? 'deposito' : !f.autistaId ? 'senza' : (f.daRiparare || f.fermo > 0 || autistaSospeso(f)) ? 'fermi' : isJolly(f) ? 'jolly' : 'assegnati';
+  const STATI = [['fermi', 'Fermi', '#ff453a', 'guasti, incidenti o autista sospeso: oggi non lavorano'], ['assegnati', 'Assegnati a una zona', '#30d158', 'lavorano nella loro zona'], ['jolly', 'Jolly', '#ffd60a', 'vanno dove servono'],
     ['senza', 'Senza autista', '#ff9f0a', 'fermi: manca chi guida'], ['deposito', 'In deposito', '#8e8e93', 'non lavorano']];
   const filtri = { tutti: () => true, problemi: f => !!problemaFurgone(f) };
   STATI.forEach(([k]) => { filtri[k] = f => statoF(f) === k; });
@@ -894,7 +895,7 @@ function vistaFlotta() {
   return `${barraMagazzini()}<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
     ${capo}
     ${piano}
-    <div class="filtri-chip">${[['tutti', 'Tutti'], ['assegnati', 'Assegnati'], ['jolly', 'Jolly'], ['senza', 'Senza autista'], ['deposito', 'In deposito'], ['problemi', 'Problemi']].map(([k, t]) =>
+    <div class="filtri-chip">${[['tutti', 'Tutti'], ['fermi', 'Fermi'], ['assegnati', 'Assegnati'], ['jolly', 'Jolly'], ['senza', 'Senza autista'], ['deposito', 'In deposito'], ['problemi', 'Problemi']].map(([k, t]) =>
       `<button data-azione="filtro-flotta" data-v="${k}" aria-pressed="${flottaFiltro === k}">${t} <span>${conta(k)}</span></button>`).join('')}</div>
     ${html || '<p class="nota">Nessun furgone in questo filtro.</p>'}
     <p class="nota">Tocca un gruppo per aprirlo, tocca un furgone per cambiare autista o zona.</p>`;
@@ -1069,7 +1070,7 @@ window.addEventListener('resize', muoviIndicatore);
 const FOGLI = ['basso', 'medio', 'alto'];
 function impostaFoglio(s) {
   const p = document.querySelector('.pannello'); if (p.dataset.foglio === s) return;
-  p.dataset.foglio = s; setTimeout(muoviIndicatore, 360);
+  p.dataset.foglio = s; document.body.dataset.foglio = s; setTimeout(muoviIndicatore, 360);
 }
 (() => {
   const p = document.querySelector('.pannello'), m = p.querySelector('.maniglia'), testa = p.querySelector('.testa');
@@ -1109,6 +1110,7 @@ function ridisegnaSePossibile() {
 }
 
 /* ---------- eventi ---------- */
+$('#logo').addEventListener('click', () => { if (S) $('#pulsante-azienda').click(); });
 $('#pulsante-impostazioni').addEventListener('click', () => {
   scheda = 'impostazioni'; negozioAperto = false; dettaglio = null; $('#contenuto').scrollTop = 0;
   const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');

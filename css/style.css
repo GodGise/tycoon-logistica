@@ -621,3 +621,6 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .invito-notifiche .riga { gap: 8px; }
 .invito-notifiche .btn { flex: 1; }
 @keyframes entra-invito { from { opacity: 0; transform: translate(-50%, -10px); } }
+/* sul telefono, a pannello alzato, i pulsanti a destra coprirebbero il pannello: si nascondono (il logo apre l'Azienda) */
+@media (max-width: 760px) { body[data-foglio="alto"] .pulsante-azienda { display: none; } }
+#logo { cursor: pointer; }
