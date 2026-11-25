@@ -160,6 +160,10 @@ const ICONE_MIGLIORAMENTI = {
   pubblicita: '<path d="M4 10v4h3l6 4V6L7 10H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
   formazione: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4v6M5.5 15.5l4.8-2.5M18.5 15.5l-4.8-2.5"/>',
   officina: '<path d="M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.5 2.5-2.5-.5-.5-2.5z"/>',
+  commerciale: '<path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2M4 12h16"/>',
+  solare: '<path d="M3 20l3-9h12l3 9z"/><path d="M8 11l-1 9M16 11l1 9M4.5 15.5h15"/><circle cx="12" cy="5" r="2"/>',
+  scaffali: '<path d="M5 3v18M19 3v18M5 8h14M5 13h14M5 18h14"/>',
+  selezione: '<circle cx="10" cy="9" r="3.5"/><path d="M4 20a6 6 0 0 1 12 0"/><path d="M16 11l2 2 4-4"/>',
 };
 // prima → dopo, con i numeri veri della tua azienda
 function primaDopo(id) {
@@ -173,6 +177,11 @@ function primaDopo(id) {
     return ['Pacchi al giorno nelle tue zone', `${n(p * (1 + 0.1 * l))}`, `${n(p * (1 + 0.1 * (l + 1)))}`, '']; }
   if (id === 'formazione') return ['Incidenti', 'normali', '4 su 10 evitati', ''];
   if (id === 'officina') return ['Guasti', 'ripari tu, prezzo pieno', 'da soli, anche di notte, a metà', ''];
+  if (id === 'commerciale') return ['Tariffa a pacco', (tariffa() * (1 + 0.05 * l)).toFixed(2).replace('.', ',') + ' €', (tariffa() * (1 + 0.05 * (l + 1))).toFixed(2).replace('.', ',') + ' €', ''];
+  if (id === 'solare') { const el = S.furgoni.filter(f => magDi(f) === magAttivo() && modello(f.modello).tipo !== 'diesel').length;
+    return ['Ricarica dei furgoni elettrici', 'prezzo pieno', 'metà prezzo', el ? `Hai ${el} furgoni elettrici.` : 'Conviene se compri furgoni elettrici.']; }
+  if (id === 'scaffali') return ['Pacchi in giacenza persi', 'dopo 1 giorno', 'la metà', ''];
+  if (id === 'selezione') return ['Candidati per ricerca', 'fino a 5', 'fino a 6, meno "mele marce"', ''];
   return null;
 }
 /* ---------- livello dell'azienda e percorso ---------- */
@@ -354,6 +363,16 @@ function vistaMagazzini() {
       : `<button class="btn primario" data-azione="scegli-sede">Apri il ${S.depositi.length + 1}° magazzino in un capoluogo di regione</button>`}
     <p class="nota">Il responsabile gestisce il magazzino al posto tuo: accetta i contratti, risponde ai clienti, assume e organizza, e ogni mese ti manda un report. Tu passi al magazzino successivo.</p>
   </div>`;
+}
+
+// cosa ha fatto il taglio del lunedì, per vedere che lavora anche quando non c'è niente da tagliare
+function esitoTaglio(m) {
+  const t = m && m.ultimoTaglio;
+  if (!t) return 'Primo controllo lunedì prossimo.';
+  const quando = t.giorno === S.giorno - 1 || t.giorno === S.giorno ? 'Ultimo controllo (lunedì)' : `Ultimo controllo: ${nomeGiorno(t.giorno)}`;
+  if (t.licenziati || t.venduti) return `${quando}: licenziati ${t.licenziati} autisti${t.venduti ? `, venduti ${t.venduti} jolly` : ''}.`;
+  const jolly = t.attesa ? `per i jolly servono ancora ${t.attesa} giorni di dati` : `${t.jolly} jolly, il minimo è ${t.servono}`;
+  return `${quando}: niente da tagliare. ${t.liberi} autist${t.liberi === 1 ? 'a' : 'i'} senza furgone (uno resta di riserva), ${jolly}.`;
 }
 
 /* ---------- selettore del magazzino che stai gestendo ---------- */
@@ -810,7 +829,8 @@ function vistaFlotta() {
       <button class="switch" role="switch" aria-checked="${!!S.capoturno}" aria-label="Gestionale ${S.capoturno ? 'acceso' : 'spento'}" data-azione="capoturno"><i></i></button></div>
     ${S.capoturno && furgoniMag.filter(isJolly).length < JOLLY_MINIMI ? `<p class="nota" style="color:#ff9f0a">Hai ${furgoniMag.filter(isJolly).length} jolly: per averne ${JOLLY_MINIMI} di riserva, dopo aver coperto ogni zona, ti servono circa ${JOLLY_MINIMI - furgoniMag.filter(isJolly).length} furgoni in più con autista.</p>` : ''}
     ${S.capoturno ? `<div class="riga capoturno"><span><b>Taglia chi è in più</b><span class="nota"> · il lunedì licenzia gli autisti senza furgone (ne tiene uno di riserva) e vende i jolly che non servono, ma ne tiene sempre almeno 5</span></span>
-      <button class="switch" role="switch" aria-checked="${S.taglia !== false}" aria-label="Taglia chi è in più" data-azione="taglia"><i></i></button></div>` : ''}`;
+      <button class="switch" role="switch" aria-checked="${S.taglia !== false}" aria-label="Taglia chi è in più" data-azione="taglia"><i></i></button></div>
+      ${S.taglia !== false ? `<p class="nota">${esitoTaglio(magazzino(magAttivo()))}</p>` : ''}` : ''}`;
   return `${barraMagazzini()}<div class="azioni-flotta"><button class="btn primario" data-azione="apri-negozio">Compra un furgone</button><button class="btn" data-azione="organizza">Organizza</button></div>
     ${capo}
     ${piano}

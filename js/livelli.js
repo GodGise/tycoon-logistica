@@ -3,11 +3,11 @@
    La periferia richiede una licenza per zona, acquistabile dopo il secondo magazzino. */
 
 const LIVELLI = [
-  { n: 1,  nome: 'Corriere di quartiere', xp: 0,      sblocca: ['Centro e primo anello della città', 'Furgoni Pacato Fiatt, Ford Trancit e Renò Mastre'] },
-  { n: 2,  nome: 'Corriere cittadino',    xp: 10000,   sblocca: ['Furgone elettrico e-Pacato', 'Navigatore intelligente'] },
-  { n: 3,  nome: 'Rete locale',           xp: 150000,   sblocca: ['Ivecco Daylì', 'Pubblicità in città'] },
+  { n: 1,  nome: 'Corriere di quartiere', xp: 0,      sblocca: ['Centro e primo anello della città', 'Furgoni Pacato Fiatt, Ford Trancit e Renò Mastre', 'Ufficio del personale'] },
+  { n: 2,  nome: 'Corriere cittadino',    xp: 10000,   sblocca: ['Furgone elettrico e-Pacato', 'Navigatore intelligente', 'Scaffali per le giacenze'] },
+  { n: 3,  nome: 'Rete locale',           xp: 30000,    sblocca: ['Ivecco Daylì', 'Pubblicità in città', 'Ufficio commerciale', 'Pannelli solari sul tetto'] },
   { n: 4,  nome: 'Logistica urbana',      xp: 75000,  sblocca: ['Mercedez Sprinta', 'Officina nel magazzino', 'Corso di guida sicura'] },
-  { n: 5,  nome: 'Operatore regionale',   xp: 30000,  sblocca: ['Furgone elettrico grande e-Daylì', 'Nastro trasportatore'] },
+  { n: 5,  nome: 'Operatore regionale',   xp: 150000, sblocca: ['Furgone elettrico grande e-Daylì', 'Nastro trasportatore'] },
   { n: 6,  nome: 'Gruppo logistico',      xp: 275000,  sblocca: ['Filiali in altre città', 'Gestionale automatizzato (100.000 €, per sempre): fa "Organizza" da solo ogni mattina'] },
   { n: 7,  nome: 'Rete interregionale',   xp: 450000,  sblocca: ['Contratti dei clienti pagati il 20% in più'] },
   { n: 8,  nome: 'Big della logistica',   xp: 700000, sblocca: ['Accordo flotta: −10% sui furgoni nuovi'] },
@@ -20,7 +20,7 @@ function pacchiZona(z) { return Math.round(z.pacchi * crescitaDomanda()); }
 // a che livello si sblocca cosa
 const SBLOCCO = {
   modelli: { pacato: 1, trancit: 1, mastre: 1, epacato: 2, daily: 3, sprinta: 4, edaily: 5 },
-  miglioramenti: { software: 2, pubblicita: 3, officina: 4, formazione: 4, nastro: 5 },
+  miglioramenti: { selezione: 1, software: 2, scaffali: 2, pubblicita: 3, commerciale: 3, solare: 3, officina: 4, formazione: 4, nastro: 5 },
   filiali: 6, capoturno: 6, contrattiPiu: 7, scontoFurgoni: 8, licenzeMeta: 9,
 };
 

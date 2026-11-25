@@ -132,7 +132,7 @@ function ammortamento(idElettrico = 'epacato', idDiesel = 'pacato') {
 function generaCandidati(ruolo) {
   const r = RUOLI[ruolo], stip = S.offerta[ruolo];
   const t = (stip - r.stipMin) / (r.stipMax - r.stipMin);
-  const n = limita(Math.round(1 + t * 4 + caso(-0.5, 0.5)), 1, 5);
+  const n = limita(Math.round(1 + t * 4 + caso(-0.5, 0.5)) + (livello('selezione') ? 1 : 0), 1, 6);
   S.candidati[ruolo] = Array.from({ length: n }, () => ({
     id: nuovoId('c'), nome: scegli(NOMI) + ' ' + scegli(COGNOMI), ruolo, stipendio: stip,
     esperienza: ruolo === 'autista' ? Math.round(limita(10 + t * 65 + caso(-15, 15), 0, 95)) : null,
@@ -400,7 +400,7 @@ function giornoLavorativo() {
   servite.forEach(z => {
     const r = ris[z.id], giri = r.giri, consegne = r.consegne, consegneCtr = r.consegneCtr;
     const restano = arrivo[z.id] - consegne;
-    const persi = Math.max(0, restano - pacchiZona(z));       // oltre un giorno di giacenza gli ordini si perdono
+    const persi = Math.max(0, restano - pacchiZona(z) * effetto.pazienza(magDi(z)));       // oltre un giorno di giacenza gli ordini si perdono
     S.giacenze[z.id] = restano - persi;
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0), daAiuto = r.aiuto;
     stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
@@ -421,7 +421,8 @@ function giornoLavorativo() {
     lavori.forEach(({ f, mie }) => {
       perFurgone[f.id] = mie;
       const km = Math.round(kmGiro(z) * effetto.km(z.id) * (ha(f, 'navigatore') ? 0.92 : 1) * (0.7 + 0.3 * Math.min(1, mie / 100)));
-      const m = modello(f.modello), c = costoKm(m, f.usato);
+      const m = modello(f.modello), c = Object.assign({}, costoKm(m, f.usato));
+      if (m.tipo !== 'diesel') c.energia *= effetto.ricarica(magDi(f));   // pannelli solari
       if (m.tipo === 'diesel') carburante += km * c.energia; else ricarica += km * c.energia;
       manut += km * c.manutenzione;
       stat(magazzino(magDi(f)) || S.depositi[0], 'costi', km * (c.energia + c.manutenzione));
@@ -526,7 +527,8 @@ function tagliaPersonaleInPiu(m) {
     const euroKm = f => { const k = costoKm(modello(f.modello), f.usato); return k.energia + k.manutenzione; };
     const jolly = S.furgoni.filter(f => magDi(f) === m.id && isJolly(f) && f.autistaId && furgoneOperativo(f)).sort((a, b) => euroKm(b) - euroKm(a));
     jolly.slice(0, Math.max(0, jolly.length - servono)).forEach(f => { const d = f.autistaId; vendiFurgone(f.id); licenzia(d); venduti++; licenziati++; });
-  }
+    m.ultimoTaglio = { giorno: S.giorno, licenziati, venduti, liberi: senzaFurgone.length, jolly: jolly.length, servono };
+  } else m.ultimoTaglio = { giorno: S.giorno, licenziati, venduti, liberi: senzaFurgone.length, attesa: 5 - storia.length };
   if (licenziati || venduti) {
     const chi = m.responsabile ? `${m.responsabile.nome} (${m.nome})` : 'Il gestionale';
     notizia(`${chi}: personale in più tagliato, ${licenziati} autist${licenziati === 1 ? 'a' : 'i'} licenziat${licenziati === 1 ? 'o' : 'i'}${venduti ? ` e ${venduti} jolly vendut${venduti === 1 ? 'o' : 'i'}` : ''}.`, 'info', 'taglia-' + m.id);

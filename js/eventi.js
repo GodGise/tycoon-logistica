@@ -1,17 +1,24 @@
 /* Tycoon Logistica – eventi rari con decisioni e miglioramenti da comprare. */
 
 /* ---------- miglioramenti ----------
-   Prezzi pensati per costare circa 20 mesi di guadagni di un magazzino pieno (in tutto 1.890.000 €). */
+   Ogni magazzino ha i suoi. Prezzi pensati per completare il primo magazzino in circa 2 settimane reali
+   (circa 15 mesi di gioco); ogni magazzino successivo costa il 50% in più del precedente. */
 const MIGLIORAMENTI = {
-  nastro:    { nome: 'Nastro trasportatore', motto: 'I pacchi corrono da soli verso i furgoni.', descr: 'Ogni magazziniere smista il 50% di pacchi in più.', livelli: [240000] },
-  software:  { nome: 'Navigatore intelligente', motto: 'Meno strada, meno gasolio, giri più rapidi.', descr: 'Giri più corti: −10% di km per ogni livello.', livelli: [150000, 360000] },
-  pubblicita:{ nome: 'Pubblicità in città', motto: 'Cartelloni, social e furgoni con il tuo logo.', descr: '+10% di pacchi in tutte le zone per ogni livello.', livelli: [90000, 210000, 420000] },
-  formazione:{ nome: 'Corso di guida sicura', motto: 'Autisti più attenti, furgoni sempre in strada.', descr: 'Gli autisti fanno il 40% di incidenti in meno.', livelli: [120000] },
-  officina:  { nome: 'Officina nel magazzino', motto: 'Un meccanico tutto tuo, giorno e notte.', descr: 'Ripara i guasti da solo, anche a gioco chiuso, a metà prezzo.', livelli: [300000] },
+  nastro:     { nome: 'Nastro trasportatore', motto: 'I pacchi corrono da soli verso i furgoni.', descr: 'Ogni magazziniere smista il 50% di pacchi in più.', livelli: [40000] },
+  software:   { nome: 'Navigatore intelligente', motto: 'Meno strada, meno gasolio, giri più rapidi.', descr: 'Giri più corti: −10% di km per ogni livello.', livelli: [25000, 55000] },
+  pubblicita: { nome: 'Pubblicità in città', motto: 'Cartelloni, social e furgoni con il tuo logo.', descr: '+10% di pacchi in tutte le zone per ogni livello.', livelli: [15000, 30000, 55000] },
+  commerciale:{ nome: 'Ufficio commerciale', motto: 'Qualcuno che tratta i prezzi con i clienti.', descr: '+5% sulla tariffa di ogni pacco per ogni livello.', livelli: [20000, 40000] },
+  formazione: { nome: 'Corso di guida sicura', motto: 'Autisti più attenti, furgoni sempre in strada.', descr: 'Gli autisti fanno il 40% di incidenti in meno.', livelli: [20000] },
+  officina:   { nome: 'Officina nel magazzino', motto: 'Un meccanico tutto tuo, giorno e notte.', descr: 'Ripara i guasti da solo, anche a gioco chiuso, a metà prezzo.', livelli: [50000] },
+  solare:     { nome: 'Pannelli solari sul tetto', motto: 'I furgoni elettrici si ricaricano col sole.', descr: 'La ricarica dei furgoni elettrici costa la metà.', livelli: [25000] },
+  scaffali:   { nome: 'Scaffali per le giacenze', motto: 'I pacchi rimasti aspettano in ordine.', descr: 'I clienti aspettano un giorno in più prima di annullare: la metà dei pacchi persi.', livelli: [20000] },
+  selezione:  { nome: 'Ufficio del personale', motto: 'Colloqui fatti bene, meno sorprese.', descr: 'Un candidato in più a ogni ricerca e metà delle "mele marce".', livelli: [10000] },
 };
 // i miglioramenti sono di ogni magazzino (di default quello che stai gestendo)
 function livello(id, mag) { const m = S.depositi && magazzino(mag || magAttivo()); return (m && m.migl && m.migl[id]) || 0; }
-function prezzoMiglioramento(id, mag) { const l = MIGLIORAMENTI[id].livelli; return livello(id, mag) < l.length ? l[livello(id, mag)] : null; }
+// ogni magazzino dopo il primo ha miglioramenti più cari del 50% rispetto al precedente (×1,5, ×2,25, ...)
+function rincaroMiglioramenti(mag) { const i = S.depositi.findIndex(m => m.id === (mag || magAttivo())); return Math.pow(1.5, Math.max(0, i)); }
+function prezzoMiglioramento(id, mag) { const l = MIGLIORAMENTI[id].livelli, n = livello(id, mag); return n < l.length ? Math.round(l[n] * rincaroMiglioramenti(mag) / 5000) * 5000 : null; }
 function compraMiglioramento(id) {
   if (!sbloccato('miglioramenti', id)) return `Si sblocca al livello ${livelloPer('miglioramenti', id)}.`;
   const prezzo = prezzoMiglioramento(id);
@@ -28,7 +35,9 @@ const effetto = {
   smistamento: mag => livello('nastro', mag) ? 1.5 : 1,
   km: zonaId => (1 - 0.1 * livello('software', magDi(zona(zonaId)))) * (S.effetti && S.effetti.lavori && S.effetti.lavori.zona === zonaId && S.giorno <= S.effetti.lavori.fino ? 1.3 : 1),
   pacchi: zonaId => (1 + 0.1 * livello('pubblicita', magDi(zona(zonaId)))) * (S.effetti && S.effetti.accordo && S.effetti.accordo.zona === zonaId && S.giorno <= S.effetti.accordo.fino ? 1.25 : 1),
-  tariffaZona: zonaId => S.effetti && S.effetti.accordo && S.effetti.accordo.zona === zonaId && S.giorno <= S.effetti.accordo.fino ? 0.9 : 1,
+  tariffaZona: zonaId => (1 + 0.05 * livello('commerciale', magDi(zona(zonaId)))) * (S.effetti && S.effetti.accordo && S.effetti.accordo.zona === zonaId && S.giorno <= S.effetti.accordo.fino ? 0.9 : 1),
+  ricarica: mag => livello('solare', mag) ? 0.5 : 1,
+  pazienza: mag => livello('scaffali', mag) ? 2 : 1,
   incidenti: mag => livello('formazione', mag) ? 0.6 : 1,
   guasti: mag => livello('officina', mag) ? 0.5 : 1,
   capacita: () => S.effetti && S.effetti.neve === S.giorno ? 0.6 : 1,
@@ -123,7 +132,7 @@ function aggiornaEvento(dt) {
 // Prima di comprare un altro magazzino (o aprire una filiale) bisogna completare tutti i miglioramenti del magazzino
 function miglioramentiMancanti(mag) { return Object.keys(MIGLIORAMENTI).filter(id => prezzoMiglioramento(id, mag) !== null); }
 function costoMiglioramentiMancanti(mag) {
-  return miglioramentiMancanti(mag).reduce((t, id) => t + MIGLIORAMENTI[id].livelli.slice(livello(id, mag)).reduce((a, b) => a + b, 0), 0);
+  return miglioramentiMancanti(mag).reduce((t, id) => t + MIGLIORAMENTI[id].livelli.slice(livello(id, mag)).reduce((a, b) => a + Math.round(b * rincaroMiglioramenti(mag) / 5000) * 5000, 0), 0);
 }
 // un altro magazzino si compra solo quando tutti quelli che hai hanno un responsabile
 function magazziniSenzaResponsabile() { return S.depositi.filter(m => !m.responsabile); }
