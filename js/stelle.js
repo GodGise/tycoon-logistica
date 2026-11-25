@@ -87,11 +87,11 @@ const TESTI_LAMENTELA = [
   n => `Il corriere ${n} ha lanciato il pacco oltre il cancello. L'ho visto dalla finestra.`,
 ];
 function emailLamentela(a) {
-  if (gestito(magDi(a))) { rispondeResponsabile(magDi(a), EMAIL_LAMENTELE[0]); return; }   // ci pensa il responsabile
+  if (gestito(magDi(a))) { rispondeResponsabile(magDi(a), EMAIL_LAMENTELE[0], { id: a.id }); return; }   // ci pensa il responsabile
   if ((a.ultimaLamentela || -99) > S.giorno - 7 || postaPiena()) { notizia(`Lamentela di un cliente su ${a.nome}.`, 'male', 'lam-' + a.id); return; }
   a.ultimaLamentela = S.giorno;
   S.posta = S.posta || [];
-  S.posta.unshift({ id: 'lamentela', lamentela: true, ctx: { id: a.id }, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
+  S.posta.unshift({ id: 'lamentela', lamentela: true, ctx: { id: a.id }, mag: magDi(a), giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
     mittente: 'Un cliente', oggetto: `Lamentela sul corriere ${a.nome}`, testo: scegli(TESTI_LAMENTELA)(a.nome), letta: false, risposta: null, esito: '', ordine: mescola(EMAIL_LAMENTELE[0].scelte) });
 }
 

@@ -697,7 +697,7 @@ function apriSede(nome) {
   notizia(`Aperto il magazzino di ${c.nome} per ${prezzo.toLocaleString('it-IT')} €: si riparte da zero, con i soldi del primo.`, 'buono');
   salva(); return null;
 }
-function spostaMagazziniere(id, cittaId) { const d = dipendente(id); if (d) d.cittaId = cittaId; }
+
 
 /* ---------- reputazione ----------
    Reputazione = servizio + fama.

@@ -47,8 +47,7 @@ function vistaAzienda() {
     </div>`;
   }).join('');
   const p = S.prezzi;
-  return `${barraMagazzini()}
-  <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
+  return `${selettoreAzienda()}
   <div class="kpi">
     <div><b>${S.furgoni.filter(delMag(magAttivo())).length}</b><span>Furgoni</span></div>
     <div><b>${autisti}</b><span>Autisti</span></div>
@@ -67,7 +66,6 @@ function vistaAzienda() {
   ${vistaMiglioramenti()}
   ${vistaTraguardi()}
   ${vistaFiliali()}
-  ${vistaAccount()}
   <div><h2>Zone di consegna <small>${esc(nomeMag(magAttivo()))} · ${zoneMag.length} zone</small></h2>
   <div style="display:grid;gap:8px">${zone}</div>
   <p class="nota" style="margin-top:8px">Un corriere fa al massimo ${COSTANTI.maxConsegneCorriere} consegne al giorno; un magazziniere smista ${COSTANTI.pacchiMagazziniere} pacchi.</p></div>
@@ -77,8 +75,45 @@ function vistaAzienda() {
     <div class="riga"><span>Ricarica in deposito</span><span class="num">${eur2.format(prezzoRicaricaDeposito())}/kWh</span></div>
     <div class="riga"><span>Energia all'ingrosso (PUN)</span><span class="num">${eur2.format(p.pun_eur_kwh)}/kWh</span></div>
     <p class="nota">Fonte: ${esc(p.fonte || '')}</p>
+  </div>`;
+}
+
+/* ---------- impostazioni: nome, logo, account, salvataggio ---------- */
+function vistaImpostazioni() {
+  return `<div class="scheda"><h2 style="margin:0">Impostazioni</h2>
+    <label class="nota" for="input-nome">Nome dell'azienda</label>
+    <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
   </div>
+  <div class="scheda"><h2 style="margin:0">Logo dell'azienda</h2>
+    <div class="riga"><span class="logo anteprima-logo">${htmlLogo()}</span><span class="nota" style="flex:1">Compare in alto a sinistra, sui pulsanti e sulla mappa sui magazzini. ${S.logo ? 'Stai usando il tuo logo.' : 'Questo è il logo di base: puoi caricare il tuo.'}</span></div>
+    <div class="riga"><label class="btn primario" style="flex:1;text-align:center">Carica un'immagine<input type="file" accept="image/*" id="file-logo" hidden></label>
+      ${S.logo ? '<button class="btn" data-azione="togli-logo">Rimetti quello di base</button>' : ''}</div>
+  </div>
+  <div class="scheda"><h2 style="margin:0">Salvataggio</h2>
+    <p class="nota">La partita si salva da sola su questo dispositivo${account.token ? ' e sul tuo account' : ''}.${account.ultimo ? ` Ultimo salvataggio online alle ${new Date(account.ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.` : ''}</p>
+    <button class="btn primario" data-azione="salva-ora">Salva la partita adesso</button>
+  </div>
+  ${vistaAccount()}
   <button class="btn link" data-azione="nuova">Ricomincia da capo</button>`;
+}
+// il logo: l'immagine caricata, oppure le iniziali
+const LOGO_DEFAULT = 'img/logo-default.png';   // Spedizioni Veloci: il giocatore può caricare il suo
+function logoAttuale() { return S && S.logo ? S.logo : LOGO_DEFAULT; }
+function htmlLogo() { return `<img src="${logoAttuale()}" alt="">`; }
+function iniziali() { return S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL'; }
+// l'immagine viene ridotta a 128×128 (quadrata, ritagliata al centro) così pesa pochi KB nel salvataggio
+function caricaLogo(file) {
+  if (!file || !file.type.startsWith('image/')) return toast('Scegli un\'immagine.');
+  const img = new Image(), url = URL.createObjectURL(file);
+  img.onload = () => {
+    const lato = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = 128;
+    c.getContext('2d').drawImage(img, (img.width - lato) / 2, (img.height - lato) / 2, lato, lato, 0, 0, 128, 128);
+    URL.revokeObjectURL(url);
+    S.logo = c.toDataURL('image/png'); if (S.logo.length > 60000) S.logo = c.toDataURL('image/jpeg', 0.85);
+    salva(); aggiornaDepositiMappa(); ridisegna(); toast('Logo caricato.');
+  };
+  img.onerror = () => toast('Non riesco a leggere questa immagine.');
+  img.src = url;
 }
 
 function vistaObiettivoEContratti() {
@@ -373,6 +408,17 @@ function esitoTaglio(m) {
   if (t.licenziati || t.venduti) return `${quando}: licenziati ${t.licenziati} autisti${t.venduti ? `, venduti ${t.venduti} jolly` : ''}.`;
   const jolly = t.attesa ? `per i jolly servono ancora ${t.attesa} giorni di dati` : `${t.jolly} jolly, il minimo è ${t.servono}`;
   return `${quando}: niente da tagliare. ${t.liberi} autist${t.liberi === 1 ? 'a' : 'i'} senza furgone (uno resta di riserva), ${jolly}.`;
+}
+
+/* ---------- in cima alla schermata Azienda: quale magazzino stai gestendo ---------- */
+function selettoreAzienda() {
+  return `<div class="scheda"><h2 style="margin:0">Quale magazzino gestisci? <small>giri, flotta, personale e posta mostrano solo questo</small></h2>
+    <div class="lista-mag">${S.depositi.map((m, i) => { const n = nonLetteDi(m.id), u = utileMagazzino(m);
+      return `<button class="voce-mag ${m.id === magAttivo() ? 'attivo' : ''}" data-azione="vai-magazzino" data-id="${m.id}">
+        <span class="num-mag">${i + 1}</span><span class="info-mag"><b>${esc(m.nome)}</b><small>${m.responsabile ? '👔 ' + esc(m.responsabile.nome) + ' · ' : ''}${S.furgoni.filter(delMag(m.id)).length} furgoni · utile del mese ${eur.format(Math.round(u))}</small></span>
+        ${n ? `<span class="badge">✉ ${n}</span>` : ''}</button>`; }).join('')}</div>
+    ${gestito(magAttivo()) ? `<p class="nota avviso-gestito">👔 ${esc(magazzino(magAttivo()).responsabile.nome)} gestisce questo magazzino da solo. Puoi comunque guardare e cambiare.</p>` : ''}
+  </div>`;
 }
 
 /* ---------- selettore del magazzino che stai gestendo ---------- */
@@ -876,7 +922,6 @@ function vistaPersonale() {
       <div class="riga"><button class="titolo-link" data-azione="dettaglio" data-tipo="dipendente" data-id="${d.id}">${esc(d.nome)} ›</button><span class="num">${eur.format(d.stipendio)}/mese</span></div>
       <div class="riga">${htmlStelle(d)}${inProva(d) ? `<span class="badge">in prova ancora ${STELLE.prova - (S.giorno - d.assuntoGiorno)} gg</span>` : ''}</div>
       ${ruolo === 'autista' ? `<div class="riga"><span>Esperienza</span><span class="num">${Math.round(d.esperienza)}/100</span></div><div class="metro ${d.esperienza >= 60 ? '' : d.esperienza >= 30 ? 'medio' : 'basso'}"><i style="width:${d.esperienza}%"></i></div>` : ''}
-      ${ruolo === 'magazziniere' && S.filiali && S.filiali.length ? `<label><span class="nota">Lavora a</span><select data-azione="citta-mag" data-id="${d.id}">${tutteCitta().map(c => `<option value="${c.id}" ${idCitta(d) === c.id ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>` : ''}
       <div class="riga"><span>${ruolo === 'autista' ? (S.furgoni.some(f => f.autistaId === d.id && isJolly(f)) ? '<b style="color:#ffd60a">Jolly</b>' : S.furgoni.some(f => f.autistaId === d.id) ? 'Assegnato a un furgone' : 'Senza furgone') : `Smista ${COSTANTI.pacchiMagazziniere} pacchi al giorno`}</span>
       <button class="btn piccolo" data-azione="licenzia" data-id="${d.id}">Licenzia</button></div>
     </div>`;
@@ -909,13 +954,13 @@ function vistaPersonale() {
   }).join('');
 }
 
-const VISTE = { azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale, posta: vistaPosta };
+const VISTE = { impostazioni: vistaImpostazioni, azienda: vistaAzienda, giri: vistaGiri, attivita: vistaAttivita, conti: vistaConti, flotta: vistaFlotta, personale: vistaPersonale, posta: vistaPosta };
 
 /* ---------- posta: una email decisionale a settimana ---------- */
 let emailAperta = null;
 function apriEmail(i) {
   // si tiene l'email (non la posizione): se ne arriva una nuova mentre leggi, non cambia sotto i tuoi occhi
-  emailAperta = S.posta[i] || null; if (emailAperta) emailAperta.letta = true;
+  emailAperta = S.posta[i] || null; if (emailAperta) { emailAperta.letta = true; S.magAttivo = magDi(emailAperta); }   // l'email è di un magazzino: si passa a quello
   dettaglio = null; scheda = 'posta';
   document.querySelectorAll('.schede button').forEach(x => x.setAttribute('aria-selected', x.dataset.scheda === 'posta'));
   const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
@@ -953,22 +998,29 @@ function vistaPosta() {
     </div>`;
   }
   if (emailAperta === null && posta.some(m => m.risposta !== null)) { pulisciPosta(); return vistaPosta(); }
-  const lista = posta.map((m, i) => `<button class="voce-email ${(m.report ? !m.letta : m.risposta === null) ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
+  const lista = posta.map((m, i) => magDi(m) !== magAttivo() ? '' : `<button class="voce-email ${(m.report ? !m.letta : m.risposta === null) ? 'da-leggere' : ''}" data-azione="apri-email" data-i="${i}">
       <span class="mittente">${(m.report ? !m.letta : m.risposta === null) ? `<i class="punto-blu ${m.grave ? 'rosso' : ''}"></i>` : ''}${m.grave ? '<span class="badge grave">Grave</span>' : ''}${esc(m.mittente)}</span>
       <span class="quando">${nomeGiorno(m.giorno)}</span>
       <b>${esc(m.oggetto)}</b>
       <span class="anteprima">${m.risposta === null ? esc(m.testo) : m.risposta === -1 ? 'Scaduta senza risposta · reputazione −1' : (m.rep > 0 ? 'Scelta giusta · ' : m.rep < 0 ? 'Scelta sbagliata · ' : '') + 'reputazione ' + (m.rep > 0 ? '+' : '') + m.rep}</span>
     </button>`).join('');
-  return `<div class="scheda"><div class="riga"><h2 style="margin:0">Posta</h2><span class="badge">Reputazione ${Math.round(S.reputazione)}</span></div>
+  const altrove = S.depositi.filter(m => m.id !== magAttivo() && nonLetteDi(m.id));
+  return `<div class="scheda"><div class="riga"><h2 style="margin:0">Posta <small>${esc(nomeMag(magAttivo()))}</small></h2><span class="badge">Reputazione ${Math.round(S.reputazione)}</span></div>
     <p class="nota">Ogni lunedì arriva un'email con una decisione da prendere. Le scelte giuste alzano la reputazione, quelle sbagliate la abbassano. Hai una settimana per rispondere, poi l'email scade (−1 di reputazione).</p></div>
-    ${lista ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per ora. La prima arriva appena hai un furgone.</p>'}`;
+    ${altrove.length ? `<p class="nota" style="color:var(--accento)">Email da leggere anche in: ${altrove.map(m => `<button class="titolo-link piccolo" data-azione="vai-magazzino" data-id="${m.id}">${esc(m.nome)} (${nonLetteDi(m.id)})</button>`).join(', ')}</p>` : ''}
+    ${lista.trim() ? `<div class="lista-email">${lista}</div>` : '<p class="nota">Nessuna email per questo magazzino.</p>'}`;
 }
 
 function testata() {
   $('#nome-azienda').textContent = S ? S.nomeAzienda : 'Tycoon Logistica';
   { const n = S ? emailNonLette() : 0, p = document.querySelector('.pallino-posta'); if (p) { p.hidden = !n; p.textContent = n; } }
+  { const b = $('#pulsante-azienda'); b.hidden = !S;
+    $('#pulsante-impostazioni').hidden = !S; $('#pulsante-impostazioni').classList.toggle('attivo', scheda === 'impostazioni');
+    if (S) { $('#logo-az').innerHTML = htmlLogo();
+      $('#mag-az').textContent = nomeMag(magAttivo()); b.classList.toggle('attivo', scheda === 'azienda');
+      b.querySelector('.pallino-az').hidden = !S.depositi.some(m => m.id !== magAttivo() && nonLetteDi(m.id)); } }
   $('#sotto-marchio').textContent = S ? `Tycoon Logistica · ${S.citta.nome}${S.filiali && S.filiali.length ? ' + ' + S.filiali.length + ' filial' + (S.filiali.length > 1 ? 'i' : 'e') : ''}` : 'nome del gioco provvisorio';
-  $('#logo').textContent = S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL';
+  $('#logo').innerHTML = S ? htmlLogo() : 'TL'; $('#logo').classList.toggle('con-immagine', !!S);
   if (!S) { $('#cassa').textContent = '–'; $('#utile-mese').textContent = 'Scegli una città per iniziare'; $('#data').textContent = 'Nuova partita'; return; }
   $('#cassa').textContent = eur.format(S.cassa);
   $('#cassa').className = 'cifra-grande' + (S.cassa < 0 ? ' meno' : '');
@@ -992,7 +1044,9 @@ function ridisegna() {
 // la "goccia" di vetro sotto la scheda selezionata scivola da una scheda all'altra
 function muoviIndicatore() {
   const b = document.querySelector('.schede button[aria-selected="true"]'), ind = document.querySelector('.schede .indicatore');
+  if (ind && !b) { ind.style.opacity = 0; return; }
   if (!b || !ind) return;
+  ind.style.opacity = b ? 1 : 0;
   ind.style.width = b.offsetWidth + 'px'; ind.style.transform = `translateX(${b.offsetLeft}px)`;
 }
 window.addEventListener('resize', muoviIndicatore);
@@ -1041,6 +1095,17 @@ function ridisegnaSePossibile() {
 }
 
 /* ---------- eventi ---------- */
+$('#pulsante-impostazioni').addEventListener('click', () => {
+  scheda = 'impostazioni'; negozioAperto = false; dettaglio = null; $('#contenuto').scrollTop = 0;
+  const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
+  ridisegna(); muoviIndicatore();
+});
+document.addEventListener('change', e => { if (e.target.id === 'file-logo') caricaLogo(e.target.files[0]); });
+$('#pulsante-azienda').addEventListener('click', () => {
+  scheda = 'azienda'; negozioAperto = false; dettaglio = null; $('#contenuto').scrollTop = 0;
+  const p = document.querySelector('.pannello'); if (p.dataset.foglio === 'basso') impostaFoglio('medio');
+  ridisegna(); muoviIndicatore();
+});
 document.querySelector('.schede').addEventListener('click', e => {
   const b = e.target.closest('button[data-scheda]'); if (!b) return;
   scheda = b.dataset.scheda; negozioAperto = false; dettaglio = null; $('#contenuto').scrollTop = 0; ridisegna();
@@ -1053,6 +1118,8 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'togli-logo': delete S.logo; salva(); aggiornaDepositiMappa(); ridisegna(); break;
+    case 'salva-ora': salva(); if (account.token) salvaOnline(true).then(() => ridisegna()); toast(account.token ? 'Partita salvata, anche sul tuo account.' : 'Partita salvata su questo dispositivo. Con un account la ritrovi anche sul telefono.'); break;
     case 'vai-magazzino': { S.magAttivo = id; flottaAperti = null; pianoMostrato = null; const m = magazzino(id); if (m && mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: Math.max(mappa.getZoom(), 12) }); ridisegna(); break; }
     case 'assumi-resp': esito(assumiResponsabile(id), 'Responsabile assunto: ora puoi comprare un altro magazzino.'); break;
     case 'licenzia-resp': if (b.dataset.conferma) { licenziaResponsabile(id); esito(null, 'Torni a gestirlo tu.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
@@ -1152,7 +1219,6 @@ function scegliCitta(c) {
 $('#contenuto').addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.azione === 'assegna') { { const r = assegna(t.dataset.id, t.dataset.campo, t.value); if (r === 'licenza') toast('Per quella zona serve la licenza: comprala nella scheda Azienda.'); if (r === 'altro-magazzino') toast('Quella zona è di un altro magazzino.'); } if (t.dataset.campo === 'zona' && flottaAperti) flottaAperti.add(t.value || 'deposito'); t.blur(); esito(); }
-  if (t.dataset.azione === 'citta-mag') { spostaMagazziniere(t.dataset.id, t.value); t.blur(); esito(null, 'Magazziniere spostato.'); }
   if (t.dataset.azione === 'stipendio') { S.offerta[t.dataset.ruolo] = +t.value; t.blur(); salva(); if (daRidisegnare) ridisegna(); }
 });
 $('#contenuto').addEventListener('input', e => {

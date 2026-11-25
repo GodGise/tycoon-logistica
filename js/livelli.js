@@ -41,7 +41,7 @@ function aggiungiEsperienza(consegne) {
 }
 
 /* ---------- licenze di zona ---------- */
-const LICENZA = { euroPerPacco: 150 };
+const LICENZA = { euroPerPacco: 400 };   // una zona da 60 pacchi costa 24.000 €
 function ePeriferia(z) { return /(^|-)a2-/.test(z.id); }
 function haLicenza(z) { return !ePeriferia(z) || !!(S.licenze && S.licenze[z.id]); }
 function prezzoLicenza(z) { return Math.round(z.pacchi * LICENZA.euroPerPacco * (sbloccato('licenzeMeta') ? 0.5 : 1) / 500) * 500; }

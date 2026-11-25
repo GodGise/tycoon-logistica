@@ -124,7 +124,8 @@ function aggiornaDepositiMappa() {
   if (!mappaPronta) return;
   markerDepositi.forEach(m => m.remove()); markerDepositi = [];
   (S ? S.depositi : []).forEach((d, i) => {
-    const el = document.createElement('div'); el.className = 'marker-deposito'; el.title = d.nome; el.textContent = i + 1;
+    const el = document.createElement('div'); el.className = 'marker-deposito con-logo'; el.title = d.nome;
+    const img = document.createElement('img'); img.src = S.logo || 'img/logo-default.png'; img.alt = ''; el.appendChild(img);
     el.addEventListener('click', ev => { ev.stopPropagation(); if (!attesaClick && window.apriDettaglio) window.apriDettaglio('magazzino', d.id); });
     markerDepositi.push(new maplibregl.Marker({ element: el }).setLngLat([d.lng, d.lat]).addTo(mappa));
   });
