@@ -67,12 +67,14 @@ function nuovoId(pref) { S.seq += 1; return pref + S.seq; }
 function vociVuote() { const v = {}; Object.keys(VOCI).forEach(k => v[k] = 0); return v; }
 
 function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
+  // nei capoluoghi di regione il magazzino ha un punto e un prezzo fissi; si parte con il prezzo + 60.000 €
+  const prezzoPrimo = citta.mag ? Math.round((COSTANTI.prezzoMagazzinoMin + 12000 * citta.raggio) / 5000) * 5000 : null;
   S = {
     citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, xp: 0, licenze: {}, capoturno: false, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
-    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoMagazzino(citta, primoMagazzino, true), migl: {} }], magAttivo: 'm1',
+    depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoPrimo || prezzoMagazzino(citta, primoMagazzino, true), migl: {} }], magAttivo: 'm1',
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
-    cassa: COSTANTI.cassaIniziale, reputazione: 70, servizio: 0.94, fama: 0,
+    cassa: prezzoPrimo ? prezzoPrimo + COSTANTI.cassaDopoMagazzino : COSTANTI.cassaIniziale, reputazione: 70, servizio: 0.94, fama: 0,
     furgoni: [], dipendenti: [],
     offerta: { autista: RUOLI.autista.stipDefault, magazziniere: RUOLI.magazziniere.stipDefault },
     candidati: { autista: [], magazziniere: [] }, annunciInArrivo: {},
@@ -315,7 +317,7 @@ function giornoLavorativo() {
   });
   S.picchiIeri = Object.keys(picco); S.piccoOggi = picco;
   const nuovi = {};
-  servite.forEach(z => { nuovi[z.id] = Math.round(z.pacchi * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + (picco[z.id] || 0); arrivo[z.id] = nuovi[z.id] + S.giacenze[z.id]; totale += arrivo[z.id]; });
+  servite.forEach(z => { nuovi[z.id] = Math.round(pacchiZona(z) * repFatt * effetto.pacchi(z.id) * caso(0.9, 1.1)) + (picco[z.id] || 0); arrivo[z.id] = nuovi[z.id] + S.giacenze[z.id]; totale += arrivo[z.id]; });
   const zonePicco = Object.keys(picco).map(id => zona(id));
   if (zonePicco.length) {
     const haJolly = S.furgoni.some(f => isJolly(f) && furgoneOperativo(f));
@@ -398,7 +400,7 @@ function giornoLavorativo() {
   servite.forEach(z => {
     const r = ris[z.id], giri = r.giri, consegne = r.consegne, consegneCtr = r.consegneCtr;
     const restano = arrivo[z.id] - consegne;
-    const persi = Math.max(0, restano - z.pacchi);       // oltre un giorno di giacenza gli ordini si perdono
+    const persi = Math.max(0, restano - pacchiZona(z));       // oltre un giorno di giacenza gli ordini si perdono
     S.giacenze[z.id] = restano - persi;
     const daJolly = r.jolly.reduce((t, j) => t + j.n, 0), daAiuto = r.aiuto;
     stat(z, 'consegne', consegne + consegneCtr); stat(z, 'incasso', consegne * tariffa() * effetto.tariffaZona(z.id));
@@ -726,7 +728,7 @@ function pianoOrganizza(soloMag) {
     // pacchi normali attesi in ogni zona (come li calcola la giornata). Picchi e pacchi rimasti in deposito
     // cambiano zona ogni giorno: li coprono i jolly, che vanno dove servono.
     const repFatt = 0.85 + S.reputazione / 100 * 0.3;
-    const serve = z => z.pacchi * repFatt * effetto.pacchi(z.id);
+    const serve = z => pacchiZona(z) * repFatt * effetto.pacchi(z.id);
     const servite = S.zone.filter(z => magDi(z) === c.id && miei.some(p => p.zona === z.id));
     const jolly = (miei.find(p => p.zona && p.zona.startsWith(ZONA_JOLLY)) || {}).zona || ZONA_JOLLY;
     const pool = miei.filter(pronto), assegnati = new Map(), manca = new Map(servite.map(z => [z.id, serve(z)]));
@@ -735,6 +737,11 @@ function pianoOrganizza(soloMag) {
     // Ogni zona ha almeno un furgone; poi restano sempre 5 jolly di riserva (se ci sono abbastanza furgoni).
     const riserva = Math.min(JOLLY_MINIMI, Math.max(0, pool.length - servite.length));
     const coperta = id => [...assegnati.values()].includes(id);
+    // prima di tutto ogni zona servita tiene almeno un furgone, anche se ha pochi pacchi
+    // (prima il furgone che era già lì; una zona con il suo furgone guasto non ruba quello di un'altra)
+    const prendi = (z, i) => { const p = pool.splice(i, 1)[0]; assegnati.set(p, z.id); manca.set(z.id, manca.get(z.id) - capacitaFurgone(p.f)); };
+    servite.forEach(z => { const i = pool.findIndex(p => p.zona === z.id); if (i >= 0) prendi(z, i); });
+    servite.forEach(z => { if (pool.length && !coperta(z.id) && !miei.some(p => p.zona === z.id && !pronto(p))) prendi(z, pool.findIndex(p => (p.zona || "").startsWith(ZONA_JOLLY)) >= 0 ? pool.findIndex(p => (p.zona || "").startsWith(ZONA_JOLLY)) : 0); });
     for (;;) {
       const scoperte = servite.filter(z => !coperta(z.id)).length;
       const soloScoperte = pool.length <= riserva + scoperte;   // i furgoni rimasti servono alle zone vuote o alla riserva

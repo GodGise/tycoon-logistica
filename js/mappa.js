@@ -38,7 +38,7 @@ function geoZone() {
 }
 function geoEtichette() {
   return { type: 'FeatureCollection', features: zoneAttuali().map(z => ({ type: 'Feature',
-    properties: { nome: z.nome, info: (S && S.ieri && S.ieri.perZona && S.ieri.perZona[z.id] ? `${S.ieri.perZona[z.id].consegne} consegne oggi` : `${z.pacchi} pacchi/giorno`)
+    properties: { nome: z.nome, info: (S && S.ieri && S.ieri.perZona && S.ieri.perZona[z.id] ? `${S.ieri.perZona[z.id].consegne} consegne oggi` : `${pacchiZona(z)} pacchi/giorno`)
       + (S && S.piccoOggi && S.piccoOggi[z.id] ? `\n▲ picco +${S.piccoOggi[z.id]} pacchi` : '') + (S && typeof haLicenza === 'function' && !haLicenza(z) ? '\nserve la licenza' : '') },
     geometry: { type: 'Point', coordinates: z.etichetta || z.centro || centroide(z.poligono) } })) };
 }
@@ -128,6 +128,14 @@ function aggiornaDepositiMappa() {
     el.addEventListener('click', ev => { ev.stopPropagation(); if (!attesaClick && window.apriDettaglio) window.apriDettaglio('magazzino', d.id); });
     markerDepositi.push(new maplibregl.Marker({ element: el }).setLngLat([d.lng, d.lat]).addTo(mappa));
   });
+}
+// segnaposto del magazzino scelto, prima di confermare la partita
+let markerSede = null;
+function mostraSedeScelta(punto) {
+  if (markerSede) { markerSede.remove(); markerSede = null; }
+  if (!punto || !mappaPronta) return;
+  const el = document.createElement('div'); el.className = 'marker-deposito'; el.textContent = '1';
+  markerSede = new maplibregl.Marker({ element: el }).setLngLat(punto).addTo(mappa);
 }
 // modalità "clicca sulla mappa" per mettere un magazzino
 function chiediPuntoSullaMappa(cb) { attesaClick = cb; if (mappa) mappa.getCanvas().style.cursor = 'crosshair'; }

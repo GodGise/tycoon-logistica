@@ -35,9 +35,9 @@ function vistaAzienda() {
   const zone = zoneMag.map(z => {
     const giri = S.furgoni.filter(f => f.zona === z.id);
     const pz = S.ieri && S.ieri.perZona && S.ieri.perZona[z.id];
-    const cap = giri.length * COSTANTI.maxConsegneCorriere, cop = cap ? Math.min(100, Math.round(cap / z.pacchi * 100)) : 0;
+    const cap = giri.length * COSTANTI.maxConsegneCorriere, cop = cap ? Math.min(100, Math.round(cap / pacchiZona(z) * 100)) : 0;
     return `<div class="scheda">
-      <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span><span class="num">${z.pacchi} pacchi/giorno</span></div>
+      <div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span><span class="num">${pacchiZona(z)} pacchi/giorno</span></div>
       <div class="metro ${cop >= 100 ? '' : cop >= 70 ? 'medio' : 'basso'}"><i style="width:${cop}%"></i></div>
       ${haLicenza(z) ? '' : `<div class="riga licenza"><span>🔒 Serve la licenza · ${eur.format(prezzoLicenza(z))}</span>${puoComprareLicenze()
         ? `<button class="btn piccolo primario" data-azione="licenza" data-id="${z.id}" ${S.cassa < prezzoLicenza(z) ? 'disabled' : ''}>Compra licenza</button>`
@@ -169,7 +169,7 @@ function primaDopo(id) {
     return ['Smistamento al giorno', `${n(base)} pacchi`, `${n(base * 1.5)} pacchi`, mags ? '' : 'Assumi dei magazzinieri per sfruttarlo.']; }
   if (id === 'software') { const km = servite.reduce((t, z) => t + kmGiro(z), 0);
     return ['Km dei giri al giorno', `${n(km * (1 - 0.1 * l))} km`, `${n(km * (1 - 0.1 * (l + 1)))} km`, servite.length ? '' : 'Conta quando hai furgoni nelle zone.']; }
-  if (id === 'pubblicita') { const p = servite.reduce((t, z) => t + z.pacchi, 0);
+  if (id === 'pubblicita') { const p = servite.reduce((t, z) => t + pacchiZona(z), 0);
     return ['Pacchi al giorno nelle tue zone', `${n(p * (1 + 0.1 * l))}`, `${n(p * (1 + 0.1 * (l + 1)))}`, '']; }
   if (id === 'formazione') return ['Incidenti', 'normali', '4 su 10 evitati', ''];
   if (id === 'officina') return ['Guasti', 'ripari tu, prezzo pieno', 'da soli, anche di notte, a metà', ''];
@@ -370,7 +370,7 @@ function vistaInizio() {
     return `<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>
     <div class="scheda"><h2 style="margin:0">Filiale di ${esc(c.nome)}</h2><p class="nota">${esc(c.dettaglio || '')}</p>
       <div class="riga"><span>Zone create in automatico</span><span class="num">${anteprimaZone ? anteprimaZone.length : 0}</span></div>
-      <div class="riga"><span>Pacchi al giorno in tutta la città</span><span class="num">${anteprimaZone ? intero.format(anteprimaZone.reduce((a, z) => a + z.pacchi, 0)) : 0}</span></div></div>
+      <div class="riga"><span>Pacchi al giorno in tutta la città</span><span class="num">${anteprimaZone ? intero.format(anteprimaZone.reduce((a, z) => a + pacchiZona(z), 0)) : 0}</span></div></div>
     <div class="scheda"><h2 style="margin:0">Metti il magazzino della filiale</h2>
       <p style="margin:0">Clicca sulla mappa dove vuoi il magazzino di ${esc(c.nome)}.</p>
       <div class="riga"><span>Apertura della filiale</span><span class="num">${eur.format(FILIALE.costo)}</span></div>
@@ -380,21 +380,20 @@ function vistaInizio() {
     <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
   }
   if (inizio.fase === 'magazzino') {
-    const c = inizio.citta;
+    const c = inizio.citta, prezzo = Math.round((COSTANTI.prezzoMagazzinoMin + 12000 * c.raggio) / 5000) * 5000;
     return `<div class="scheda">
       <h2 style="margin:0">${esc(c.nome)}</h2>
       <p class="nota">${esc(c.dettaglio || '')}</p>
-      <div class="riga"><span>Zone create in automatico</span><span class="num">${anteprimaZone ? anteprimaZone.length : 0}</span></div>
-      <div class="riga"><span>Pacchi al giorno in tutta la città</span><span class="num">${anteprimaZone ? intero.format(anteprimaZone.reduce((a, z) => a + z.pacchi, 0)) : 0}</span></div>
+      <div class="riga"><span>Zone della città</span><span class="num">${anteprimaZone ? anteprimaZone.length : 0}</span></div>
+      <div class="riga"><span>Pacchi al giorno all'inizio</span><span class="num">${anteprimaZone ? intero.format(anteprimaZone.reduce((a, z) => a + pacchiZona(z), 0)) : 0}</span></div>
+      <p class="nota">Salendo di livello arrivano più ordini, fino a ${anteprimaZone ? intero.format(anteprimaZone.reduce((a, z) => a + z.pacchi, 0)) : 0} al giorno.</p>
     </div>
     <div class="scheda" style="border-color:var(--accento)">
       <label style="display:grid;gap:6px"><span class="nota">Nome della tua azienda</span><input id="nome-nuova" class="campo-testo" maxlength="40" value="${esc(inizio.nome || ('Logistica ' + c.nome))}"></label>
-      <h2 style="margin:0">Metti il tuo primo magazzino</h2>
-      <p style="margin:0">Clicca sulla mappa nel punto dove vuoi il magazzino. Vicino al centro i giri sono più corti; in periferia arrivi meglio alle zone esterne.</p>
-      <div class="riga"><span>Prezzo del magazzino</span><span class="num">${eur.format(COSTANTI.prezzoMagazzinoMin)}–${eur.format(COSTANTI.prezzoMagazzinoMax)}</span></div>
-      <div class="riga"><span>Cassa iniziale</span><span class="num">${eur.format(COSTANTI.cassaIniziale)}</span></div>
-      <p class="nota">In centro costa 300.000 €, verso il bordo della città scende fino a 200.000 €. Quello che resta ti serve per furgoni e stipendi.</p>
-      ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}
+      <p style="margin:0">Il magazzino è nella zona industriale di ${esc(c.nome)} (il segnaposto sulla mappa).</p>
+      <div class="riga"><span>Prezzo del magazzino</span><span class="num">${eur.format(prezzo)}</span></div>
+      <div class="riga"><span>Ti restano per furgoni e stipendi</span><span class="num">${eur.format(COSTANTI.cassaDopoMagazzino)}</span></div>
+      <button class="btn primario" data-azione="conferma-inizio">Apri qui la tua azienda</button>
     </div>
     <button class="btn" data-azione="cambia-citta">Scegli un'altra città</button>`;
   }
@@ -402,13 +401,11 @@ function vistaInizio() {
   const risultati = inizio.risultati;
   return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : vistaAccount()}<div style="display:grid;gap:10px">
       <h2 style="margin:0;font-size:22px">${filiale ? 'In quale città apri la filiale?' : 'Dove apri la tua azienda?'}</h2>
-      <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : 'Scegli un capoluogo di provincia o una città con più di 100.000 abitanti: le zone di consegna si creano da sole, a cerchi intorno al centro.'}</p>
-      <form class="cerca" data-azione="cerca"><input id="cerca-citta" type="search" placeholder="Cerca una città…" autocomplete="off" value="${esc(inizio.testo || '')}"><button class="btn primario" type="submit" ${inizio.cercando ? 'disabled' : ''}>${inizio.cercando ? 'Cerco…' : 'Cerca'}</button></form>
+      <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : 'Scegli uno dei 20 capoluoghi di regione. Il magazzino è già nella zona industriale della città, le zone di consegna si creano da sole.'}</p>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}
     </div>
-    ${risultati ? `<div class="lista-citta">${risultati.length ? risultati.map((c, i) => voce(c, i, 'r')).join('') : '<p class="nota">Nessuna città trovata.</p>'}</div>` : ''}
-    <div><h2>Oppure ${filiale ? 'scegli' : 'parti'} da qui</h2><div class="lista-citta">${CITTA_SUGGERITE.filter(c => !S || !tutteCitta().some(x => x.nome === c.nome)).map(c => voce(c, CITTA_SUGGERITE.indexOf(c), 's')).join('')}</div></div>
-    <p class="nota">Ricerca: © OpenStreetMap, Nominatim.</p>`;
+    <div class="lista-citta">${CAPOLUOGHI_REGIONE.map((c, i) => voce(c, i, 'k')).join('')}</div>
+    `;
 }
 
 // Scheda Giri: per ogni zona quanti pacchi ci sono e quanti aspettano in deposito
@@ -450,7 +447,7 @@ function vistaGiri() {
     const assegnati = S.furgoni.filter(f => f.zona === z.id);
     const partiti = d ? d.giri : assegnati.filter(f => furgoneOperativo(f)).length;
     const cap = d ? d.capacita : assegnati.filter(f => furgoneOperativo(f)).reduce((t, f) => t + capacitaFurgone(f), 0);
-    const arrivo = d ? d.arrivo : z.pacchi;
+    const arrivo = d ? d.arrivo : pacchiZona(z);
     const pronti = d ? d.smistati : arrivo;          // i furgoni possono portare solo i pacchi smistati
     const jollyN = d ? d.jolly + (d.aiuto || 0) : 0;   // jolly + furgoni vicini con posto libero
     // barra: quanto sono pieni i furgoni della zona (pacchi pronti / posti sui furgoni partiti)
@@ -580,7 +577,7 @@ function dettaglioMagazzino(mz) {
       <div><b>${zone.length ? Math.round(zone.reduce((t, z) => t + kmGiro(z), 0) / zone.length) : 0} km</b><span>giro medio</span></div></div>
     <div class="scheda">${tabellaStat(mz, [['Pacchi smistati per le sue zone', 'pacchi', 'num']])}</div>
     <div class="scheda"><h2 style="margin:0">Zone che partono da qui</h2>
-      ${zone.map(z => `<div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span><span class="num">${z.pacchi} pacchi · giro ${kmGiro(z)} km${S.furgoni.some(f => f.zona === z.id) ? '' : ' · <span class="nota">non servita</span>'}</span></div>`).join('') || '<p class="nota">Nessuna: le zone partono da un altro magazzino più vicino.</p>'}
+      ${zone.map(z => `<div class="riga"><span class="zona-titolo"><i class="pallino" style="background:${z.colore}"></i>${esc(z.nome)}</span><span class="num">${pacchiZona(z)} pacchi · giro ${kmGiro(z)} km${S.furgoni.some(f => f.zona === z.id) ? '' : ' · <span class="nota">non servita</span>'}</span></div>`).join('') || '<p class="nota">Nessuna: le zone partono da un altro magazzino più vicino.</p>'}
     </div>
     ${S.depositi.length > 1 ? `<div class="scheda"><div class="riga"><span>Vendita (70% del prezzo)</span><button class="btn piccolo" data-azione="vendi-magazzino" data-id="${mz.id}">Vendi per ${eur.format(valoreMagazzino(mz) * COSTANTI.rivenditaMagazzino)}</button></div></div>` : ''}`;
 }
@@ -773,7 +770,7 @@ function vistaFlotta() {
     if (k === 'assegnati') {
       const zs = new Set(fs.map(f => f.zona));
       const corte = [...zs].filter(id => { const z = zona(id); const posti = S.furgoni.filter(f => f.zona === id && furgoneOperativo(f)).reduce((t, f) => t + capacitaFurgone(f), 0);
-        return z && posti < Math.round(z.pacchi * (1 + 0.1 * livello('pubblicita'))); }).length;
+        return z && posti < Math.round(pacchiZona(z) * (1 + 0.1 * livello('pubblicita'))); }).length;
       inf = `${zs.size} zone${corte ? ` · ${corte} con pochi posti` : ''}`;
       return { id: k, titolo: t, colore: col, fs, info: inf, corto: corte > 0 };
     }
@@ -1073,8 +1070,16 @@ $('#contenuto').addEventListener('click', e => {
     case 'assumi': esito(assumi(id, b.dataset.ruolo), 'Assunto!'); break;
     case 'licenzia': if (b.dataset.conferma) { licenzia(id); esito(null, 'Dipendente licenziato.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'annuncio': { const r = b.dataset.ruolo; esito(pubblicaAnnuncio(r, S.offerta[r])); break; }
-    case 'scegli-citta': scegliCitta((b.dataset.gruppo === 's' ? CITTA_SUGGERITE : inizio.risultati)[+b.dataset.i]); break;
-    case 'cambia-citta': annullaPuntoSullaMappa(); inizio.fase = 'citta'; inizio.errore = ''; ridisegna(); break;
+    case 'scegli-citta': scegliCitta((b.dataset.gruppo === 'k' ? CAPOLUOGHI_REGIONE : b.dataset.gruppo === 's' ? CITTA_SUGGERITE : inizio.risultati)[+b.dataset.i]); break;
+    case 'conferma-inizio': {
+      const c = inizio.citta; if (!c || !c.mag) break;
+      const campo = document.getElementById('nome-nuova');
+      mostraSedeScelta(null);
+      nuovaPartita(prezziCaricati || PREZZI_RISERVA, Object.assign({}, c), c.mag, anteprimaZone, (campo && campo.value.trim()) || inizio.nome);
+      salva(); scheda = 'azienda'; ridisegna(); aggiornaZoneMappa(); aggiornaDepositiMappa();
+      toast(`Magazzino comprato a ${c.nome} per ${eur.format(S.depositi[0].valore)}. Ora compra un furgone!`); break;
+    }
+    case 'cambia-citta': annullaPuntoSullaMappa(); mostraSedeScelta(null); inizio.fase = 'citta'; inizio.errore = ''; ridisegna(); break;
     case 'scegli-sede': sceltaSede = true; ridisegna(); break;
     case 'annulla-sede': sceltaSede = false; ridisegna(); break;
     case 'vedi-sede': { const c = CAPOLUOGHI_REGIONE.find(x => x.nome === id); if (c && mappa) mappa.flyTo({ center: c.mag, zoom: 11 }); break; }
@@ -1101,6 +1106,7 @@ function scegliCitta(c) {
   if (!c || c.troppoPiccola) return;
   Object.assign(inizio, { fase: 'magazzino', citta: c, errore: '' });
   mostraCitta(c); ridisegna();
+  if (c.mag && inizio.modo !== 'filiale') { mostraSedeScelta(c.mag); return; }   // punto fisso: si conferma col pulsante
   if (inizio.modo === 'filiale') {
     const attendiF = punto => {
       const err = apriFiliale(c, punto, anteprimaZone);
@@ -1135,12 +1141,12 @@ $('#contenuto').addEventListener('input', e => {
 });
 
 /* ---------- ciclo di gioco ---------- */
-// Il tempo scorre da solo: ogni giornata dura 3 minuti, il fine settimana passa in un unico blocco.
+// Il tempo scorre da solo: ogni giornata dura 10 minuti, il fine settimana passa in un unico blocco.
 // Il tempo trascorso nella giornata è salvato, quindi ricaricare la pagina non fa ripartire il giorno.
 let ultimoSalvataggio = 0, ultimaTestata = 0;
 function ciclo(t) {
   if (ultimoT === null) ultimoT = t;
-  if (!S) { ultimoT = t; $('#countdown').textContent = '2:30'; $('#ora').textContent = ''; requestAnimationFrame(ciclo); return; }
+  if (!S) { ultimoT = t; $('#countdown').textContent = Math.floor(COSTANTI.secondiPerGiorno / 60) + ':00'; $('#ora').textContent = ''; requestAnimationFrame(ciclo); return; }
   const dt = Math.min(0.25, (t - ultimoT) / 1000); ultimoT = t;
   const durata = COSTANTI.secondiPerGiorno;
   if (!S.inCorso || S.inCorso.giorno !== S.giorno) avviaGiornata();
