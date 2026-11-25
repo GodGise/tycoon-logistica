@@ -70,7 +70,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   // nei capoluoghi di regione il magazzino ha un punto e un prezzo fissi; si parte con il prezzo + 60.000 €
   const prezzoPrimo = citta.mag ? Math.round((COSTANTI.prezzoMagazzinoMin + 12000 * citta.raggio) / 5000) * 5000 : null;
   S = {
-    citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 2, xp: 0, licenze: {}, capoturno: false, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
+    citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 3, xp: 0, licenze: {}, capoturno: false, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
     depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoPrimo || prezzoMagazzino(citta, primoMagazzino, true), migl: {} }], magAttivo: 'm1',
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
@@ -571,6 +571,19 @@ function carica() {
       if (S.servizio === undefined) { S.servizio = Math.max(0.9, 1 - (85 - Math.min(S.reputazione, 85)) / 150); S.fama = Math.max(0, S.reputazione - 85); S.reputazione = calcolaReputazione(); }
       // grafica delle zone v2: più grandi sulla mappa (pacchi e km invariati)
       if ((S.versioneZone || 1) < 2) { tutteCitta().forEach(c => ridisegnaZone(S.zone.filter(z => idCitta(z) === c.id), c)); S.versioneZone = 2; }
+      // zone finite in mare nelle città di costa: si tolgono, i furgoni tornano in deposito
+      if ((S.versioneZone || 1) < 3) {
+        tutteCitta().forEach(c => {
+          if (!c.mare && !(CAPOLUOGHI_REGIONE.find(x => x.nome === c.nome) || {}).mare) return;
+          const valide = new Set(generaZone(c).map(z => z.id));
+          S.zone.filter(z => idCitta(z) === c.id && !valide.has(z.id.replace(/^c\d+-/, ''))).forEach(z => {
+            S.furgoni.filter(f => f.zona === z.id).forEach(f => { f.zona = null; });
+            delete S.giacenze[z.id]; if (S.licenze) delete S.licenze[z.id];
+            S.zone = S.zone.filter(x => x !== z);
+          });
+        });
+        S.versioneZone = 3;
+      }
       if (!S.contrattiAttivi) S.contrattiAttivi = [];
       // conti: aggiunge le voci nuove e ripara i valori rotti (NaN) delle versioni precedenti
       const ripara = v => { Object.keys(VOCI).forEach(k => { if (!Number.isFinite(v[k])) v[k] = 0; }); for (const k in v) if (!Number.isFinite(v[k])) v[k] = 0; };
