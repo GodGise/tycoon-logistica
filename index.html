@@ -26,7 +26,6 @@
     </div>
   </header>
   <nav class="schede" role="tablist"><span class="indicatore" aria-hidden="true"></span>
-    <button role="tab" data-scheda="azienda" aria-selected="true">Azienda</button>
     <button role="tab" data-scheda="giri">Giri</button>
     <button role="tab" data-scheda="attivita">Attività</button>
     <button role="tab" data-scheda="conti">Conti</button>
@@ -43,6 +42,9 @@
   <div class="barra-giorno"><i id="barra-giorno"></i></div>
 </div>
 <div id="guasti" class="guasti" aria-live="polite"></div>
+<button id="pulsante-azienda" class="pulsante-azienda" aria-label="Azienda e magazzini" hidden>
+  <span class="icona-az" id="logo-az">TL</span><span class="testo-az"><b>Azienda</b><small id="mag-az">–</small></span><i class="pallino-az" hidden></i>
+</button>
 <div id="offerta" class="offerta vetro" role="dialog" aria-label="Nuova offerta di contratto" hidden></div>
 <div id="finestra" class="finestra" role="dialog" aria-modal="false" hidden></div>
 <div id="toast" class="vetro" role="status" aria-live="polite"></div>

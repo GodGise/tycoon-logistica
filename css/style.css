@@ -573,3 +573,30 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 .riga.sede { padding: 6px 0; border-top: 1px solid rgba(255,255,255,.06); gap: 10px; }
 .riga.sede .titolo-link { text-align: left; flex: 1; min-width: 0; }
 .riga.sede .btn { flex: none; white-space: nowrap; }
+/* pulsante fisso a destra: apre la schermata Azienda (scelta del magazzino, miglioramenti, statistiche) */
+.pulsante-azienda { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); z-index: 8; display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); cursor: pointer; font: inherit; color: var(--testo);
+  background: rgba(30,30,34,.72); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); box-shadow: 0 8px 28px rgba(0,0,0,.35); }
+.pulsante-azienda .icona-az { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-weight: 700; font-size: 15px;
+  background: linear-gradient(160deg, #3d8bff, #1f5fe0); color: #fff; }
+.pulsante-azienda .testo-az { display: grid; text-align: left; line-height: 1.15; }
+.pulsante-azienda .testo-az b { font-size: 14px; }
+.pulsante-azienda .testo-az small { font-size: 11.5px; opacity: .7; max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pulsante-azienda.attivo { border-color: var(--accento); box-shadow: 0 0 0 2px rgba(61,139,255,.35), 0 8px 28px rgba(0,0,0,.35); }
+.pulsante-azienda .pallino-az { position: absolute; top: 4px; left: 36px; width: 9px; height: 9px; border-radius: 50%; background: #ff453a; }
+.schede .indicatore { transition: transform .3s, width .3s, opacity .2s; }
+@media (max-width: 760px) {
+  .pulsante-azienda { top: 110px; transform: none; right: 10px; padding: 6px; }
+  .pulsante-azienda .testo-az { display: none; }
+  .pulsante-azienda .pallino-az { left: auto; right: 2px; top: 2px; }
+}
+.lista-mag { display: grid; gap: 6px; }
+.voce-mag { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.04); color: var(--testo); font: inherit; text-align: left; cursor: pointer; }
+.voce-mag.attivo { border-color: var(--accento); background: rgba(61,139,255,.12); }
+.voce-mag .num-mag { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; background: rgba(255,255,255,.1); flex: none; }
+.voce-mag.attivo .num-mag { background: var(--accento); color: #fff; }
+.voce-mag .info-mag { display: grid; flex: 1; min-width: 0; }
+.voce-mag .info-mag small { opacity: .7; font-size: 12px; }
+.marchio > div { min-width: 0; }
+#sotto-marchio { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

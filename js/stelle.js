@@ -91,7 +91,7 @@ function emailLamentela(a) {
   if ((a.ultimaLamentela || -99) > S.giorno - 7 || postaPiena()) { notizia(`Lamentela di un cliente su ${a.nome}.`, 'male', 'lam-' + a.id); return; }
   a.ultimaLamentela = S.giorno;
   S.posta = S.posta || [];
-  S.posta.unshift({ id: 'lamentela', lamentela: true, ctx: { id: a.id }, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
+  S.posta.unshift({ id: 'lamentela', lamentela: true, ctx: { id: a.id }, mag: magDi(a), giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
     mittente: 'Un cliente', oggetto: `Lamentela sul corriere ${a.nome}`, testo: scegli(TESTI_LAMENTELA)(a.nome), letta: false, risposta: null, esito: '', ordine: mescola(EMAIL_LAMENTELE[0].scelte) });
 }
 

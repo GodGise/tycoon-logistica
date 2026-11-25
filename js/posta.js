@@ -303,6 +303,10 @@ function nomeMagazziniere() { const a = S.dipendenti.filter(d => d.ruolo === 'ma
 function testoDi(v) { return typeof v === 'function' ? v() : v; }
 
 // chiamata all'inizio di ogni giornata lavorativa
+// ogni email arriva a un magazzino: a uno che gestisci tu (quelli con il responsabile se la cavano da soli)
+function magPerEmail() { const miei = S.depositi.filter(m => !m.responsabile); return (miei.length ? scegli(miei) : magazzino(magAttivo())).id; }
+function postaDi(mag) { return (S.posta || []).filter(m => magDi(m) === mag); }
+function nonLetteDi(mag) { return postaDi(mag).filter(m => m.report ? !m.letta : m.risposta === null).length; }
 function controllaPosta() {
   S.posta = S.posta || [];
   // a gioco chiuso le email non scadono: aspettano che torni
@@ -323,7 +327,7 @@ function controllaPosta() {
   const usate = S.postaUsate || [];
   const libere = EMAIL.filter(e => !usate.includes(e.id));
   const e = scegli(libere.length ? libere : EMAIL);
-  S.posta.unshift({ id: e.id, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
+  S.posta.unshift({ id: e.id, mag: magPerEmail(), giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
     mittente: testoDi(e.mittente), oggetto: e.oggetto, testo: testoDi(e.testo), letta: false, risposta: null, esito: '', ordine: mescola(e.scelte) });
   segnaUsata(e.id);
   notizia(`Nuova email: "${e.oggetto}". Rispondi entro ${POSTA.giorniPerRispondere} giorni nella scheda Posta.`, 'info', 'posta');
@@ -450,7 +454,7 @@ function forseEmailGrave() {
   if (!possibili.length) return;
   const e = scegli(possibili), ctx = e.prepara();
   S.meseGrave = mese;
-  S.posta.unshift({ id: e.id, grave: true, ctx, giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
+  S.posta.unshift({ id: e.id, grave: true, ctx, mag: ctx && ctx.id && dipendente(ctx.id) ? magDi(dipendente(ctx.id)) : magPerEmail(), giorno: S.giorno, scadenza: S.giorno + POSTA.giorniPerRispondere,
     mittente: e.mittente(ctx), oggetto: e.oggetto(ctx), testo: e.testo(ctx), letta: false, risposta: null, esito: '', ordine: mescola(e.scelte) });
   notizia(`Email urgente: "${S.posta[0].oggetto}". Decidi nella scheda Posta.`, 'male', 'posta-grave');
   segnaUsata(e.id);
