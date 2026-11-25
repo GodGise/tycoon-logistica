@@ -85,9 +85,9 @@ function vistaImpostazioni() {
     <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
   </div>
   <div class="scheda"><h2 style="margin:0">Logo dell'azienda</h2>
-    <div class="riga"><span class="logo anteprima-logo">${htmlLogo()}</span><span class="nota" style="flex:1">Compare in alto a sinistra e sulla mappa al posto dei pallini dei magazzini.</span></div>
+    <div class="riga"><span class="logo anteprima-logo">${htmlLogo()}</span><span class="nota" style="flex:1">Compare in alto a sinistra, sui pulsanti e sulla mappa sui magazzini. ${S.logo ? 'Stai usando il tuo logo.' : 'Questo è il logo di base: puoi caricare il tuo.'}</span></div>
     <div class="riga"><label class="btn primario" style="flex:1;text-align:center">Carica un'immagine<input type="file" accept="image/*" id="file-logo" hidden></label>
-      ${S.logo ? '<button class="btn" data-azione="togli-logo">Togli</button>' : ''}</div>
+      ${S.logo ? '<button class="btn" data-azione="togli-logo">Rimetti quello di base</button>' : ''}</div>
   </div>
   <div class="scheda"><h2 style="margin:0">Salvataggio</h2>
     <p class="nota">La partita si salva da sola su questo dispositivo${account.token ? ' e sul tuo account' : ''}.${account.ultimo ? ` Ultimo salvataggio online alle ${new Date(account.ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.` : ''}</p>
@@ -97,7 +97,9 @@ function vistaImpostazioni() {
   <button class="btn link" data-azione="nuova">Ricomincia da capo</button>`;
 }
 // il logo: l'immagine caricata, oppure le iniziali
-function htmlLogo() { return S && S.logo ? `<img src="${S.logo}" alt="">` : esc(iniziali()); }
+const LOGO_DEFAULT = 'img/logo-default.png';   // Spedizioni Veloci: il giocatore può caricare il suo
+function logoAttuale() { return S && S.logo ? S.logo : LOGO_DEFAULT; }
+function htmlLogo() { return `<img src="${logoAttuale()}" alt="">`; }
 function iniziali() { return S ? S.nomeAzienda.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') : 'TL'; }
 // l'immagine viene ridotta a 128×128 (quadrata, ritagliata al centro) così pesa pochi KB nel salvataggio
 function caricaLogo(file) {
@@ -1018,7 +1020,7 @@ function testata() {
       $('#mag-az').textContent = nomeMag(magAttivo()); b.classList.toggle('attivo', scheda === 'azienda');
       b.querySelector('.pallino-az').hidden = !S.depositi.some(m => m.id !== magAttivo() && nonLetteDi(m.id)); } }
   $('#sotto-marchio').textContent = S ? `Tycoon Logistica · ${S.citta.nome}${S.filiali && S.filiali.length ? ' + ' + S.filiali.length + ' filial' + (S.filiali.length > 1 ? 'i' : 'e') : ''}` : 'nome del gioco provvisorio';
-  $('#logo').innerHTML = htmlLogo(); $('#logo').classList.toggle('con-immagine', !!(S && S.logo));
+  $('#logo').innerHTML = S ? htmlLogo() : 'TL'; $('#logo').classList.toggle('con-immagine', !!S);
   if (!S) { $('#cassa').textContent = '–'; $('#utile-mese').textContent = 'Scegli una città per iniziare'; $('#data').textContent = 'Nuova partita'; return; }
   $('#cassa').textContent = eur.format(S.cassa);
   $('#cassa').className = 'cifra-grande' + (S.cassa < 0 ? ' meno' : '');
