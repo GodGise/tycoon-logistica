@@ -93,8 +93,22 @@ function vistaImpostazioni() {
     <p class="nota">La partita si salva da sola su questo dispositivo${account.token ? ' e sul tuo account' : ''}.${account.ultimo ? ` Ultimo salvataggio online alle ${new Date(account.ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.` : ''}</p>
     <button class="btn primario" data-azione="salva-ora">Salva la partita adesso</button>
   </div>
+  ${vistaNotifiche()}
   ${vistaAccount()}
   <button class="btn link" data-azione="nuova">Ricomincia da capo</button>`;
+}
+function vistaNotifiche() {
+  const attive = notificheAttive();
+  const spiega = suIphoneNelBrowser() && !pushSupportato()
+    ? '<p class="nota">Su iPhone: tocca Condividi → <b>Aggiungi alla schermata Home</b>, apri il gioco dall\'icona e attivale da lì.</p>' : '';
+  return `<div class="scheda"><div class="riga"><h2 style="margin:0">Notifiche sul telefono</h2>${attive ? '<span class="badge">attive</span>' : ''}</div>
+    <p class="nota">Quando chiudi il gioco ti avvisa quando i furgoni hanno finito i giri (dopo 2 ore), quando arriva la posta del lunedì e se un'email sta per scadere.</p>
+    ${spiega}
+    ${!account.token ? '<p class="nota">Serve un account: accedi o registrati qui sotto.</p>' : ''}
+    ${notifiche.errore ? `<p class="nota meno">${esc(notifiche.errore)}</p>` : ''}
+    ${attive ? `<div class="riga"><button class="btn" data-azione="prova-notifica">Manda una prova</button><button class="btn" data-azione="disattiva-notifiche">Disattiva</button></div>`
+      : `<button class="btn primario" data-azione="attiva-notifiche" ${!account.token || notifiche.stato === 'attesa' ? 'disabled' : ''}>${notifiche.stato === 'attesa' ? 'Attendi…' : 'Attiva le notifiche'}</button>`}
+  </div>`;
 }
 // il logo: l'immagine caricata, oppure le iniziali
 const LOGO_DEFAULT = 'img/logo-default.png';   // Spedizioni Veloci: il giocatore può caricare il suo
@@ -329,7 +343,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-partita]'); if (!b) return;
   const el = $('#finestra'); el.hidden = true; el.dataset.tipo = '';
   const { riga, token, nome } = chiediQualePartita.attesa;
-  Object.assign(account, { token, nome, nuvolaIl: 0 }); ricordaAccount();
+  Object.assign(account, { token, nome, nuvolaIl: 0 }); ricordaAccount(); setTimeout(proponiNotifiche, 1500);
   if (b.dataset.partita === 'online') { usaPartitaNuvola(riga); dopoCambioPartita('Partita online caricata.'); }
   else { await salvaOnline(true); dopoCambioPartita('Questa partita ora è salvata sul tuo account.'); }
 });
@@ -1118,6 +1132,9 @@ $('#contenuto').addEventListener('click', e => {
     case 'chiudi-negozio': negozioAperto = false; ridisegna(); break;
     case 'usato': negozioUsato = b.dataset.v === '1'; ridisegna(); break;
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
+    case 'attiva-notifiche': notifiche.stato = 'attesa'; ridisegna(); attivaNotifiche().then(() => { notifiche.stato = ''; ridisegna(); if (notificheAttive()) toast('Notifiche attive.'); }); break;
+    case 'disattiva-notifiche': disattivaNotifiche().then(() => { ridisegna(); toast('Notifiche disattivate.'); }); break;
+    case 'prova-notifica': provaNotifica().then(() => toast('Prova inviata: arriva tra pochi secondi.')).catch(e => toast(messaggioOnline(e))); break;
     case 'togli-logo': delete S.logo; salva(); aggiornaDepositiMappa(); ridisegna(); break;
     case 'salva-ora': salva(); if (account.token) salvaOnline(true).then(() => ridisegna()); toast(account.token ? 'Partita salvata, anche sul tuo account.' : 'Partita salvata su questo dispositivo. Con un account la ritrovi anche sul telefono.'); break;
     case 'vai-magazzino': { S.magAttivo = id; salva(); flottaAperti = null; pianoMostrato = null; const m = magazzino(id); if (m && mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: Math.max(mappa.getZoom(), 12) }); ridisegna(); break; }
