@@ -106,6 +106,31 @@ async function cercaCitta(testo) {
     .sort((a, b) => (!!a.troppoPiccola - !!b.troppoPiccola) || (b.abitanti || 0) - (a.abitanti || 0));
 }
 
+// Le 20 città dove si possono aprire nuovi magazzini: i capoluoghi di regione.
+// mag = dove sta il magazzino (zona industriale o interporto vicino alla città).
+const CAPOLUOGHI_REGIONE = [
+  { nome: 'Torino', dettaglio: 'Piemonte', lng: 7.6869, lat: 45.0703, raggio: 7, mag: [7.6150, 45.0350] },
+  { nome: 'Aosta', dettaglio: "Valle d'Aosta", lng: 7.3201, lat: 45.7375, raggio: 3, mag: [7.3500, 45.7300] },
+  { nome: 'Milano', dettaglio: 'Lombardia', lng: 9.1900, lat: 45.4642, raggio: 9, mag: [9.1100, 45.5050] },
+  { nome: 'Trento', dettaglio: 'Trentino-Alto Adige', lng: 11.1217, lat: 46.0748, raggio: 4, mag: [11.1100, 46.0950] },
+  { nome: 'Venezia', dettaglio: 'Veneto (Mestre)', lng: 12.2389, lat: 45.4920, raggio: 5.5, mag: [12.2350, 45.4600] },
+  { nome: 'Trieste', dettaglio: 'Friuli-Venezia Giulia', lng: 13.7768, lat: 45.6495, raggio: 5, mag: [13.8000, 45.6150] },
+  { nome: 'Genova', dettaglio: 'Liguria', lng: 8.9463, lat: 44.4056, raggio: 6, mag: [8.8900, 44.4300] },
+  { nome: 'Bologna', dettaglio: 'Emilia-Romagna', lng: 11.3426, lat: 44.4949, raggio: 6, mag: [11.4000, 44.5050] },
+  { nome: 'Firenze', dettaglio: 'Toscana', lng: 11.2558, lat: 43.7696, raggio: 6, mag: [11.1900, 43.8000] },
+  { nome: 'Perugia', dettaglio: 'Umbria', lng: 12.3888, lat: 43.1107, raggio: 4, mag: [12.3600, 43.0850] },
+  { nome: 'Ancona', dettaglio: 'Marche', lng: 13.5189, lat: 43.6158, raggio: 4, mag: [13.5200, 43.5750] },
+  { nome: 'Roma', dettaglio: 'Lazio', lng: 12.4964, lat: 41.9028, raggio: 10, mag: [12.5900, 41.9200] },
+  { nome: "L'Aquila", dettaglio: 'Abruzzo', lng: 13.3995, lat: 42.3498, raggio: 4, mag: [13.4500, 42.3400] },
+  { nome: 'Campobasso', dettaglio: 'Molise', lng: 14.6568, lat: 41.5603, raggio: 3, mag: [14.6800, 41.5700] },
+  { nome: 'Napoli', dettaglio: 'Campania', lng: 14.2681, lat: 40.8518, raggio: 7, mag: [14.3050, 40.8550] },
+  { nome: 'Potenza', dettaglio: 'Basilicata', lng: 15.8056, lat: 40.6404, raggio: 3.5, mag: [15.7700, 40.6250] },
+  { nome: 'Bari', dettaglio: 'Puglia', lng: 16.8719, lat: 41.1171, raggio: 6, mag: [16.8100, 41.1000] },
+  { nome: 'Catanzaro', dettaglio: 'Calabria', lng: 16.5877, lat: 38.9098, raggio: 4, mag: [16.5600, 38.8850] },
+  { nome: 'Palermo', dettaglio: 'Sicilia', lng: 13.3615, lat: 38.1157, raggio: 6, mag: [13.4000, 38.0980] },
+  { nome: 'Cagliari', dettaglio: 'Sardegna', lng: 9.1217, lat: 39.2238, raggio: 5, mag: [9.0750, 39.2450] },
+];
+
 const CITTA_SUGGERITE = [
   { nome: 'Udine', dettaglio: 'Friuli-Venezia Giulia', lng: 13.2350, lat: 46.0626, raggio: 4.5 },
   { nome: 'Milano', dettaglio: 'Lombardia', lng: 9.1900, lat: 45.4642, raggio: 9 },

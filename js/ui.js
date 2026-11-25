@@ -316,11 +316,21 @@ function vistaFiliali() {
       <button class="btn piccolo" data-azione="vedi-citta" data-id="${c.id}">Vedi</button></div>`;
   }).join('');
   return `<div class="scheda"><h2 style="margin:0">Città <small>${tutteCitta().length === 1 ? 'solo la sede' : tutteCitta().length + ' città'}</small></h2>${lista}
-    ${manca.length ? `<p class="nota">Per aprire una filiale in un'altra città ti servono ${manca.join(', ')}.</p><button class="btn" disabled>Apri una filiale</button>`
-      : `<button class="btn primario" data-azione="apri-filiale">Apri una filiale (${eur.format(FILIALE.costo)} + magazzino)</button>`}
+    <p class="nota">Le nuove città si aprono comprando un magazzino in un capoluogo di regione, qui sopra.</p>
   </div>`;
 }
 
+let sceltaSede = false;
+function listaCapoluoghi() {
+  const vicino = c => Math.min(...tutteCitta().map(t => distanzaKm([t.lng, t.lat], [c.lng, c.lat])));
+  const liberi = capoluoghiLiberi().sort((a, b) => vicino(a) - vicino(b));
+  if (!liberi.length) return '<p class="nota">Hai un magazzino in tutti i capoluoghi d\'Italia. Prossima tappa: l\'estero!</p>';
+  return `<div class="riga"><b>Dove apri il ${S.depositi.length + 1}° magazzino?</b><button class="btn piccolo" data-azione="annulla-sede">Chiudi</button></div>
+    <p class="nota">Il nuovo magazzino parte da zero: zone, furgoni e personale nuovi. Tocca una città per vederla sulla mappa.</p>
+    <div class="lista-sedi">${liberi.map(c => { const p = prezzoSede(c);
+      return `<div class="riga sede"><button class="titolo-link" data-azione="vedi-sede" data-id="${esc(c.nome)}"><b>${esc(c.nome)}</b> <span class="nota">${esc(c.dettaglio)} · ${Math.round(vicino(c))} km</span></button>
+        <button class="btn piccolo ${S.cassa >= p ? 'primario' : ''}" data-azione="apri-sede" data-id="${esc(c.nome)}" ${S.cassa < p ? 'disabled' : ''}>${eur.format(p)}</button></div>`; }).join('')}</div>`;
+}
 function vistaMagazzini() {
   const lista = S.depositi.map((m, i) => {
     const zoneServite = S.zone.filter(z => magDi(z) === m.id && S.furgoni.some(f => f.zona === z.id)).length;
@@ -338,10 +348,10 @@ function vistaMagazzini() {
   return `<div class="scheda">
     <h2 style="margin:0">Magazzini <small>di tua proprietà</small></h2>
     ${lista}
-    ${posizionando ? `<p class="nota" style="color:var(--accento)">Clicca sulla mappa dove vuoi il nuovo magazzino.</p><button class="btn" data-azione="annulla-magazzino">Annulla</button>`
-      : senza.length ? `<div class="bloccato">🔒 Per comprare il ${S.depositi.length + 1}° magazzino ogni magazzino deve avere un responsabile, che si assume quando ha tutti i miglioramenti.<br>
+    ${senza.length ? `<div class="bloccato">🔒 Per aprire il ${S.depositi.length + 1}° magazzino ogni magazzino deve avere un responsabile, che si assume quando ha tutti i miglioramenti.<br>
           Senza responsabile: <b>${senza.map(m => esc(m.nome)).join(', ')}</b></div>`
-      : `<button class="btn" data-azione="nuovo-magazzino" ${S.cassa < prezzoMagazzinoMin() ? 'disabled' : ''}>Compra il ${S.depositi.length + 1}° magazzino (${eur.format(prezzoMagazzinoMin())}–${eur.format(prezzoMagazzinoMax())})</button>`}
+      : sceltaSede ? listaCapoluoghi()
+      : `<button class="btn primario" data-azione="scegli-sede">Apri il ${S.depositi.length + 1}° magazzino in un capoluogo di regione</button>`}
     <p class="nota">Il responsabile gestisce il magazzino al posto tuo: accetta i contratti, risponde ai clienti, assume e organizza, e ogni mese ti manda un report. Tu passi al magazzino successivo.</p>
   </div>`;
 }
@@ -1065,6 +1075,11 @@ $('#contenuto').addEventListener('click', e => {
     case 'annuncio': { const r = b.dataset.ruolo; esito(pubblicaAnnuncio(r, S.offerta[r])); break; }
     case 'scegli-citta': scegliCitta((b.dataset.gruppo === 's' ? CITTA_SUGGERITE : inizio.risultati)[+b.dataset.i]); break;
     case 'cambia-citta': annullaPuntoSullaMappa(); inizio.fase = 'citta'; inizio.errore = ''; ridisegna(); break;
+    case 'scegli-sede': sceltaSede = true; ridisegna(); break;
+    case 'annulla-sede': sceltaSede = false; ridisegna(); break;
+    case 'vedi-sede': { const c = CAPOLUOGHI_REGIONE.find(x => x.nome === id); if (c && mappa) mappa.flyTo({ center: c.mag, zoom: 11 }); break; }
+    case 'apri-sede': if (b.dataset.conferma) { const err = apriSede(id); if (!err) { sceltaSede = false; flottaAperti = null; aggiornaZoneMappa(); aggiornaDepositiMappa(); const m = magazzino(magAttivo()); if (mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: 11 }); } esito(err, `Magazzino di ${id} aperto!`); }
+      else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'nuovo-magazzino': posizionando = true; ridisegna(); chiediPuntoSullaMappa(punto => {
       posizionando = false; esito(apriMagazzino(punto), 'Magazzino aperto.'); aggiornaDepositiMappa(); }); break;
     case 'annulla-magazzino': posizionando = false; annullaPuntoSullaMappa(); ridisegna(); break;
