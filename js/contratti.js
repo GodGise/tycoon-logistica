@@ -7,12 +7,12 @@ const CLIENTI = {
 
 // Tipi di carico: paga per pacco (o per trasporto) e quanti pacchi
 const TIPI_CARICO = {
-  standard: { nome: 'Pacchi express', paga: [9, 12], pacchi: [20, 80], unita: 'pacchi' },
+  standard: { nome: 'Pacchi express', paga: [5, 7], pacchi: [20, 80], unita: 'pacchi' },
 };
 
 const OFFERTA = {
   primaDopo: 30,          // secondi reali prima della prima offerta
-  ogni: [90, 150],        // secondi reali tra un'offerta e l'altra (circa una per giornata)
+  ogni: [360, 600],       // secondi reali tra un'offerta e l'altra (circa una per giornata)
   durata: 40,             // secondi per accettare
   maxAttivi: 3,
   quotaPenale: 0.3,       // penale = 30% del valore non consegnato
@@ -99,10 +99,10 @@ function notiziaContratto(c) {
 function nuovoObiettivo(consegneOggi, giacenzeOggi) {
   const giorno = prossimoFeriale(S.giorno);
   if (giacenzeOggi > 0 && Math.random() < 0.4) {
-    S.obiettivo = { giorno, tipo: 'giacenze', testo: 'Nessun pacco in giacenza in nessuna zona', premio: 1200 };
+    S.obiettivo = { giorno, tipo: 'giacenze', testo: 'Nessun pacco in giacenza in nessuna zona', premio: 600 };
   } else {
     const target = Math.max(consegneOggi + 20, Math.round(consegneOggi * 1.12 / 10) * 10, 60);
-    S.obiettivo = { giorno, tipo: 'consegne', target, testo: `Consegna almeno ${target} pacchi`, premio: Math.round((500 + target * 3) / 50) * 50 };
+    S.obiettivo = { giorno, tipo: 'consegne', target, testo: `Consegna almeno ${target} pacchi`, premio: Math.round((250 + target * 1.5) / 50) * 50 };
   }
 }
 function valutaObiettivo(consegne, giacenze) {

@@ -2,13 +2,14 @@
    Tutti i numeri qui sono PROVVISORI: vanno tarati durante i test. */
 
 const COSTANTI = {
-  cassaIniziale: 400000,          // basta per il primo magazzino (fino a 300.000 €), un furgone e i primi stipendi
-  euroPerConsegna: 6,             // tariffa base; con la reputazione va da 5,10 a 6,90 €.
-                                  // Alta per un gioco: un furgone usato si ripaga in circa 1 ora reale
+  cassaIniziale: 400000,          // solo per le vecchie partite fuori dai capoluoghi
+  cassaDopoMagazzino: 60000,      // all'inizio hai il prezzo del magazzino più 60.000 €: un furgone e i primi stipendi
+  euroPerConsegna: 3.5,           // tariffa base; con la reputazione va da 2,98 a 4,03 €.
+                                  // Circa metà del margine di prima: un furgone si ripaga in settimane di gioco
   maxConsegneCorriere: 125,       // oltre restano pacchi in giacenza
   pacchiMagazziniere: 300,        // pacchi smistati al giorno da un magazziniere
-  secondiPerGiorno: 150,          // ogni giornata dura 2 minuti e mezzo reali, senza possibilità di accelerare
-  // il fine settimana (sabato + domenica) passa in un unico blocco da 3 minuti
+  secondiPerGiorno: 600,          // ogni giornata dura 10 minuti reali, senza possibilità di accelerare
+  // il fine settimana (sabato + domenica) passa in un unico blocco (una giornata)
   assicurazioneMensile: 150,      // per furgone, premio base
   aumentoPremioIncidente: 0.25,   // +25% al premio di QUEL furgone per ogni incidente. Non scende più:
                                   // se sale troppo conviene vendere il furgone e comprarne un altro

@@ -4,16 +4,19 @@
 
 const LIVELLI = [
   { n: 1,  nome: 'Corriere di quartiere', xp: 0,      sblocca: ['Centro e primo anello della città', 'Furgoni Pacato Fiatt, Ford Trancit e Renò Mastre'] },
-  { n: 2,  nome: 'Corriere cittadino',    xp: 2000,   sblocca: ['Furgone elettrico e-Pacato', 'Navigatore intelligente'] },
-  { n: 3,  nome: 'Rete locale',           xp: 6000,   sblocca: ['Ivecco Daylì', 'Pubblicità in città'] },
-  { n: 4,  nome: 'Logistica urbana',      xp: 15000,  sblocca: ['Mercedez Sprinta', 'Officina nel magazzino', 'Corso di guida sicura'] },
+  { n: 2,  nome: 'Corriere cittadino',    xp: 10000,   sblocca: ['Furgone elettrico e-Pacato', 'Navigatore intelligente'] },
+  { n: 3,  nome: 'Rete locale',           xp: 150000,   sblocca: ['Ivecco Daylì', 'Pubblicità in città'] },
+  { n: 4,  nome: 'Logistica urbana',      xp: 75000,  sblocca: ['Mercedez Sprinta', 'Officina nel magazzino', 'Corso di guida sicura'] },
   { n: 5,  nome: 'Operatore regionale',   xp: 30000,  sblocca: ['Furgone elettrico grande e-Daylì', 'Nastro trasportatore'] },
-  { n: 6,  nome: 'Gruppo logistico',      xp: 55000,  sblocca: ['Filiali in altre città', 'Gestionale automatizzato (100.000 €, per sempre): fa "Organizza" da solo ogni mattina'] },
-  { n: 7,  nome: 'Rete interregionale',   xp: 90000,  sblocca: ['Contratti dei clienti pagati il 20% in più'] },
-  { n: 8,  nome: 'Big della logistica',   xp: 140000, sblocca: ['Accordo flotta: −10% sui furgoni nuovi'] },
-  { n: 9,  nome: 'Network nazionale',     xp: 210000, sblocca: ['Licenze di zona a metà prezzo'] },
-  { n: 10, nome: 'Leader nazionale',      xp: 300000, sblocca: ['Il titolo più alto e una medaglia d\'oro'] },
+  { n: 6,  nome: 'Gruppo logistico',      xp: 275000,  sblocca: ['Filiali in altre città', 'Gestionale automatizzato (100.000 €, per sempre): fa "Organizza" da solo ogni mattina'] },
+  { n: 7,  nome: 'Rete interregionale',   xp: 450000,  sblocca: ['Contratti dei clienti pagati il 20% in più'] },
+  { n: 8,  nome: 'Big della logistica',   xp: 700000, sblocca: ['Accordo flotta: −10% sui furgoni nuovi'] },
+  { n: 9,  nome: 'Network nazionale',     xp: 1050000, sblocca: ['Licenze di zona a metà prezzo'] },
+  { n: 10, nome: 'Leader nazionale',      xp: 1500000, sblocca: ['Il titolo più alto e una medaglia d\'oro'] },
 ];
+// i pacchi nelle zone crescono con il livello: al livello 1 arriva il 45% degli ordini, al 10 tutti
+function crescitaDomanda() { const n = (typeof S !== 'undefined' && S && S.xp !== undefined) ? livelloAzienda().n : 1; return 0.45 + 0.55 * (n - 1) / 9; }
+function pacchiZona(z) { return Math.round(z.pacchi * crescitaDomanda()); }
 // a che livello si sblocca cosa
 const SBLOCCO = {
   modelli: { pacato: 1, trancit: 1, mastre: 1, epacato: 2, daily: 3, sprinta: 4, edaily: 5 },
