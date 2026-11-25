@@ -657,6 +657,29 @@ function apriFiliale(citta, lngLat, zonePronte) {
   notizia(`Aperta la filiale di ${citta.nome}! Assumi magazzinieri per la nuova città e assegna i furgoni alle sue zone.`, 'buono');
   return null;
 }
+/* ---------- nuovi magazzini: solo nei capoluoghi di regione ----------
+   Ogni nuovo magazzino apre in un capoluogo dove non sei ancora, con le sue zone, nel punto già deciso.
+   Prezzo: più la città è grande più costa, e ogni magazzino in più costa il 20% più del precedente. */
+function capoluoghiLiberi() {
+  return CAPOLUOGHI_REGIONE.filter(c => !tutteCitta().some(t => t.nome === c.nome || distanzaKm([t.lng, t.lat], [c.lng, c.lat]) < t.raggio + c.raggio));
+}
+function prezzoSede(c) { return Math.round((COSTANTI.prezzoMagazzinoMin + 12000 * c.raggio) * rincaroMagazzini() / 5000) * 5000; }
+function apriSede(nome) {
+  if (magazziniSenzaResponsabile().length) return 'Prima completa i miglioramenti e affida ogni magazzino a un responsabile.';
+  const c = capoluoghiLiberi().find(x => x.nome === nome); if (!c) return 'Qui hai già un magazzino.';
+  const prezzo = prezzoSede(c);
+  if (S.cassa < prezzo) return `A ${c.nome} il magazzino costa ${prezzo.toLocaleString('it-IT')} €: non hai abbastanza soldi.`;
+  movimento('magazzini', -prezzo);
+  const id = 'c' + (S.filiali.length + 2);
+  const nuova = { id, nome: c.nome, dettaglio: c.dettaglio, lng: c.lng, lat: c.lat, raggio: c.raggio };
+  S.filiali.push(nuova);
+  const zone = generaZone(nuova).map(z => Object.assign(z, { id: id + '-' + z.id, cittaId: id }));
+  const m = { id: nuovoId('m'), cittaId: id, nome: 'Magazzino ' + c.nome, lng: c.mag[0], lat: c.mag[1], valore: prezzo, migl: {} };
+  S.depositi.push(m); S.magAttivo = m.id;
+  zone.forEach(z => { z.mag = m.id; S.zone.push(z); S.giacenze[z.id] = 0; });
+  notizia(`Aperto il magazzino di ${c.nome} per ${prezzo.toLocaleString('it-IT')} €: si riparte da zero, con i soldi del primo.`, 'buono');
+  salva(); return null;
+}
 function spostaMagazziniere(id, cittaId) { const d = dipendente(id); if (d) d.cittaId = cittaId; }
 
 /* ---------- reputazione ----------
