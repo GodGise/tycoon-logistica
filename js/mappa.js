@@ -89,15 +89,17 @@ function avviaMappa(contenitore, quandoFallisce) {
       if (!attesaClick) return;
       const cb = attesaClick; annullaPuntoSullaMappa(); cb([e.lngLat.lng, e.lngLat.lat]);
     });
-    inquadraZone('c1');
+    inquadraAttivo();
     const avviso = document.getElementById('avviso-mappa'); if (avviso) avviso.hidden = true;
-    window.addEventListener('resize', () => { clearTimeout(inquadraZone._t); inquadraZone._t = setTimeout(() => inquadraZone('c1'), 250); });
+    window.addEventListener('resize', () => { clearTimeout(inquadraZone._t); inquadraZone._t = setTimeout(inquadraAttivo, 250); });
     mappaPronta = true;
   });
 }
 
 // Inquadra le zone lasciando spazio al pannello. Il margine si adatta alla finestra,
 // così su schermi stretti la mappa non si allontana fino a mostrare tutto il Friuli.
+// inquadra la città del magazzino che stai gestendo (non sempre la prima)
+function inquadraAttivo() { inquadraZone(S && S.depositi ? idCitta(magazzino(magAttivo())) : 'c1'); }
 function inquadraZone(cittaId) {
   if (!mappa) return;
   // con una città indicata inquadra solo le sue zone; in anteprima (scelta città) solo quelle nuove
