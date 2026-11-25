@@ -10,9 +10,9 @@ const INDOLI = {
   perla:       { autista: 'lavora benissimo', magazziniere: 'smista velocissimo' },
 };
 function indoleCasuale() {
-  const r = Math.random();
-  if (r < 0.125) return scegli(['distratto', 'pasticcione', 'scortese']);
-  if (r < 0.225) return 'perla';
+  const r = Math.random(), marce = (S && S.depositi && livello('selezione')) ? 0.0625 : 0.125;   // ufficio del personale: metà delle mele marce
+  if (r < marce) return scegli(['distratto', 'pasticcione', 'scortese']);
+  if (r < marce + 0.1) return 'perla';
   return null;
 }
 
