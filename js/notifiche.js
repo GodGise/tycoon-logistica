@@ -75,3 +75,24 @@ document.addEventListener('visibilitychange', () => {
   const lista = document.visibilityState === 'hidden' ? avvisiDaProgrammare() : [];
   rpc('programma_notifiche', { p_token: account.token, p_lista: lista }, true).catch(() => {});
 });
+
+/* ---------- invito al primo avvio ----------
+   Il permesso del sistema si può chiedere solo dopo un tocco: al primo avvio compare un riquadro
+   con "Sì, attiva", e quel tocco apre subito la richiesta. Se il permesso c'è già, si attivano da sole. */
+const CHIAVE_INVITO = 'tycoon-logistica-invito-notifiche';
+function proponiNotifiche() {
+  if (!pushSupportato() || !account.token || !S || notificheAttive()) return;
+  if (Notification.permission === 'granted') { attivaNotifiche(); return; }        // già concesso: niente domande
+  if (Notification.permission === 'denied') return;
+  try { if (localStorage.getItem(CHIAVE_INVITO)) return; } catch (e) { return; }
+  if (document.getElementById('invito-notifiche')) return;
+  const d = document.createElement('div'); d.id = 'invito-notifiche'; d.className = 'invito-notifiche vetro';
+  d.innerHTML = `<b>🔔 Vuoi le notifiche?</b><p>Ti avviso quando i furgoni hanno finito i giri, quando arriva la posta e se un'email sta per scadere.</p>
+    <div class="riga"><button class="btn" data-no>Non ora</button><button class="btn primario" data-si>Sì, attiva</button></div>`;
+  document.body.appendChild(d);
+  const chiudi = () => { try { localStorage.setItem(CHIAVE_INVITO, '1'); } catch (e) { /* ignora */ } d.remove(); };
+  d.querySelector('[data-no]').onclick = chiudi;
+  d.querySelector('[data-si]').onclick = () => { chiudi(); attivaNotifiche().then(() => { if (typeof ridisegna === 'function') ridisegna(); if (notificheAttive() && typeof toast === 'function') toast('Notifiche attive.'); else if (notifiche.errore && typeof toast === 'function') toast(notifiche.errore); }); };
+}
+// all'apertura (dopo aver ripreso l'account) e dopo l'accesso
+window.addEventListener('load', () => setTimeout(proponiNotifiche, 4000));

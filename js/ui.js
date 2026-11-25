@@ -343,7 +343,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-partita]'); if (!b) return;
   const el = $('#finestra'); el.hidden = true; el.dataset.tipo = '';
   const { riga, token, nome } = chiediQualePartita.attesa;
-  Object.assign(account, { token, nome, nuvolaIl: 0 }); ricordaAccount();
+  Object.assign(account, { token, nome, nuvolaIl: 0 }); ricordaAccount(); setTimeout(proponiNotifiche, 1500);
   if (b.dataset.partita === 'online') { usaPartitaNuvola(riga); dopoCambioPartita('Partita online caricata.'); }
   else { await salvaOnline(true); dopoCambioPartita('Questa partita ora è salvata sul tuo account.'); }
 });
