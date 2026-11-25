@@ -311,7 +311,7 @@ function vistaAccount() {
 // dopo che la partita è cambiata (accesso, altro dispositivo): ridisegna pannello e mappa
 function dopoCambioPartita(msg) {
   ridisegna();
-  if (S && typeof aggiornaDepositiMappa === 'function') { try { aggiornaDepositiMappa(); aggiornaZoneMappa(); inquadraZone('c1'); } catch (e) { /* mappa non pronta */ } }
+  if (S && typeof aggiornaDepositiMappa === 'function') { try { aggiornaDepositiMappa(); aggiornaZoneMappa(); inquadraAttivo(); } catch (e) { /* mappa non pronta */ } }
   if (msg) toast(msg);
 }
 function chiediQualePartita(riga, token, nome) {
@@ -1120,7 +1120,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'dettaglio': apriDettaglio(b.dataset.tipo, id); break;
     case 'togli-logo': delete S.logo; salva(); aggiornaDepositiMappa(); ridisegna(); break;
     case 'salva-ora': salva(); if (account.token) salvaOnline(true).then(() => ridisegna()); toast(account.token ? 'Partita salvata, anche sul tuo account.' : 'Partita salvata su questo dispositivo. Con un account la ritrovi anche sul telefono.'); break;
-    case 'vai-magazzino': { S.magAttivo = id; flottaAperti = null; pianoMostrato = null; const m = magazzino(id); if (m && mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: Math.max(mappa.getZoom(), 12) }); ridisegna(); break; }
+    case 'vai-magazzino': { S.magAttivo = id; salva(); flottaAperti = null; pianoMostrato = null; const m = magazzino(id); if (m && mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: Math.max(mappa.getZoom(), 12) }); ridisegna(); break; }
     case 'assumi-resp': esito(assumiResponsabile(id), 'Responsabile assunto: ora puoi comprare un altro magazzino.'); break;
     case 'licenzia-resp': if (b.dataset.conferma) { licenziaResponsabile(id); esito(null, 'Torni a gestirlo tu.'); } else { b.dataset.conferma = 1; b.textContent = 'Confermi?'; } break;
     case 'consiglio': { const m = (S.posta || []).find(x => x.report && x.giorno === +b.dataset.g && x.mag === b.dataset.mag); if (m) { seguiConsiglio(m, +b.dataset.i); esito(null, 'Fatto.'); } break; }
