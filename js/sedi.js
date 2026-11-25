@@ -61,12 +61,13 @@ function assumiPer(magId, ruolo) {
   return true;
 }
 // il responsabile risponde alle email dei clienti del suo magazzino (8 volte su 10 nel modo giusto)
-function rispondeResponsabile(magId, email) {
+function rispondeResponsabile(magId, email, ctx) {
   const m = magazzino(magId), r = m.responsabile; r.mese = r.mese || { contratti: 0, email: 0, giuste: 0, assunti: 0, riparati: 0 };
   const giusta = Math.random() < RESPONSABILE.giusteSu10 / 10;
   const scelte = email.scelte, migliore = scelte.reduce((b, s, i) => s.rep > scelte[b].rep ? i : b, 0);
   const i = giusta ? migliore : Math.floor(Math.random() * scelte.length);
-  const s = scelte[i]; cambiaFama(s.rep); if (s.soldi) movimento(s.soldi > 0 ? 'contratti' : 'eventi', s.soldi);
+  const s = scelte[i]; if (s.fai) s.fai(ctx || {}); cambiaFama(s.rep); if (s.soldi) movimento(s.soldi > 0 ? 'contratti' : 'eventi', s.soldi);
+  return s;
   r.mese.email++; if (i === migliore) r.mese.giuste++;
 }
 // contratti nelle zone gestite: li accetta lui se ha furgoni nella zona
