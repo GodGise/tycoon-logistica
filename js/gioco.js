@@ -630,6 +630,7 @@ function recuperaOffline() {
   S.furgoni.filter(f => f.daRiparare && livello('officina', magDi(f))).forEach(f => { movimento('manutenzione', -f.daRiparare); f.daRiparare = 0; f.fermo = 0; f.motivo = null; });
   const durata = COSTANTI.secondiPerGiorno;
   S.recuperoOffline = true;
+  postaPrimaOffline = new Set(S.posta || []); postaMaxOffline = limitePostaOffline(via);
   S.offertaContratto = null;
   let resto = secondi, consegne = 0;
   while (resto > 0) {
@@ -642,7 +643,7 @@ function recuperaOffline() {
     concludiGiornata();
     if (sabato) simulaGiorno();
   }
-  delete S.recuperoOffline;
+  delete S.recuperoOffline; postaPrimaOffline = null;
   // a gioco chiuso la reputazione può scendere al massimo di 5 punti
   if (S.reputazione < prima.reputazione - 5) { S.servizio = Math.max(S.servizio, prima.servizio - 0.02); S.reputazione = prima.reputazione - 5; }
   return { secondi: Math.min(via, OFFLINE_MAX_SECONDI), lento: via > OFFLINE_PIENO_SECONDI, ridotto: via > OFFLINE_MAX_SECONDI, giorni: S.giorno - prima.giorno, consegne, differenza: S.cassa - prima.cassa };
