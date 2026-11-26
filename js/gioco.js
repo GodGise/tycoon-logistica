@@ -615,12 +615,15 @@ function rinominaAzienda(nome) {
 }
 
 /* ---------- tempo passato a gioco chiuso ---------- */
-const OFFLINE_MAX_SECONDI = 2 * 60 * 60;   // si recuperano al massimo 2 ore reali
+const OFFLINE_PIENO_SECONDI = 2 * 60 * 60;   // le prime 2 ore a gioco chiuso contano piene
+const OFFLINE_MAX_SECONDI = 8 * 60 * 60;     // dalla 2ª all'8ª ora contano a metà; dopo 8 ore l'azienda si ferma
+// secondi di gioco che valgono le ore passate a gioco chiuso (8 ore → 5 ore di gioco)
+function secondiRecuperati(via) { const t = Math.min(via, OFFLINE_MAX_SECONDI); return Math.min(t, OFFLINE_PIENO_SECONDI) + Math.max(0, t - OFFLINE_PIENO_SECONDI) / 2; }
 // Fa passare il tempo trascorso mentre il gioco era chiuso, con la stessa simulazione di sempre
 // (niente offerte di contratto ed eventi: quelli richiedono il giocatore). Restituisce un riepilogo.
 function recuperaOffline() {
   if (!S || !S.salvatoIl) return null;
-  const secondi = Math.min(OFFLINE_MAX_SECONDI, (Date.now() - S.salvatoIl) / 1000);
+  const via = (Date.now() - S.salvatoIl) / 1000, secondi = secondiRecuperati(via);
   if (secondi < 60) return null;
   const prima = { cassa: S.cassa, giorno: S.giorno, consegne: 0, servizio: S.servizio, reputazione: S.reputazione };
   // con l'officina nel magazzino i furgoni già guasti si riparano mentre sei via
@@ -642,7 +645,7 @@ function recuperaOffline() {
   delete S.recuperoOffline;
   // a gioco chiuso la reputazione può scendere al massimo di 5 punti
   if (S.reputazione < prima.reputazione - 5) { S.servizio = Math.max(S.servizio, prima.servizio - 0.02); S.reputazione = prima.reputazione - 5; }
-  return { secondi, ridotto: (Date.now() - S.salvatoIl) / 1000 > OFFLINE_MAX_SECONDI, giorni: S.giorno - prima.giorno, consegne, differenza: S.cassa - prima.cassa };
+  return { secondi: Math.min(via, OFFLINE_MAX_SECONDI), lento: via > OFFLINE_PIENO_SECONDI, ridotto: via > OFFLINE_MAX_SECONDI, giorni: S.giorno - prima.giorno, consegne, differenza: S.cassa - prima.cassa };
 }
 
 /* ---------- filiali in altre città ---------- */
