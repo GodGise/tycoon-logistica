@@ -54,7 +54,7 @@ const EVENTI = [
   { id: 'sciopero', puo: () => S.furgoni.length >= 2, crea: () => {
       const n = S.dipendenti.filter(d => d.ruolo === 'autista').length, costo = n * 150;
       return { titolo: 'Sciopero dei trasporti', testo: `I sindacati hanno indetto uno sciopero per domani. Puoi pagare uno straordinario di 150 € a ogni autista (${n}) per lavorare lo stesso, oppure restare fermi un giorno.`,
-        scelte: [{ testo: `Paga ${costo.toLocaleString('it-IT')} € e lavora`, fai: () => { movimento('eventi', -costo); return 'Gli autisti lavorano anche domani.'; } },
+        scelte: [{ testo: `Paga ${costo.toLocaleString(LOCALE)} € e lavora`, fai: () => { movimento('eventi', -costo); return 'Gli autisti lavorano anche domani.'; } },
                  { testo: 'Resta fermo domani', fai: () => { S.effetti.sciopero = prossimoFeriale(S.giorno); cambiaFama(-2); return 'Domani i furgoni restano in deposito.'; } }] };
     } },
   { id: 'lavori', puo: () => !!servitaCasuale(), crea: () => {
@@ -81,7 +81,7 @@ const EVENTI = [
   { id: 'neve', puo: () => [10, 11, 0, 1, 2].includes(dataDelGiorno(S.giorno).getMonth()) && S.furgoni.length >= 1, crea: () => {
       const costo = S.furgoni.length * 120;
       return { titolo: 'Allerta neve per domani', testo: `È prevista una forte nevicata. Con le catene e le gomme da neve (120 € a furgone) lavori normalmente; senza, domani i furgoni fanno il 40% di consegne in meno.`,
-        scelte: [{ testo: `Compra le catene (${costo.toLocaleString('it-IT')} €)`, fai: () => { movimento('eventi', -costo); return 'Furgoni pronti per la neve.'; } },
+        scelte: [{ testo: `Compra le catene (${costo.toLocaleString(LOCALE)} €)`, fai: () => { movimento('eventi', -costo); return 'Furgoni pronti per la neve.'; } },
                  { testo: 'Rischia', fai: () => { S.effetti.neve = prossimoFeriale(S.giorno); return 'Domani si va piano.'; } }] };
     } },
   { id: 'accordo', puo: () => !!servitaCasuale(), crea: () => {
@@ -92,7 +92,7 @@ const EVENTI = [
     } },
   { id: 'compratore', puo: () => S.furgoni.length >= 2, crea: () => {
       const f = scegli(S.furgoni), m = modello(f.modello), offerta = Math.round(f.valore * 0.8 / 100) * 100;
-      return { titolo: 'Un concorrente vuole un tuo furgone', testo: `Un corriere della zona ti offre ${offerta.toLocaleString('it-IT')} € per il tuo ${m.nome}${f.usato ? ' usato' : ''}: più dei ${Math.round(f.valore * COSTANTI.valoreRivendita).toLocaleString('it-IT')} € che prenderesti rivendendolo.`,
+      return { titolo: 'Un concorrente vuole un tuo furgone', testo: `Un corriere della zona ti offre ${offerta.toLocaleString(LOCALE)} € per il tuo ${m.nome}${f.usato ? ' usato' : ''}: più dei ${Math.round(f.valore * COSTANTI.valoreRivendita).toLocaleString(LOCALE)} € che prenderesti rivendendolo.`,
         scelte: [{ testo: 'Vendi', fai: () => { movimento('vendite', offerta); S.furgoni = S.furgoni.filter(x => x.id !== f.id); return 'Furgone venduto.'; } },
                  { testo: 'Tienilo', fai: () => 'Il furgone resta tuo.' }] };
     } },

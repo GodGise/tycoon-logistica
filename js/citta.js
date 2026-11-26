@@ -110,7 +110,7 @@ async function cercaCitta(testo) {
       return { nome: d.name || d.display_name.split(',')[0], dettaglio: d.display_name.split(',').slice(1, 4).join(',').trim(),
         lng: +d.lon, lat: +d.lat, raggio: raggioDaRiquadro(d.boundingbox), abitanti: ab,
         troppoPiccola: eCapoluogo(d.name || '') || (ab && ab >= ABITANTI_MINIMI) ? null
-          : ab ? `${ab.toLocaleString('it-IT')} abitanti e non è capoluogo` : 'non è capoluogo di provincia' };
+          : ab ? `${ab.toLocaleString(LOCALE)} abitanti e non è capoluogo` : 'non è capoluogo di provincia' };
     })
     .sort((a, b) => (!!a.troppoPiccola - !!b.troppoPiccola) || (b.abitanti || 0) - (a.abitanti || 0));
 }

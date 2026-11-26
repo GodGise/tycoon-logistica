@@ -92,13 +92,13 @@ function reportMensile(d) {
     });
     S.furgoni.filter(f => magDi(f) === m.id).forEach(f => {
       const incasso = leggiStat(f, 'mese', 'incasso'), costi = ['carburante', 'ricarica', 'manutenzione', 'assicurazione'].reduce((t, k) => t + leggiStat(f, 'mese', k), 0);
-      if (incasso > 0 && incasso < costi) consigli.push({ tipo: 'vendi', id: f.id, testo: `${modello(f.modello).nome}${f.zona && !isJolly(f) ? ' in ' + nomeZona(zona(f.zona)) : ''}: assicurazione ${assicurazioneFurgone(f)} €/mese, il giro è in perdita di ${Math.round(costi - incasso).toLocaleString('it-IT')} €. Valuta di venderlo e comprarne uno nuovo.` });
+      if (incasso > 0 && incasso < costi) consigli.push({ tipo: 'vendi', id: f.id, testo: `${modello(f.modello).nome}${f.zona && !isJolly(f) ? ' in ' + nomeZona(zona(f.zona)) : ''}: assicurazione ${assicurazioneFurgone(f)} €/mese, il giro è in perdita di ${Math.round(costi - incasso).toLocaleString(LOCALE)} €. Valuta di venderlo e comprarne uno nuovo.` });
     });
     const mese = r.mese || {};
     S.posta = S.posta || [];
     S.posta.unshift({ id: 'report', report: true, mag: m.id, giorno: S.giorno, mittente: `${r.nome} · responsabile ${m.nome}`,
-      oggetto: `Report di ${d.toLocaleDateString('it-IT', { month: 'long' })}`,
-      righe: [`Utile del magazzino: ${utile.toLocaleString('it-IT')} €`, `Mio compenso: ${costo.toLocaleString('it-IT')} € (${RESPONSABILE.stipendio.toLocaleString('it-IT')} € + 8% dell'utile)`,
+      oggetto: `Report di ${d.toLocaleDateString(LOCALE, { month: 'long' })}`,
+      righe: [`Utile del magazzino: ${utile.toLocaleString(LOCALE)} €`, `Mio compenso: ${costo.toLocaleString(LOCALE)} € (${RESPONSABILE.stipendio.toLocaleString(LOCALE)} € + 8% dell'utile)`,
         `Contratti accettati: ${mese.contratti || 0} · Email dei clienti gestite: ${mese.email || 0} (${mese.giuste || 0} come avresti fatto tu)`,
         `Assunti: ${mese.assunti || 0} · Licenziati perché in più: ${mese.tagliati || 0} · Guasti fatti riparare: ${mese.riparati || 0}`],
       consigli, letta: false, risposta: null, esito: '' });

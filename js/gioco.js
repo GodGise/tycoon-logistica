@@ -160,7 +160,7 @@ function licenzia(id) {
   const d = dipendente(id); if (!d) return;
   pagaPersonaleParziale(d);
   const liquidazione = costoLicenziamento(d);
-  if (liquidazione) { movimento('personale', -liquidazione); notizia(`Liquidazione a ${d.nome}: ${liquidazione.toLocaleString('it-IT')} € (era fuori dal periodo di prova).`, 'info'); }
+  if (liquidazione) { movimento('personale', -liquidazione); notizia(`Liquidazione a ${d.nome}: ${liquidazione.toLocaleString(LOCALE)} € (era fuori dal periodo di prova).`, 'info'); }
   S.dipendenti = S.dipendenti.filter(x => x.id !== id);
   S.furgoni.forEach(f => { if (f.autistaId === id) f.autistaId = null; });
   notizia(`${d.nome} non lavora più per te.`, 'male');
@@ -175,7 +175,7 @@ function compraFurgone(idModello, usato) {
   movimento('mezzi', -prezzo);
   S.furgoni.push({ id: nuovoId('f'), modello: m.id, usato, km: usato ? casoInt(90000, 180000) : 0,
     autistaId: null, zona: null, fermo: 0, motivo: null, valore: prezzo, acquistatoGiorno: S.giorno, premio: 1, incidenti: 0, mag: magAttivo() });
-  notizia(`Comprato ${m.nome}${usato ? ' usato' : ''} per ${prezzo.toLocaleString('it-IT')} €.`, 'info');
+  notizia(`Comprato ${m.nome}${usato ? ' usato' : ''} per ${prezzo.toLocaleString(LOCALE)} €.`, 'info');
   return null;
 }
 function vendiFurgone(id) {
@@ -194,12 +194,12 @@ function apriMagazzino(lngLat) {
   if (magazziniSenzaResponsabile().length) return 'Prima completa i miglioramenti e affida ogni magazzino a un responsabile.';
   const err = puoiMettereMagazzino(lngLat); if (err) return err;
   const cittaM = cittaVicina(lngLat).citta, prezzo = prezzoMagazzino(cittaM, lngLat);
-  if (S.cassa < prezzo) return `Qui un magazzino costa ${prezzo.toLocaleString('it-IT')} €: non hai abbastanza soldi.`;
+  if (S.cassa < prezzo) return `Qui un magazzino costa ${prezzo.toLocaleString(LOCALE)} €: non hai abbastanza soldi.`;
   movimento('magazzini', -prezzo);
   const n = S.depositi.length + 1;
   const nuovo = { id: nuovoId('m'), cittaId: cittaM.id, nome: 'Magazzino ' + n + (S.filiali.length ? ' ' + cittaM.nome : ''), lng: lngLat[0], lat: lngLat[1], valore: prezzo, migl: {} };
   S.depositi.push(nuovo); assegnaZoneNuovoMagazzino(nuovo); S.magAttivo = nuovo.id;
-  notizia(`Comprato il Magazzino ${n} per ${prezzo.toLocaleString('it-IT')} €. Ogni zona parte dal magazzino più vicino.`, 'buono');
+  notizia(`Comprato il Magazzino ${n} per ${prezzo.toLocaleString(LOCALE)} €. Ogni zona parte dal magazzino più vicino.`, 'buono');
   return null;
 }
 function valoreMagazzino(m) { return m.valore || COSTANTI.prezzoMagazzinoMin; }
@@ -209,7 +209,7 @@ function vendiMagazzino(id) {
   const ricavo = Math.round(valoreMagazzino(m) * COSTANTI.rivenditaMagazzino);
   movimento('vendite', ricavo);
   S.depositi = S.depositi.filter(x => x.id !== id);
-  notizia(`Venduto ${m.nome} per ${ricavo.toLocaleString('it-IT')} €.`, 'info');
+  notizia(`Venduto ${m.nome} per ${ricavo.toLocaleString(LOCALE)} €.`, 'info');
   return null;
 }
 
@@ -221,7 +221,7 @@ function assegna(idFurgone, campo, valore) {
   } else {
     const z = valore && !String(valore).startsWith(ZONA_JOLLY) ? zona(valore) : null;
     if (z && magDi(z) !== magDi(f)) return 'altro-magazzino';
-    if (z && !haLicenza(z)) { notizia(`Per consegnare in ${nomeZona(z)} serve la licenza (${prezzoLicenza(z).toLocaleString('it-IT')} €).`, 'male'); return 'licenza'; }
+    if (z && !haLicenza(z)) { notizia(`Per consegnare in ${nomeZona(z)} serve la licenza (${prezzoLicenza(z).toLocaleString(LOCALE)} €).`, 'male'); return 'licenza'; }
     f.zona = valore || null;
   }
 }
@@ -232,9 +232,9 @@ function furgoneOperativo(f) { return f.zona && f.autistaId && f.fermo === 0 && 
 function furgoniDaRiparare() { return S ? S.furgoni.filter(f => f.daRiparare > 0) : []; }
 function ripara(id) {
   const f = S.furgoni.find(x => x.id === id); if (!f || !f.daRiparare) return 'Questo furgone non è guasto.';
-  if (S.cassa < f.daRiparare) return `Servono ${f.daRiparare.toLocaleString('it-IT')} € per la riparazione.`;
+  if (S.cassa < f.daRiparare) return `Servono ${f.daRiparare.toLocaleString(LOCALE)} € per la riparazione.`;
   movimento('manutenzione', -f.daRiparare); stat(f, 'manutenzione', f.daRiparare);
-  notizia(`${modello(f.modello).nome} riparato per ${f.daRiparare.toLocaleString('it-IT')} €: dalla prossima giornata torna a lavorare.`, 'info');
+  notizia(`${modello(f.modello).nome} riparato per ${f.daRiparare.toLocaleString(LOCALE)} €: dalla prossima giornata torna a lavorare.`, 'info');
   f.daRiparare = 0; f.fermo = 0; f.motivo = null;
   return null;
 }
@@ -475,7 +475,7 @@ function giornoLavorativo() {
   S.ieri = { festivo: false, consegne: consegneTot, incasso, perZona };
   aggiungiEsperienza(consegneTot);
   aggiornaReputazione(perZona);
-  if (consegneTot) notizia(`${consegneTot} consegne, incasso ${incasso.toLocaleString('it-IT')} €.`, 'buono', 'giornata');
+  if (consegneTot) notizia(`${consegneTot} consegne, incasso ${incasso.toLocaleString(LOCALE)} €.`, 'buono', 'giornata');
 }
 
 function assicurazioneFurgone(f) { return Math.round(COSTANTI.assicurazioneMensile * (f.premio || 1)); }
@@ -498,7 +498,7 @@ function fineMese(d) {
   if (personale) movimento('personale', -Math.round(personale));
   const assic = S.furgoni.reduce((t, f) => t + assicurazioneFurgone(f), 0);
   if (assic) movimento('assicurazione', -assic);
-  const nomeMese = d.toLocaleDateString('it-IT', { month: 'long' });
+  const nomeMese = d.toLocaleDateString(LOCALE, { month: 'long' });
   if (personale) notizia(`Busta paga di ${nomeMese}: ${Math.round(personale)} € al personale.`, 'info', 'paga');
   if (assic) notizia(`Assicurazione flotta di ${nomeMese}: ${assic} €.`, 'info', 'assic');
   S.furgoni.forEach(f => { stat(f, 'assicurazione', assicurazioneFurgone(f)); stat(magazzino(magDi(f)) || S.depositi[0], 'costi', assicurazioneFurgone(f)); });
@@ -656,7 +656,7 @@ function requisitiFiliale() {
   if (magazziniSenzaResponsabile().length) mancano.push('un responsabile in ogni magazzino');
   if (S.furgoni.length < FILIALE.furgoni) mancano.push(`almeno ${FILIALE.furgoni} furgoni (ne hai ${S.furgoni.length})`);
   if (S.reputazione < FILIALE.reputazione) mancano.push(`reputazione almeno ${FILIALE.reputazione} (ora ${Math.round(S.reputazione)})`);
-  if (S.cassa < FILIALE.costo + prezzoMagazzinoMin()) mancano.push(`almeno ${(FILIALE.costo + prezzoMagazzinoMin()).toLocaleString('it-IT')} € in cassa`);
+  if (S.cassa < FILIALE.costo + prezzoMagazzinoMin()) mancano.push(`almeno ${(FILIALE.costo + prezzoMagazzinoMin()).toLocaleString(LOCALE)} € in cassa`);
   return mancano;
 }
 function apriFiliale(citta, lngLat, zonePronte) {
@@ -667,7 +667,7 @@ function apriFiliale(citta, lngLat, zonePronte) {
   const d = distanzaKm([citta.lng, citta.lat], lngLat);
   if (d > citta.raggio * COSTANTI.distanzaMaxMagazzino) return `Troppo lontano dal centro di ${citta.nome} (${Math.round(d)} km).`;
   const prezzo = prezzoMagazzino(nuova, lngLat);
-  if (S.cassa < FILIALE.costo + prezzo) return `Servono ${(FILIALE.costo + prezzo).toLocaleString('it-IT')} € (apertura + magazzino).`;
+  if (S.cassa < FILIALE.costo + prezzo) return `Servono ${(FILIALE.costo + prezzo).toLocaleString(LOCALE)} € (apertura + magazzino).`;
   movimento('magazzini', -(FILIALE.costo + prezzo));
   S.filiali.push(nuova);
   const zone = (zonePronte || generaZone(nuova)).map(z => Object.assign(z, { id: id + '-' + z.id, cittaId: id }));
@@ -688,7 +688,7 @@ function apriSede(nome) {
   if (magazziniSenzaResponsabile().length) return 'Prima completa i miglioramenti e affida ogni magazzino a un responsabile.';
   const c = capoluoghiLiberi().find(x => x.nome === nome); if (!c) return 'Qui hai già un magazzino.';
   const prezzo = prezzoSede(c);
-  if (S.cassa < prezzo) return `A ${c.nome} il magazzino costa ${prezzo.toLocaleString('it-IT')} €: non hai abbastanza soldi.`;
+  if (S.cassa < prezzo) return `A ${c.nome} il magazzino costa ${prezzo.toLocaleString(LOCALE)} €: non hai abbastanza soldi.`;
   movimento('magazzini', -prezzo);
   const id = 'c' + (S.filiali.length + 2);
   const nuova = { id, nome: c.nome, dettaglio: c.dettaglio, lng: c.lng, lat: c.lat, raggio: c.raggio };
@@ -697,7 +697,7 @@ function apriSede(nome) {
   const m = { id: nuovoId('m'), cittaId: id, nome: 'Magazzino ' + c.nome, lng: c.mag[0], lat: c.mag[1], valore: prezzo, migl: {} };
   S.depositi.push(m); S.magAttivo = m.id;
   zone.forEach(z => { z.mag = m.id; S.zone.push(z); S.giacenze[z.id] = 0; });
-  notizia(`Aperto il magazzino di ${c.nome} per ${prezzo.toLocaleString('it-IT')} €: si riparte da zero, con i soldi del primo.`, 'buono');
+  notizia(`Aperto il magazzino di ${c.nome} per ${prezzo.toLocaleString(LOCALE)} €: si riparte da zero, con i soldi del primo.`, 'buono');
   salva(); return null;
 }
 
