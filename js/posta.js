@@ -4,7 +4,14 @@
 
 const POSTA = { giorniSettimana: [1], giorniPerRispondere: 7, massimoInAttesa: 3 };   // una email ogni lunedì
 // al massimo 3 email da leggere alla volta, anche dopo tanto tempo offline
-function postaPiena() { return (S.posta || []).filter(m => m.risposta === null && !m.report).length >= POSTA.massimoInAttesa; }
+// a gioco chiuso arrivano al massimo 1 email (fino a 2 ore via), 2 (fino a 4 ore) o 3 (oltre)
+let postaPrimaOffline = null, postaMaxOffline = 0;
+function limitePostaOffline(secondiVia) { return secondiVia <= 2 * 3600 ? 1 : secondiVia <= 4 * 3600 ? 2 : 3; }
+function nuoveOffline() { return postaPrimaOffline ? (S.posta || []).filter(m => !postaPrimaOffline.has(m) && !m.report && m.risposta === null).length : 0; }
+function postaPiena() {
+  if (S.recuperoOffline && postaPrimaOffline && nuoveOffline() >= postaMaxOffline) return true;
+  return (S.posta || []).filter(m => m.risposta === null && !m.report).length >= POSTA.massimoInAttesa;
+}
 function segnaUsata(id) { S.postaUsate = (S.postaUsate || []).concat(id).slice(-30); S.postaRicevute = (S.postaRicevute || 0) + 1; }
 // le email già risposte o scadute spariscono dall'elenco
 function pulisciPosta() { S.posta = (S.posta || []).filter(m => m.risposta === null && !m.archiviato); }   // lunedì e giovedì
@@ -446,7 +453,7 @@ function trovaEmail(id) { return EMAIL.find(x => x.id === id) || EMAIL_GRAVI.fin
 
 // al massimo una email grave al mese, in un giorno a caso dopo il 5 del mese
 function forseEmailGrave() {
-  if (S.furgoni.length < 2) return;
+  if (S.furgoni.length < 2 || (S.recuperoOffline && postaPrimaOffline && nuoveOffline() >= postaMaxOffline)) return;
   const d = dataDelGiorno(S.giorno), mese = d.getFullYear() + '-' + d.getMonth();
   if (S.meseGrave === mese || d.getDate() < 5) return;
   if (d.getDate() < 25 && Math.random() > 0.15) return;
