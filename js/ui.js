@@ -95,6 +95,7 @@ function vistaImpostazioni() {
   </div>
   ${vistaNotifiche()}
   ${vistaAccount()}
+  <button class="btn" data-azione="rivedi-tutorial">Rivedi il tutorial</button>
   <button class="btn link" data-azione="nuova">Ricomincia da capo</button>`;
 }
 function vistaNotifiche() {
@@ -443,7 +444,25 @@ function barraMagazzini() {
     ${gestito(magAttivo()) ? `<p class="nota avviso-gestito">👔 ${esc(magazzino(magAttivo()).responsabile.nome)} gestisce questo magazzino: contratti, clienti, assunzioni e flotta li fa lui. Puoi comunque guardare e cambiare.</p>` : ''}`;
 }
 
+function vistaBenvenuto() {
+  return `<div class="benvenuto">
+    <img src="img/logo-default.png" alt="" class="benvenuto-logo">
+    <h2>Benvenuto in Tycoon Logistica</h2>
+    <p>Apri la tua azienda di corrieri in un capoluogo italiano e falla crescere:</p>
+    <ul>
+      <li>🚚 compri furgoni e li mandi nelle zone della città</li>
+      <li>👷 assumi autisti e magazzinieri (e scopri chi lavora bene)</li>
+      <li>✉ ogni settimana prendi decisioni, non sempre facili</li>
+      <li>🏢 sali di livello e apri magazzini in tutta Italia</li>
+    </ul>
+    <p class="nota">Il gioco va avanti anche quando lo chiudi (fino a 8 ore).</p>
+    <button class="btn primario" data-azione="benvenuto-nuova">Inizia una nuova partita</button>
+    <button class="btn" data-azione="benvenuto-account">Ho già un account</button>
+  </div>`;
+}
 function vistaInizio() {
+  if (inizio.modo !== 'filiale' && !account.token && onlineAttivo() && !inizio.benvenuto) return vistaBenvenuto();
+  if (inizio.benvenuto === 'account' && !account.token) return `<button class="btn link indietro" data-azione="benvenuto-indietro">‹ Indietro</button>${vistaAccount()}`;
   const filiale = inizio.modo === 'filiale';
   if (inizio.fase === 'magazzino' && filiale) {
     const c = inizio.citta;
@@ -479,7 +498,7 @@ function vistaInizio() {
   }
   const voce = (c, i, gruppo) => `<button class="voce-citta" data-azione="scegli-citta" data-gruppo="${gruppo}" data-i="${i}" ${c.troppoPiccola ? 'disabled' : ''}><b>${esc(c.nome)}</b><span>${esc(c.dettaglio || '')}${c.troppoPiccola ? ` · <span class="meno">${esc(c.troppoPiccola)}: servono un capoluogo o ${intero.format(ABITANTI_MINIMI)} abitanti</span>` : c.abitanti ? ' · ' + intero.format(c.abitanti) + ' abitanti' : ''}</span></button>`;
   const risultati = inizio.risultati;
-  return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : vistaAccount()}<div style="display:grid;gap:10px">
+  return `${filiale ? '<button class="btn link indietro" data-azione="annulla-filiale">‹ Annulla</button>' : account.token ? vistaAccount() : (onlineAttivo() ? '<button class="btn link indietro" data-azione="benvenuto-indietro">‹ Indietro</button>' : '')}<div style="display:grid;gap:10px">
       <h2 style="margin:0;font-size:22px">${filiale ? 'In quale città apri la filiale?' : 'Dove apri la tua azienda?'}</h2>
       <p class="nota" style="margin:0">${filiale ? `Apertura ${eur.format(FILIALE.costo)} più il magazzino. La nuova città avrà le sue zone, il suo magazzino e i suoi magazzinieri.` : 'Scegli uno dei 20 capoluoghi di regione. Il magazzino è già nella zona industriale della città, le zone di consegna si creano da sole.'}</p>
       ${inizio.errore ? `<p class="nota meno">${esc(inizio.errore)}</p>` : ''}
@@ -1055,6 +1074,7 @@ function ridisegna() {
   document.querySelectorAll('.schede button').forEach(b => b.setAttribute('aria-selected', b.dataset.scheda === scheda));
   muoviIndicatore();
   aggiornaZoneMappa();
+  if (typeof aggiornaTutorial === 'function') aggiornaTutorial();
   daRidisegnare = false;
 }
 // la "goccia" di vetro sotto la scheda selezionata scivola da una scheda all'altra
@@ -1138,6 +1158,10 @@ $('#contenuto').addEventListener('click', e => {
     case 'attiva-notifiche': notifiche.stato = 'attesa'; ridisegna(); attivaNotifiche().then(() => { notifiche.stato = ''; ridisegna(); if (notificheAttive()) toast('Notifiche attive.'); }); break;
     case 'disattiva-notifiche': disattivaNotifiche().then(() => { ridisegna(); toast('Notifiche disattivate.'); }); break;
     case 'prova-notifica': provaNotifica().then(() => toast('Prova inviata: arriva tra pochi secondi.')).catch(e => toast(messaggioOnline(e))); break;
+    case 'rivedi-tutorial': iniziaTutorial(); toast('Tutorial ripartito.'); break;
+    case 'benvenuto-nuova': inizio.benvenuto = 'nuova'; ridisegna(); break;
+    case 'benvenuto-account': inizio.benvenuto = 'account'; ridisegna(); break;
+    case 'benvenuto-indietro': inizio.benvenuto = null; ridisegna(); break;
     case 'togli-logo': delete S.logo; salva(); aggiornaDepositiMappa(); ridisegna(); break;
     case 'salva-ora': salva(); if (account.token) salvaOnline(true).then(() => ridisegna()); toast(account.token ? 'Partita salvata, anche sul tuo account.' : 'Partita salvata su questo dispositivo. Con un account la ritrovi anche sul telefono.'); break;
     case 'vai-magazzino': { S.magAttivo = id; salva(); flottaAperti = null; pianoMostrato = null; const m = magazzino(id); if (m && mappa) mappa.flyTo({ center: [m.lng, m.lat], zoom: Math.max(mappa.getZoom(), 12) }); ridisegna(); break; }

@@ -624,3 +624,31 @@ tr.totale td { font-weight: 700; font-size: 16px; }
 /* sul telefono, a pannello alzato, i pulsanti a destra coprirebbero il pannello: si nascondono (il logo apre l'Azienda) */
 @media (max-width: 760px) { body[data-foglio="alto"] .pulsante-azienda { display: none; } }
 #logo { cursor: pointer; }
+/* ---------- benvenuto ---------- */
+.benvenuto { display: grid; gap: 12px; text-align: center; padding: 6px 4px 10px; }
+.benvenuto-logo { width: 96px; height: 96px; border-radius: 24px; margin: 0 auto; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.benvenuto h2 { margin: 0; font-size: 24px; }
+.benvenuto p { margin: 0; }
+.benvenuto ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; text-align: left; }
+.benvenuto li { padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.05); }
+/* ---------- tutorial ---------- */
+.tutorial { position: fixed; z-index: 40; top: 96px; left: 50%; transform: translateX(-50%); width: min(380px, calc(100vw - 20px));
+  padding: 14px 16px; border-radius: 22px; display: grid; gap: 6px; color: var(--testo);
+  background: rgba(24,24,28,.9); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid rgba(61,139,255,.55); box-shadow: 0 18px 50px rgba(0,0,0,.55); animation: entra-tut .35s ease; }
+@keyframes entra-tut { from { opacity: 0; } }
+.tutorial p { margin: 0; font-size: 14px; line-height: 1.45; opacity: .9; }
+.tut-testa { display: flex; justify-content: space-between; align-items: center; }
+.tut-num { font-size: 12px; font-weight: 600; color: var(--accento); text-transform: uppercase; letter-spacing: .04em; }
+.tut-x { border: 0; background: rgba(255,255,255,.08); color: var(--testo); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font: inherit; }
+.tut-titolo { font-size: 17px; }
+.tut-azioni { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
+.tut-azioni .btn.primario { margin-left: auto; }
+.tut-punti { display: flex; gap: 5px; justify-content: center; margin-top: 2px; }
+.tut-punti i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.2); }
+.tut-punti i.fatto { background: #30d158; } .tut-punti i.ora { background: var(--accento); width: 16px; border-radius: 3px; }
+.tutorial.ridotto p, .tutorial.ridotto .tut-azioni, .tutorial.ridotto .tut-punti { display: none; }
+.tut-evidenzia { position: relative; z-index: 2; animation: tut-pulsa 1.4s ease-in-out infinite; border-radius: 14px; }
+@keyframes tut-pulsa { 0%, 100% { box-shadow: 0 0 0 0 rgba(61,139,255,.0), 0 0 0 2px rgba(61,139,255,.9); } 50% { box-shadow: 0 0 0 8px rgba(61,139,255,.25), 0 0 0 2px rgba(61,139,255,.9); } }
+@media (max-width: 760px) { .tutorial { top: 84px; left: 10px; right: 64px; width: auto; transform: none; } }
+.pulsante-azienda[hidden] { display: none; }

@@ -70,7 +70,7 @@ function nuovaPartita(prezzi, citta, primoMagazzino, zonePronte, nomeAzienda) {
   // nei capoluoghi di regione il magazzino ha un punto e un prezzo fissi; si parte con il prezzo + 60.000 €
   const prezzoPrimo = citta.mag ? Math.round((COSTANTI.prezzoMagazzinoMin + 12000 * citta.raggio) / 5000) * 5000 : null;
   S = {
-    citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 3, xp: 0, licenze: {}, capoturno: false, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
+    citta: Object.assign(citta, { id: 'c1' }), filiali: [], versioneZone: 3, tutorial: { passo: 0, giorno: 0 }, xp: 0, licenze: {}, capoturno: false, zone: (zonePronte || generaZone(citta)).map(z => Object.assign(z, { cittaId: 'c1' })),
     depositi: [{ id: 'm1', cittaId: 'c1', nome: 'Magazzino 1', lng: primoMagazzino[0], lat: primoMagazzino[1], valore: prezzoPrimo || prezzoMagazzino(citta, primoMagazzino, true), migl: {} }], magAttivo: 'm1',
     versione: 1, seq: 0, giorno: 0,
     nomeAzienda: nomeAzienda || ('Logistica ' + citta.nome),
