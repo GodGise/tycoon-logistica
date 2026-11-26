@@ -50,7 +50,7 @@ function compraLicenza(idZona) {
   const z = zona(idZona); if (!z) return 'Zona non trovata.';
   if (haLicenza(z)) return 'Hai già la licenza per questa zona.';
   if (!puoComprareLicenze()) return 'Le licenze per la periferia si comprano dopo aver aperto il secondo magazzino.';
-  const p = prezzoLicenza(z); if (S.cassa < p) return `Servono ${p.toLocaleString('it-IT')} €.`;
+  const p = prezzoLicenza(z); if (S.cassa < p) return `Servono ${p.toLocaleString(LOCALE)} €.`;
   movimento('licenze', -p); S.licenze = S.licenze || {}; S.licenze[z.id] = true;
   notizia(`Licenza comprata: ora puoi consegnare in ${nomeZona(z)}.`, 'buono');
   return null;

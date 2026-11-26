@@ -1,15 +1,15 @@
 /* Tycoon Logistica – interfaccia: pannello laterale, schede, ciclo di gioco. */
 {
 const $ = s => document.querySelector(s);
-const eur = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0, useGrouping: true });
-const eur2 = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 3, maximumFractionDigits: 3 });
-const dec1 = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 });
-const eurCent = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const intero = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0, useGrouping: true });
+const eur = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0, useGrouping: true });
+const eur2 = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'EUR', minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const dec1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
+const eurCent = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const intero = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0, useGrouping: true });
 const segnato = n => `<span class="num ${n >= 0 ? 'piu' : 'meno'}">${n >= 0 ? '+' : '−'}${eur.format(Math.abs(n))}</span>`;
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // solo il giorno della settimana: niente numero, mese o anno
-const nomeGiorno = g => { const s = dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'long' }); return s[0].toUpperCase() + s.slice(1); };
+const nomeGiorno = g => { const s = dataDelGiorno(g).toLocaleDateString(LOCALE, { weekday: 'long' }); return s[0].toUpperCase() + s.slice(1); };
 const fmtData = g => S && g === S.giorno ? 'Oggi · ' + nomeGiorno(g) : S && g === S.giorno - 1 ? 'Ieri · ' + nomeGiorno(g) : nomeGiorno(g);
 const fmtFaGiorni = g => { const n = S ? S.giorno - g : 0; return n <= 0 ? 'oggi' : n === 1 ? 'ieri' : n + ' giorni fa'; };
 
@@ -81,6 +81,7 @@ function vistaAzienda() {
 /* ---------- impostazioni: nome, logo, account, salvataggio ---------- */
 function vistaImpostazioni() {
   return `<div class="scheda"><h2 style="margin:0">Impostazioni</h2>
+    <div class="riga"><span>Lingua</span><div class="filtri-chip"><button data-azione="lingua" data-id="it" aria-pressed="${!inglese()}">🇮🇹 Italiano</button><button data-azione="lingua" data-id="en" aria-pressed="${inglese()}">🇬🇧 English</button></div></div>
     <label class="nota" for="input-nome">Nome dell'azienda</label>
     <form class="cerca" data-azione="rinomina"><input id="input-nome" maxlength="40" value="${esc(S.nomeAzienda)}" aria-label="Nome dell'azienda"><button class="btn" type="submit">Rinomina</button></form>
   </div>
@@ -90,7 +91,7 @@ function vistaImpostazioni() {
       ${S.logo ? '<button class="btn" data-azione="togli-logo">Rimetti quello di base</button>' : ''}</div>
   </div>
   <div class="scheda"><h2 style="margin:0">Salvataggio</h2>
-    <p class="nota">La partita si salva da sola su questo dispositivo${account.token ? ' e sul tuo account' : ''}.${account.ultimo ? ` Ultimo salvataggio online alle ${new Date(account.ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}.` : ''}</p>
+    <p class="nota">La partita si salva da sola su questo dispositivo${account.token ? ' e sul tuo account' : ''}.${account.ultimo ? ` Ultimo salvataggio online alle ${new Date(account.ultimo).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })}.` : ''}</p>
     <button class="btn primario" data-azione="salva-ora">Salva la partita adesso</button>
   </div>
   ${vistaNotifiche()}
@@ -133,7 +134,7 @@ function caricaLogo(file) {
 
 function vistaObiettivoEContratti() {
   const o = S.obiettivo;
-  const quando = g => g === S.giorno ? 'oggi' : g === S.giorno + 1 ? 'domani' : dataDelGiorno(g).toLocaleDateString('it-IT', { weekday: 'long' });
+  const quando = g => g === S.giorno ? 'oggi' : g === S.giorno + 1 ? 'domani' : dataDelGiorno(g).toLocaleDateString(LOCALE, { weekday: 'long' });
   const ob = o ? `<div class="scheda obiettivo"><div class="riga"><span>Obiettivo di ${quando(o.giorno)}</span><b class="piu">+${eur.format(o.premio)}</b></div><div>${esc(o.testo)}</div></div>` : '';
   const ctr = S.contrattiAttivi.length ? `<div class="scheda"><h2 style="margin:0">Contratti firmati</h2>${S.contrattiAttivi.map(c => {
     const pronti = furgoniAdatti(c.zona, c.tipo).length;
@@ -181,7 +182,7 @@ function disegnaOfferta() {
     const pronti = furgoniAdatti(o.zona, o.tipo).length;
     const requisito = pronti ? `Hai ${pronti} furgon${pronti > 1 ? 'i' : 'e'} in questa zona` : 'Nessun furgone in questa zona: assegnane uno prima del giorno di consegna';
     el.innerHTML = `<div class="offerta-testa"><span class="badge">${t.nome}</span><span class="nota">Nuovo contratto</span></div>
-      <div class="offerta-corpo"><div><b>${esc(o.cliente)}</b><div class="nota">${o.pacchi} ${t.unita} in zona ${esc(nomeZona(z))} · ${o.giorno === S.giorno + 1 ? 'domani' : dataDelGiorno(o.giorno).toLocaleDateString('it-IT', { weekday: 'long' })} · ${eurCent.format(o.paga)} l'uno</div></div>
+      <div class="offerta-corpo"><div><b>${esc(o.cliente)}</b><div class="nota">${o.pacchi} ${t.unita} in zona ${esc(nomeZona(z))} · ${o.giorno === S.giorno + 1 ? 'domani' : dataDelGiorno(o.giorno).toLocaleDateString(LOCALE, { weekday: 'long' })} · ${eurCent.format(o.paga)} l'uno</div></div>
       <div class="offerta-totale">${eur.format(o.totale)}</div></div>
       <div class="nota ${pronti ? 'piu' : 'meno'}">${requisito}. Se non consegni tutto paghi una penale.</div>
       <div class="metro"><i id="offerta-tempo"></i></div>
@@ -308,7 +309,7 @@ let accountAttesa = false;
 function vistaAccount() {
   if (!onlineAttivo()) return '';
   if (account.token) {
-    const quando = account.ultimo ? new Date(account.ultimo).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : null;
+    const quando = account.ultimo ? new Date(account.ultimo).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) : null;
     return `<div class="scheda"><div class="riga"><h2 style="margin:0">Account</h2><span class="badge">${esc(account.nome)}</span></div>
       <p class="nota">La partita si salva online ogni 30 secondi${quando ? ' · ultimo salvataggio alle ' + quando : ''}. Accedi con lo stesso nome su un altro dispositivo per ritrovarla.</p>
       ${account.errore ? `<p class="nota meno">${esc(account.errore)}</p>` : ''}
@@ -694,8 +695,8 @@ function apriDettaglio(tipo, id) {
 window.apriDettaglio = apriDettaglio;
 
 /* ---------- grafici (scheda Conti) ---------- */
-const nomeMeseBreve = k => { const [a, m] = k.split('-'); return new Date(+a, +m - 1, 1).toLocaleDateString('it-IT', { month: 'short' }); };
-const compatto = n => { const a = Math.abs(n); return (n < 0 ? '−' : '') + (a >= 1e6 ? (a / 1e6).toLocaleString('it-IT', { maximumFractionDigits: 1 }) + ' mln' : a >= 1e3 ? Math.round(a / 1e3) + 'k' : Math.round(a)) + ' €'; };
+const nomeMeseBreve = k => { const [a, m] = k.split('-'); return new Date(+a, +m - 1, 1).toLocaleDateString(LOCALE, { month: 'short' }); };
+const compatto = n => { const a = Math.abs(n); return (n < 0 ? '−' : '') + (a >= 1e6 ? (a / 1e6).toLocaleString(LOCALE, { maximumFractionDigits: 1 }) + ' mln' : a >= 1e3 ? Math.round(a / 1e3) + 'k' : Math.round(a)) + ' €'; };
 function graficoCassa() {
   const s = S.serieCassa || [];
   if (s.length < 2) return `<div class="scheda"><h2 style="margin:0">Cassa giorno per giorno</h2><p class="nota">Il grafico compare dopo qualche giornata di lavoro.</p></div>`;
@@ -1158,6 +1159,7 @@ $('#contenuto').addEventListener('click', e => {
     case 'attiva-notifiche': notifiche.stato = 'attesa'; ridisegna(); attivaNotifiche().then(() => { notifiche.stato = ''; ridisegna(); if (notificheAttive()) toast('Notifiche attive.'); }); break;
     case 'disattiva-notifiche': disattivaNotifiche().then(() => { ridisegna(); toast('Notifiche disattivate.'); }); break;
     case 'prova-notifica': provaNotifica().then(() => toast('Prova inviata: arriva tra pochi secondi.')).catch(e => toast(messaggioOnline(e))); break;
+    case 'lingua': if ((id === 'en') !== inglese()) { salva(); scegliLingua(id); } break;
     case 'rivedi-tutorial': iniziaTutorial(); toast('Tutorial ripartito.'); break;
     case 'benvenuto-nuova': inizio.benvenuto = 'nuova'; ridisegna(); break;
     case 'benvenuto-account': inizio.benvenuto = 'account'; ridisegna(); break;

@@ -40,7 +40,7 @@ function accettaOfferta() {
   const o = S.offertaContratto; if (!o) return null;
   if (S.contrattiAttivi.length >= OFFERTA.maxAttivi) return `Puoi avere al massimo ${OFFERTA.maxAttivi} contratti aperti.`;
   S.contrattiAttivi.push(o); S.offertaContratto = null;
-  notizia(`Contratto firmato con ${o.cliente}: ${o.pacchi} ${TIPI_CARICO[o.tipo].unita} in zona ${zona(o.zona).nome}, ${o.totale.toLocaleString('it-IT')} €.`, 'buono');
+  notizia(`Contratto firmato con ${o.cliente}: ${o.pacchi} ${TIPI_CARICO[o.tipo].unita} in zona ${zona(o.zona).nome}, ${o.totale.toLocaleString(LOCALE)} €.`, 'buono');
   return null;
 }
 function rifiutaOfferta() { S.offertaContratto = null; }
@@ -90,9 +90,9 @@ function contrattiNonServiti() {
 
 function notiziaContratto(c) {
   if (c.fatti === c.pacchi) { S.contrattiCompletati = (S.contrattiCompletati || 0) + 1; }
-  if (c.fatti === c.pacchi) notizia(`Contratto ${c.cliente} completato: +${c.ricavo.toLocaleString('it-IT')} €.`, 'buono', 'ctr-' + c.id);
-  else if (!c.adatto) notizia(`Contratto ${c.cliente} fallito: nessun furgone in zona. Penale ${c.penale.toLocaleString('it-IT')} €.`, 'male', 'ctr-' + c.id);
-  else notizia(`Contratto ${c.cliente} consegnato a metà (${c.fatti}/${c.pacchi}): +${c.ricavo.toLocaleString('it-IT')} €, penale ${c.penale.toLocaleString('it-IT')} €.`, 'male', 'ctr-' + c.id);
+  if (c.fatti === c.pacchi) notizia(`Contratto ${c.cliente} completato: +${c.ricavo.toLocaleString(LOCALE)} €.`, 'buono', 'ctr-' + c.id);
+  else if (!c.adatto) notizia(`Contratto ${c.cliente} fallito: nessun furgone in zona. Penale ${c.penale.toLocaleString(LOCALE)} €.`, 'male', 'ctr-' + c.id);
+  else notizia(`Contratto ${c.cliente} consegnato a metà (${c.fatti}/${c.pacchi}): +${c.ricavo.toLocaleString(LOCALE)} €, penale ${c.penale.toLocaleString(LOCALE)} €.`, 'male', 'ctr-' + c.id);
 }
 
 /* ---------- obiettivo del giorno: si decide oggi per domani ---------- */

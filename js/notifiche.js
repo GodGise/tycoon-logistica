@@ -42,7 +42,7 @@ async function disattivaNotifiche() {
 
 // prova: una notifica subito (la funzione si chiama a mano invece di aspettare il giro dei 5 minuti)
 async function provaNotifica() {
-  await rpc('programma_notifiche', { p_token: account.token, p_lista: [{ tra_minuti: 0, titolo: S.nomeAzienda, testo: 'Le notifiche funzionano! 🚚' }] });
+  await rpc('programma_notifiche', { p_token: account.token, p_lista: [{ tra_minuti: 0, titolo: S.nomeAzienda, testo: tr('Le notifiche funzionano! 🚚') }] });
   await fetch(`${ONLINE.url}/functions/v1/invia-notifiche`, { method: 'POST' }).catch(() => {});
 }
 
@@ -75,7 +75,7 @@ function avvisiDaProgrammare() {
 // chiudi o metti in secondo piano: programma gli avvisi; torni: li cancella
 document.addEventListener('visibilitychange', () => {
   if (!notificheAttive() || !account.token || !S) return;
-  const lista = document.visibilityState === 'hidden' ? avvisiDaProgrammare() : [];
+  const lista = (document.visibilityState === 'hidden' ? avvisiDaProgrammare() : []).map(n => Object.assign(n, { titolo: tr(n.titolo), testo: tr(n.testo) }));
   rpc('programma_notifiche', { p_token: account.token, p_lista: lista }, true).catch(() => {});
 });
 

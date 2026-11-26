@@ -31,7 +31,7 @@ function controllaTraguardi() {
     if (!fatto) return;
     S.traguardi[t.id] = S.giorno;
     movimento('premi', t.premio);
-    notizia(`Traguardo sbloccato: ${t.nome.replace(/!$/, '')}! +${t.premio.toLocaleString('it-IT')} €`, 'buono', 'tr-' + t.id);
+    notizia(`Traguardo sbloccato: ${t.nome.replace(/!$/, '')}! +${t.premio.toLocaleString(LOCALE)} €`, 'buono', 'tr-' + t.id);
     nuovi.push(t);
   });
   if (nuovi.length) S.traguardiNuovi = (S.traguardiNuovi || []).concat(nuovi.map(t => t.id));
