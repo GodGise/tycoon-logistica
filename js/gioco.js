@@ -587,6 +587,13 @@ function carica() {
         S.versioneZone = 3;
       }
       if (!S.contrattiAttivi) S.contrattiAttivi = [];
+      // pulizia: niente contratti, offerte, giacenze o furgoni legati a zone che non esistono più (es. quelle in mare)
+      { const esiste = id => !id || id.startsWith(ZONA_JOLLY) || S.zone.some(z => z.id === id);
+        S.contrattiAttivi = S.contrattiAttivi.filter(c => esiste(c.zona));
+        if (S.offertaContratto && !esiste(S.offertaContratto.zona)) S.offertaContratto = null;
+        Object.keys(S.giacenze || {}).forEach(id => { if (!esiste(id)) delete S.giacenze[id]; });
+        Object.keys(S.licenze || {}).forEach(id => { if (!esiste(id)) delete S.licenze[id]; });
+        S.furgoni.forEach(f => { if (!esiste(f.zona)) f.zona = null; }); }
       // conti: aggiunge le voci nuove e ripara i valori rotti (NaN) delle versioni precedenti
       const ripara = v => { Object.keys(VOCI).forEach(k => { if (!Number.isFinite(v[k])) v[k] = 0; }); for (const k in v) if (!Number.isFinite(v[k])) v[k] = 0; };
       ripara(S.conti.voci); (S.storico || []).forEach(m => ripara(m.voci));
