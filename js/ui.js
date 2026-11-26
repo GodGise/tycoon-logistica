@@ -286,8 +286,9 @@ function disegnaEvento() {
 function mostraRiepilogoOffline(r) {
   const el = $('#finestra'); el.dataset.tipo = 'offline'; el.hidden = false;
   const ore = Math.floor(r.secondi / 3600), min = Math.round(r.secondi % 3600 / 60);
-  el.innerHTML = `<div class="finestra-corpo vetro"><span class="badge">Bentornato</span><h2>Mentre eri via</h2>
-    <p>Sono passat${ore ? 'e ' + ore + ' or' + (ore > 1 ? 'e' : 'a') + ' e ' : 'i '}${min} minuti${r.ridotto ? ' (si recuperano al massimo 2 ore)' : ''}: <b>${r.giorni} giorni</b> di lavoro per la tua azienda.</p>
+  const nota = r.lento ? '<p class="nota">Le prime 2 ore contano piene, quelle dopo a metà velocità (fino a 8 ore).</p>' : '';
+  el.innerHTML = `<div class="finestra-corpo vetro"><span class="badge">Bentornato</span><h2>Mentre eri via</h2>${nota}
+    <p>Sono passat${ore ? 'e ' + ore + ' or' + (ore > 1 ? 'e' : 'a') + ' e ' : 'i '}${min} minuti${r.ridotto ? ' (si recuperano al massimo 8 ore)' : ''}: <b>${r.giorni} giorni</b> di lavoro per la tua azienda.</p>
     <div class="riga"><span>Consegne</span><span class="num">${intero.format(r.consegne)}</span></div>
     <div class="riga"><span>Cassa</span>${segnato(r.differenza)}</div>
     <div class="scelte"><button class="btn primario" data-scelta="ok">Continua</button></div></div>`;

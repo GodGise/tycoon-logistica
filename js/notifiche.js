@@ -50,14 +50,17 @@ async function provaNotifica() {
 function avvisiDaProgrammare() {
   if (!S) return [];
   const minGiorno = COSTANTI.secondiPerGiorno / 60, lista = [];
-  const maxMin = Math.round(OFFLINE_MAX_SECONDI / 60);
-  // 1) il recupero a gioco chiuso arriva al massimo: da lì l'azienda si ferma
-  lista.push({ tra_minuti: maxMin, titolo: S.nomeAzienda, testo: `Sono passate ${maxMin / 60} ore: i tuoi furgoni hanno finito i giri. Torna a gestire l'azienda!` });
+  const maxMin = Math.round(OFFLINE_MAX_SECONDI / 60), pienoMin = Math.round(OFFLINE_PIENO_SECONDI / 60);
+  // minuti reali dopo cui passa un certo tempo di gioco (dopo 2 ore il tempo va a metà)
+  const realiPer = giocoMin => giocoMin <= pienoMin ? giocoMin : pienoMin + (giocoMin - pienoMin) * 2;
+  // 1) dopo 2 ore si rallenta, dopo 8 ore l'azienda si ferma
+  lista.push({ tra_minuti: pienoMin, titolo: S.nomeAzienda, testo: 'Sono passate 2 ore: da adesso, a gioco chiuso, la tua azienda va a metà velocità.' });
+  lista.push({ tra_minuti: maxMin, titolo: '🚚 Furgoni fermi', testo: `${S.nomeAzienda}: i furgoni sono fermi, serve il tuo intervento.` });
   // 2) la posta del lunedì (arriva durante il recupero)
   if (S.depositi.some(m => !m.responsabile)) {
     for (let g = 1; g <= 7; g++) {
       if (dataDelGiorno(S.giorno + g).getDay() === 1) {
-        const min = Math.round(g * minGiorno);
+        const min = Math.round(realiPer(g * minGiorno));
         if (min > 0 && min < maxMin) lista.push({ tra_minuti: min, titolo: '✉ Posta del lunedì', testo: 'È arrivata una nuova email: c\'è una decisione da prendere.' });
         break;
       }
@@ -65,7 +68,7 @@ function avvisiDaProgrammare() {
   }
   // 3) un'email sta per scadere (−1 di reputazione)
   const prima = (S.posta || []).filter(m => m.risposta === null && !m.report).sort((a, b) => a.scadenza - b.scadenza)[0];
-  if (prima) { const min = Math.round((prima.scadenza - S.giorno) * minGiorno); if (min > 0 && min < maxMin) lista.push({ tra_minuti: min, titolo: '⏳ Email in scadenza', testo: `"${prima.oggetto}": rispondi o perdi 1 punto di reputazione.` }); }
+  if (prima) { const min = Math.round(realiPer((prima.scadenza - S.giorno) * minGiorno)); if (min > 0 && min < maxMin) lista.push({ tra_minuti: min, titolo: '⏳ Email in scadenza', testo: `"${prima.oggetto}": rispondi o perdi 1 punto di reputazione.` }); }
   return lista;
 }
 
