@@ -55,7 +55,7 @@ function avvisiDaProgrammare() {
   const realiPer = giocoMin => giocoMin <= pienoMin ? giocoMin : pienoMin + (giocoMin - pienoMin) * 2;
   // 1) dopo 2 ore si rallenta, dopo 8 ore l'azienda si ferma
   lista.push({ tra_minuti: pienoMin, titolo: S.nomeAzienda, testo: 'Sono passate 2 ore: da adesso, a gioco chiuso, la tua azienda va a metà velocità.' });
-  lista.push({ tra_minuti: maxMin, titolo: S.nomeAzienda, testo: `Sono passate ${maxMin / 60} ore: i tuoi furgoni si sono fermati. Torna a gestire l'azienda!` });
+  lista.push({ tra_minuti: maxMin, titolo: '🚚 Furgoni fermi', testo: `${S.nomeAzienda}: i furgoni sono fermi, serve il tuo intervento.` });
   // 2) la posta del lunedì (arriva durante il recupero)
   if (S.depositi.some(m => !m.responsabile)) {
     for (let g = 1; g <= 7; g++) {
